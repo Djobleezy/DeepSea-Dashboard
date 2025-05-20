@@ -32,7 +32,7 @@
       const whale = document.createElement('div');
       whale.className = 'whale';
       whale.style.top = Math.random() * 100 + '%';
-      whale.style.left = '-10%';
+      whale.style.left = '-150px';
       whale.style.animationDuration = 8 + Math.random() * 4 + 's';
       whale.style.animationDelay = Math.random() * 6 + 's';
       whale.style.fontSize = 2 + Math.random() * 2 + 'rem';
