@@ -261,6 +261,10 @@ For optimal performance:
 9. Alt + W on Dashboard resets wallet configuration and redirects to Boot sequence
 10. If block event lines persist across sessions, use `window.clearBlockAnnotations()` in the browser console to clear them. Older annotations are automatically pruned.
 
+## Easter Egg
+
+Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief deep sea surprise!
+
 ## Debug Logging
 
 Client-side logging can be noisy in production. All `console.log` calls are now
