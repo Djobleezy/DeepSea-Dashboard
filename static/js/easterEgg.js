@@ -1,6 +1,7 @@
 (function() {
   const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
   let index = 0;
+  let cursorClicks = [];
 
   function handleKey(e) {
     if (e.key === konami[index]) {
@@ -19,15 +20,20 @@
 
     const overlay = document.createElement('div');
     overlay.id = 'easterEggOverlay';
-    if (localStorage.getItem('useDeepSeaTheme') === 'true') {
+    const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+    if (useDeepSea) {
       overlay.classList.add('deepsea');
+    } else {
+      overlay.classList.add('bitcoin');
     }
 
     const text = document.createElement('div');
-    text.textContent = 'DeepSea Discovery!';
+    text.textContent = useDeepSea ? 'DeepSea Discovery!' : 'Bitcoin Surprise!';
     overlay.appendChild(text);
 
-    const whaleCount = Math.max(20, Math.floor(window.innerHeight / 30));
+    const whaleCount = window.innerWidth < 600
+      ? 10
+      : Math.max(20, Math.floor(window.innerHeight / 30));
     for (let i = 0; i < whaleCount; i++) {
       const whale = document.createElement('div');
       whale.className = 'whale';
@@ -45,4 +51,24 @@
   }
 
   window.addEventListener('keydown', handleKey);
+
+  function handleCursorClick() {
+    const now = Date.now();
+    cursorClicks.push(now);
+    cursorClicks = cursorClicks.filter(t => now - t < 2000);
+    if (cursorClicks.length >= 10) {
+      trigger();
+      cursorClicks = [];
+    }
+  }
+
+  function cursorListener(e) {
+    const target = e.target;
+    if (target.id === 'terminal-cursor' || target.classList.contains('terminal-cursor')) {
+      handleCursorClick();
+    }
+  }
+
+  window.addEventListener('click', cursorListener);
+  window.addEventListener('touchstart', cursorListener);
 })();

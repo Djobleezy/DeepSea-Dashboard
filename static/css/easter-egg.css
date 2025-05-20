@@ -20,6 +20,10 @@
   color: #00aaff;
 }
 
+#easterEggOverlay.bitcoin {
+  color: #f7931a;
+}
+
 #easterEggOverlay .whale {
   position: absolute;
   font-size: 3rem;
@@ -30,4 +34,14 @@
 @keyframes swim {
   from { transform: translateX(0); }
   to { transform: translateX(calc(100vw + 200px)); }
+}
+
+@media (max-width: 600px) {
+  #easterEggOverlay {
+    font-size: 1.2rem;
+  }
+
+  #easterEggOverlay .whale {
+    font-size: 2rem;
+  }
 }
