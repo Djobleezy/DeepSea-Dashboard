@@ -1434,43 +1434,45 @@ def earnings():
             'CHF': 'Fr'
         }
         
+        error_message = None
+
         # Add graceful error handling for earnings data
         try:
             # Get earnings data with a longer timeout
             earnings_data = dashboard_service.get_earnings_data()
+            state_manager.save_last_earnings(earnings_data)
         except requests.exceptions.ReadTimeout:
             logging.warning("Timeout fetching earnings data from ocean.xyz - using cached or fallback data")
-            # Try to use cached metrics as fallback
-            if cached_metrics and 'unpaid_earnings' in cached_metrics:
-                # Create minimal earnings data from cached metrics
-                earnings_data = {
-                    'payments': [],
-                    'total_payments': 0,
-                    'total_paid_btc': 0,
-                    'total_paid_sats': 0,
-                    'total_paid_usd': 0,
-                    'unpaid_earnings': cached_metrics.get('unpaid_earnings', 0),
-                    'unpaid_earnings_sats': int(float(cached_metrics.get('unpaid_earnings', 0)) * 100000000),
-                    'est_time_to_payout': cached_metrics.get('est_time_to_payout', 'Unknown'),
-                    'monthly_summaries': [],
-                    'timestamp': datetime.now(ZoneInfo(user_timezone)).isoformat()
-                }
-            else:
-                # Create empty fallback data
-                earnings_data = {
-                    'payments': [],
-                    'total_payments': 0,
-                    'total_paid_btc': 0,
-                    'total_paid_sats': 0,
-                    'total_paid_usd': 0,
-                    'unpaid_earnings': 0,
-                    'unpaid_earnings_sats': 0,
-                    'est_time_to_payout': 'Unknown',
-                    'monthly_summaries': [],
-                    'timestamp': datetime.now(ZoneInfo(user_timezone)).isoformat()
-                }
-            
-            # Add notification about timeout
+            error_message = "Timeout fetching earnings data. Showing cached information."
+            earnings_data = state_manager.get_last_earnings() or {}
+            if not earnings_data:
+                if cached_metrics and 'unpaid_earnings' in cached_metrics:
+                    earnings_data = {
+                        'payments': [],
+                        'total_payments': 0,
+                        'total_paid_btc': 0,
+                        'total_paid_sats': 0,
+                        'total_paid_usd': 0,
+                        'unpaid_earnings': cached_metrics.get('unpaid_earnings', 0),
+                        'unpaid_earnings_sats': int(float(cached_metrics.get('unpaid_earnings', 0)) * 100000000),
+                        'est_time_to_payout': cached_metrics.get('est_time_to_payout', 'Unknown'),
+                        'monthly_summaries': [],
+                        'timestamp': datetime.now(ZoneInfo(user_timezone)).isoformat()
+                    }
+                else:
+                    earnings_data = {
+                        'payments': [],
+                        'total_payments': 0,
+                        'total_paid_btc': 0,
+                        'total_paid_sats': 0,
+                        'total_paid_usd': 0,
+                        'unpaid_earnings': 0,
+                        'unpaid_earnings_sats': 0,
+                        'est_time_to_payout': 'Unknown',
+                        'monthly_summaries': [],
+                        'timestamp': datetime.now(ZoneInfo(user_timezone)).isoformat()
+                    }
+
             notification_service.add_notification(
                 "Data fetch timeout",
                 "Unable to fetch payment history data from Ocean.xyz. Showing limited earnings data.",
@@ -1479,8 +1481,8 @@ def earnings():
             )
         except Exception as e:
             logging.error(f"Error fetching earnings data: {e}")
-            # Create empty fallback data
-            earnings_data = {
+            error_message = f"Error fetching earnings data: {e}"
+            earnings_data = state_manager.get_last_earnings() or {
                 'payments': [],
                 'total_payments': 0,
                 'total_paid_btc': 0,
@@ -1490,11 +1492,9 @@ def earnings():
                 'unpaid_earnings_sats': 0,
                 'est_time_to_payout': 'Unknown',
                 'monthly_summaries': [],
-                'error': str(e),
                 'timestamp': datetime.now(ZoneInfo(user_timezone)).isoformat()
             }
-            
-            # Add notification about error
+
             notification_service.add_notification(
                 "Error fetching earnings data",
                 f"Error: {str(e)}",
@@ -1540,8 +1540,9 @@ def earnings():
                             month['total_fiat'] = month['total_usd']
         
         return render_template(
-            'earnings.html', 
+            'earnings.html',
             earnings=earnings_data,
+            error_message=error_message,
             user_currency=user_currency,
             user_timezone=user_timezone,
             currency_symbols=currency_symbols,
@@ -1559,6 +1560,7 @@ def api_earnings():
     try:
         # Get the earnings data with a reasonable timeout
         earnings_data = dashboard_service.get_earnings_data()
+        state_manager.save_last_earnings(earnings_data)
         return jsonify(earnings_data)
     except Exception as e:
         logging.error(f"Error in earnings API endpoint: {e}")

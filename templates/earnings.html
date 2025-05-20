@@ -14,11 +14,14 @@
 
 {% block content %}
 <div class="dashboard-container">
+    {% if error_message %}
+    <div class="error-banner">{{ error_message }}</div>
+    {% endif %}
 
     <!-- Summary Cards Section -->
     <div class="stats-grid">
         <div class="stat-card">
-            <h2>Unpaid Earnings</h2>
+            <h2><i class="fa-solid fa-coins"></i> Unpaid Earnings</h2>
             <div class="stat-value">
                 <span id="unpaid-sats">{{ earnings.unpaid_earnings_sats|default(0)|int|commafy }}</span>
                 <span class="stat-unit">sats</span>
@@ -30,7 +33,7 @@
         </div>
 
         <div class="stat-card">
-            <h2>Total Paid</h2>
+            <h2><i class="fa-solid fa-wallet"></i> Total Paid</h2>
             <div class="stat-value">
                 <span id="total-paid-sats">{{ earnings.total_paid_sats|default(0)|int|commafy }}</span>
                 <span class="stat-unit">sats</span>
@@ -44,7 +47,7 @@
         </div>
 
         <div class="stat-card">
-            <h2>Total Payments</h2>
+            <h2><i class="fa-solid fa-file-invoice-dollar"></i> Total Payments</h2>
             <div class="stat-value">
                 <span id="payment-count">{{ earnings.total_payments|default(0) }}</span>
             </div>
@@ -65,6 +68,9 @@
     <!-- Monthly Summaries Section -->
     <div class="earnings-section">
         <h2>Monthly Summary</h2>
+        <div class="chart-container">
+            <canvas id="earningsChart"></canvas>
+        </div>
         <div class="table-container">
             <table class="earnings-table">
                 <thead>
@@ -144,6 +150,7 @@
     const userCurrency = "{{ user_currency }}";
     const userTimezone = "{{ user_timezone }}";
     const currencySymbol = "{{ currency_symbols[user_currency] }}";
+    const monthlySummaries = {{ earnings.monthly_summaries | tojson | safe }};
 </script>
 {% endblock %}
 
