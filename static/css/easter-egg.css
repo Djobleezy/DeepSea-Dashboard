@@ -31,17 +31,33 @@
   pointer-events: none;
 }
 
+#easterEggOverlay .btc {
+  position: absolute;
+  font-size: 3rem;
+  animation: spin-move 12s linear infinite;
+  pointer-events: none;
+}
+
 @keyframes swim {
   from { transform: translateX(0); }
   to { transform: translateX(calc(100vw + 200px)); }
 }
 
-@media (max-width: 600px) {
-  #easterEggOverlay {
-    font-size: 1.2rem;
-  }
-
-  #easterEggOverlay .whale {
-    font-size: 2rem;
-  }
+@keyframes spin-move {
+  from { transform: translateX(0) rotate(0deg); }
+  to { transform: translateX(calc(100vw + 200px)) rotate(720deg); }
 }
+
+@media (max-width: 600px) {
+    #easterEggOverlay {
+      font-size: 1.2rem;
+    }
+
+    #easterEggOverlay .whale {
+      font-size: 2rem;
+    }
+
+    #easterEggOverlay .btc {
+      font-size: 2rem;
+    }
+  }

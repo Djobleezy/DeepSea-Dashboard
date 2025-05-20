@@ -31,19 +31,25 @@
     text.textContent = useDeepSea ? 'DeepSea Discovery!' : 'Bitcoin Surprise!';
     overlay.appendChild(text);
 
-    const whaleCount = window.innerWidth < 600
+    const iconCount = window.innerWidth < 600
       ? 10
       : Math.max(20, Math.floor(window.innerHeight / 30));
-    for (let i = 0; i < whaleCount; i++) {
-      const whale = document.createElement('div');
-      whale.className = 'whale';
-      whale.style.top = Math.random() * 100 + '%';
-      whale.style.left = '-150px';
-      whale.style.animationDuration = 8 + Math.random() * 4 + 's';
-      whale.style.animationDelay = Math.random() * 6 + 's';
-      whale.style.fontSize = 2 + Math.random() * 2 + 'rem';
-      whale.textContent = '🐳';
-      overlay.appendChild(whale);
+
+    for (let i = 0; i < iconCount; i++) {
+      const icon = document.createElement('div');
+      if (useDeepSea) {
+        icon.className = 'whale';
+        icon.textContent = '🐳';
+      } else {
+        icon.className = 'btc';
+        icon.textContent = '₿';
+      }
+      icon.style.top = Math.random() * 100 + '%';
+      icon.style.left = '-150px';
+      icon.style.animationDuration = 8 + Math.random() * 4 + 's';
+      icon.style.animationDelay = Math.random() * 6 + 's';
+      icon.style.fontSize = 2 + Math.random() * 2 + 'rem';
+      overlay.appendChild(icon);
     }
 
     document.body.appendChild(overlay);
