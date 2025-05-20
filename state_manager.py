@@ -45,9 +45,13 @@ class StateManager:
         self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
         self.payout_history = []
 
+        # Cache for last successful earnings fetch
+        self.last_earnings = {}
+
         # Load state if available
         self.load_graph_state()
         self.load_payout_history()
+        self.load_last_earnings()
         
     def _connect_to_redis(self, redis_url):
         """
@@ -566,3 +570,34 @@ class StateManager:
                 self.redis_client.delete("payout_history")
         except Exception as e:
             logging.error(f"Error clearing payout history from Redis: {e}")
+
+    # ------------------------------------------------------------------
+    # Last earnings caching
+    # ------------------------------------------------------------------
+    def load_last_earnings(self):
+        """Load last successful earnings data from Redis."""
+        if not self.redis_client:
+            return
+        try:
+            data = self.redis_client.get("last_earnings")
+            if data:
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8")
+                self.last_earnings = json.loads(data)
+        except Exception as e:
+            logging.error(f"Error loading last earnings from Redis: {e}")
+
+    def save_last_earnings(self, earnings):
+        """Save earnings data to Redis and memory."""
+        try:
+            self.last_earnings = earnings
+            if self.redis_client:
+                self.redis_client.set("last_earnings", json.dumps(earnings))
+            return True
+        except Exception as e:
+            logging.error(f"Error saving last earnings: {e}")
+            return False
+
+    def get_last_earnings(self):
+        """Return the last cached earnings data."""
+        return self.last_earnings
