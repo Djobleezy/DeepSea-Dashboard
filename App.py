@@ -23,7 +23,7 @@ from notification_service import NotificationService, NotificationLevel, Notific
 from config import load_config, save_config
 from data_service import MiningDashboardService
 from worker_service import WorkerService
-from state_manager import StateManager
+from state_manager import StateManager, MAX_HISTORY_ENTRIES
 from config import get_timezone
 
 # Memory management configuration
@@ -589,12 +589,8 @@ def stream():
     except ValueError:
         start_event_id = 0
 
-    try:
-        num_points = int(request.args.get("points", 180))
-        if num_points not in [30, 60, 180]:
-            num_points = 180
-    except Exception:
-        num_points = 180
+    # The server now always streams the full history (MAX_HISTORY_ENTRIES)
+    num_points = MAX_HISTORY_ENTRIES
 
     def event_stream(start_event_id, num_points):
         global active_sse_connections, cached_metrics
@@ -625,15 +621,7 @@ def stream():
             except ValueError:
                 connection_event_id = 0
 
-            # Parse the number of points once per connection
-            try:
-                parsed_points = int(request.args.get('points', num_points))
-                if parsed_points not in [30, 60, 180]:
-                    parsed_points = 180
-            except Exception:
-                parsed_points = 180
-            num_points = parsed_points
-            logging.info(f"SSE {client_id}: Using {num_points} data points")
+            logging.info(f"SSE {client_id}: Streaming {num_points} history points")
 
             # Send initial data immediately to prevent delay in dashboard updates
             if cached_metrics:
@@ -651,9 +639,9 @@ def stream():
                         # Create a slimmer version with essential fields for SSE updates
                         sse_metrics = {k: v for k, v in cached_metrics.items()}
     
-                        # Use the parsed num_points value
+                        # Trim history if necessary
 
-                        # If arrow_history is very large, only send the requested number of points
+                        # If arrow_history is very large, only send the configured number of points
                         if 'arrow_history' in sse_metrics:
                             for key, values in sse_metrics['arrow_history'].items():
                                 if len(values) > num_points:

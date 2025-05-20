@@ -684,8 +684,9 @@ function setChartPoints(points) {
         console.error("Error storing chart points preference", e);
     }
 
-    showLoadingOverlay('trendGraph');
-    setupEventSource();
+    // No need to reconnect SSE when toggling chart view
+    // The current metrics already contain all history points
+    // and updateChartWithNormalizedData will re-render the chart
 }
 
 function showLoadingOverlay(elementId) {
@@ -1419,10 +1420,10 @@ function setupEventSource() {
 
     // Always use absolute URL with origin to ensure it works from any path
     const baseUrl = window.location.origin;
-    // Include points parameter in the stream URL
-    const streamUrl = `${baseUrl}/stream?points=${chartPoints}`;
+    // The server now always streams the full history so no points parameter is needed
+    const streamUrl = `${baseUrl}/stream`;
 
-    console.log(`Setting up EventSource with ${chartPoints} data points`);
+    console.log('Setting up EventSource using shared history');
 
     // Clear any existing ping interval
     if (pingInterval) {
