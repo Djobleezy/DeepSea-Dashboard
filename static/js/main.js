@@ -918,6 +918,7 @@ function trackPayoutPerformance(data) {
             lastPayoutTracking.payoutHistory.pop();
         }
 
+        updateAvgDaysFromHistory();
 
         try {
             localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
