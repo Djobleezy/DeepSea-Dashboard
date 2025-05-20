@@ -1,8 +1,5 @@
 // earnings.js
 document.addEventListener('DOMContentLoaded', function () {
-    if (window.PageLoader) {
-        PageLoader.show('Loading earnings...');
-    }
     console.log('Earnings page loaded');
 
     // Add refresh functionality if needed
@@ -16,9 +13,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize the system monitor
     initializeSystemMonitor();
-    if (window.PageLoader) {
-        PageLoader.hide();
-    }
 });
 
 // Initialize the BitcoinMinuteRefresh system monitor

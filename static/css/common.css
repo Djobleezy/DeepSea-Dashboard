@@ -1229,39 +1229,3 @@ html.deepsea-theme #congratsMessage {
     border-right: 3px solid var(--primary-color);
   }
 }
-
-/* ----- PAGE LOADER ----- */
-#page-loader {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 9998;
-  font-family: var(--terminal-font);
-}
-
-html.bitcoin-theme #page-loader {
-  background-color: #111111;
-  color: #f2a900;
-}
-
-html.deepsea-theme #page-loader {
-  background-color: #0c141a;
-  color: #0088cc;
-}
-
-#page-loader-icon {
-  font-size: 48px;
-  margin-bottom: 20px;
-  animation: spin 2s infinite linear;
-}
-
-#page-loader-text {
-  font-size: 24px;
-  text-transform: uppercase;
-}
