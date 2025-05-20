@@ -996,7 +996,7 @@ class MiningDashboardService:
             dict: Worker data dictionary with stats and list of workers
         """
         logging.info("Attempting to get worker data from Ocean.xyz")
-        
+
         # First try the alternative method as it's more robust
         result = self.get_worker_data_alternative()
         
@@ -1035,6 +1035,24 @@ class MiningDashboardService:
                 return result
             else:
                 logging.warning("Original method found workers but with invalid names")
+
+        # If original method also failed, try fetching from the official API
+        logging.info("Trying API worker data method")
+        result = self.get_worker_data_api()
+
+        if result and result.get('workers') and len(result['workers']) > 0:
+            has_valid_workers = False
+            for worker in result['workers']:
+                name = worker.get('name', '').lower()
+                if name and name not in ['online', 'offline', 'total', 'worker', 'status']:
+                    has_valid_workers = True
+                    break
+
+            if has_valid_workers:
+                logging.info(f"API worker data method successful: {len(result['workers'])} workers with valid names")
+                return result
+            else:
+                logging.warning("API method found workers but with invalid names")
                 
         # If both methods failed or found workers with invalid names, use fallback data
         logging.warning("Both worker data fetch methods failed to get valid names, using fallback data")
@@ -1422,4 +1440,92 @@ class MiningDashboardService:
 
         except Exception as e:
             logging.error(f"Error in alternative worker data fetch: {e}")
+            return None
+
+    def get_worker_data_api(self):
+        """Fetch worker data using the Ocean.xyz API."""
+        api_base = "https://api.ocean.xyz/v1"
+        try:
+            url = f"{api_base}/user_hashrate_full/{self.wallet}"
+            logging.info(f"Fetching worker data from API: {url}")
+            resp = self.session.get(url, timeout=10)
+            if not resp.ok:
+                logging.error(f"API user_hashrate_full request failed: {resp.status_code}")
+                return None
+
+            data = resp.json()
+            workers_obj = data.get("workers") or data.get("result", {}).get("workers")
+            if not workers_obj:
+                # Some API responses may store workers inside 'user_hashrate'
+                workers_obj = data.get("user_hashrate", {}).get("workers")
+
+            if not workers_obj:
+                # If still empty, maybe the response is a list
+                if isinstance(data, list):
+                    workers_iter = [(w.get("workername") or w.get("name"), w) for w in data]
+                else:
+                    logging.warning("No worker info returned from API")
+                    return None
+            else:
+                workers_iter = workers_obj.items() if isinstance(workers_obj, dict) else [
+                    (w.get("workername") or w.get("name"), w) for w in workers_obj
+                ]
+
+            workers = []
+            total_hashrate = 0
+            workers_online = 0
+            workers_offline = 0
+            invalid_names = ['online', 'offline', 'status', 'worker', 'total']
+
+            for name, info in workers_iter:
+                if not name or name.lower() in invalid_names:
+                    continue
+
+                hr3 = info.get("hashrate_10800") or info.get("hashrate_7200") or info.get("hashrate_3600") or info.get("hashrate_300s")
+                hr60 = info.get("hashrate_60s") or 0
+
+                status = "online" if (hr60 or hr3) else "offline"
+
+                worker = {
+                    "name": name,
+                    "status": status,
+                    "type": "ASIC",
+                    "model": "Unknown",
+                    "hashrate_60sec": hr60 or 0,
+                    "hashrate_60sec_unit": "H/s",
+                    "hashrate_3hr": hr3 or 0,
+                    "hashrate_3hr_unit": "H/s",
+                    "efficiency": 0,
+                    "last_share": "N/A",
+                    "earnings": 0,
+                    "power_consumption": 0,
+                    "temperature": 0,
+                }
+
+                if status == "online":
+                    workers_online += 1
+                else:
+                    workers_offline += 1
+
+                total_hashrate += convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                workers.append(worker)
+
+            if not workers:
+                logging.warning("API worker data returned no valid workers")
+                return None
+
+            result = {
+                'workers': workers,
+                'total_hashrate': total_hashrate,
+                'hashrate_unit': 'TH/s',
+                'workers_total': len(workers),
+                'workers_online': workers_online,
+                'workers_offline': workers_offline,
+                'total_earnings': 0,
+                'timestamp': datetime.now(ZoneInfo(get_timezone())).isoformat()
+            }
+
+            return result
+        except Exception as e:
+            logging.error(f"Error in API worker data fetch: {e}")
             return None

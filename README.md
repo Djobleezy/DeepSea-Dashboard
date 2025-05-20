@@ -56,6 +56,7 @@ This open-source dashboard provides real-time monitoring for Ocean.xyz pool mine
 ### System Resilience
 - **Connection Recovery**: Automatic reconnection after network interruptions
 - **Backup Polling**: Fallback to traditional polling if real-time connection fails
+- **API Worker Fallback**: Uses the Ocean.xyz API for worker lists when HTML parsing fails
 - **Cross-Tab Synchronization**: Data consistency across multiple browser tabs
 - **Server Health Monitoring**: Built-in watchdog processes ensure reliability
 - **Error Handling**: Displays a user-friendly error page (`error.html`) for unexpected issues.

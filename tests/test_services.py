@@ -198,3 +198,30 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
     assert data['total_paid_btc'] == 100 / svc.sats_per_btc
 
 
+def test_get_worker_data_api(monkeypatch):
+    svc = MiningDashboardService(0, 0, 'w')
+
+    sample = {
+        'workers': {
+            'rig1': {'hashrate_60s': 100, 'hashrate_3600': 1000},
+            'rig2': {'hashrate_60s': 0, 'hashrate_3600': 0},
+        }
+    }
+
+    def fake_get(url, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = sample
+        return resp
+
+    monkeypatch.setattr(svc.session, 'get', fake_get)
+    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
+
+    data = svc.get_worker_data_api()
+
+    assert data['workers_total'] == 2
+    assert data['workers_online'] == 1
+    names = {w['name'] for w in data['workers']}
+    assert 'rig1' in names and 'rig2' in names
+
+
