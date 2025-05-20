@@ -940,30 +940,9 @@ function trackPayoutPerformance(data) {
                 // Format the difference for display
                 const formattedDifference = formatTimeDifference(differenceMinutes);
 
-                // Calculate accuracy as a percentage (improved algorithm)
-                // The closer the actual time is to the estimated time, the higher the accuracy
-                let accuracyPercent = 100; // Start with perfect accuracy
-
-                // Calculate actual time deviation
-                const absMinutesDiff = Math.abs(differenceMinutes);
-
-                // Calculate accuracy based on deviation relative to estimated time
-                if (absMinutesDiff <= estimatedMinutes * 0.1) {
-                    // Within 10% of estimate: Very accurate (90-100%)
-                    accuracyPercent = Math.max(90, 100 - (absMinutesDiff / estimatedMinutes) * 100);
-                } else if (absMinutesDiff <= estimatedMinutes * 0.3) {
-                    // Within 30% of estimate: Good accuracy (70-90%)
-                    accuracyPercent = Math.max(70, 90 - (absMinutesDiff / estimatedMinutes) * 100);
-                } else if (absMinutesDiff <= estimatedMinutes * 0.6) {
-                    // Within 60% of estimate: Fair accuracy (50-70%)
-                    accuracyPercent = Math.max(50, 70 - (absMinutesDiff / estimatedMinutes) * 50);
-                } else {
-                    // Greater deviation: Poor accuracy (below 50%)
-                    accuracyPercent = Math.max(0, 50 - (absMinutesDiff / estimatedMinutes) * 25);
-                }
-
-                // Round to nearest whole percent
-                accuracyPercent = Math.round(accuracyPercent);
+                // Calculate accuracy using a consistent formula
+                const actualMinutes = estimatedMinutes + differenceMinutes;
+                const accuracyPercent = calculatePayoutAccuracy(estimatedMinutes, actualMinutes);
 
                 // Historical prediction using average days between payouts
                 let histEstimate = 'N/A';
@@ -979,11 +958,10 @@ function trackPayoutPerformance(data) {
                         const prev = new Date(lastPayoutTracking.payoutHistory[0].timestamp);
                         const actualInterval = (actualPayoutTime - prev) / 60000;
                         histActual = formatMinutesToTime(actualInterval);
-                        const diff = Math.abs(actualInterval - histMinutes);
-                        const acc = Math.max(0, 100 - (diff / histMinutes) * 100);
-                        histAccuracy = acc.toFixed(0) + '%';
-                    }
+                    const acc = calculatePayoutAccuracy(histMinutes, actualInterval);
+                    histAccuracy = acc + '%';
                 }
+            }
 
                 // Store the payout comparison with enhanced data
                 const payoutComparison = {
@@ -1079,6 +1057,17 @@ function parseEstimatedTimeToMinutes(timeString) {
     }
 
     return minutes;
+}
+
+// Calculate how close the actual payout time was to the estimate
+function calculatePayoutAccuracy(expectedMinutes, actualMinutes) {
+    if (!expectedMinutes || expectedMinutes <= 0) {
+        return 0;
+    }
+
+    const diff = Math.abs(actualMinutes - expectedMinutes);
+    const accuracy = 100 - (diff / expectedMinutes) * 100;
+    return Math.max(0, Math.min(100, Math.round(accuracy)));
 }
 
 // Format time difference in minutes to a readable string
@@ -1596,8 +1585,9 @@ function verifyPayoutsAgainstOfficial() {
                         detectedPayout.expectedTime = formatMinutesToTime(estMinutes);
                         detectedPayout.difference = formatTimeDifference(diffMinutes);
 
-                        let accuracy = Math.max(0, 100 - (Math.abs(diffMinutes) / 10));
-                        detectedPayout.accuracy = `${accuracy.toFixed(0)}%`;
+                        const actualMinutes = (actual - estimateStart) / 60000;
+                        const accuracy = calculatePayoutAccuracy(estMinutes, actualMinutes);
+                        detectedPayout.accuracy = `${accuracy}%`;
                         console.log(`Calculated accuracy for previous payout: ${detectedPayout.accuracy}`);
                     }
 
