@@ -20,7 +20,15 @@ const BitcoinMinuteRefresh = (function () {
         UPTIME_MINUTES: 'uptime-minutes',
         UPTIME_SECONDS: 'uptime-seconds',
         MINIMIZED_UPTIME: 'minimized-uptime-value',
-        SHOW_BUTTON: 'bitcoin-terminal-show'
+        SHOW_BUTTON: 'bitcoin-terminal-show',
+        MEM_GAUGE: 'memory-gauge-fill',
+        MEM_TEXT: 'memory-percent',
+        CONN_TEXT: 'connection-count',
+        SCHED_STATUS: 'scheduler-status',
+        SCHED_LAST: 'scheduler-last',
+        DATA_AGE: 'data-age',
+        PREV_BTN: 'monitor-prev',
+        NEXT_BTN: 'monitor-next'
     };
     // Add these new keys to the STORAGE_KEYS constant
     const STORAGE_KEYS = {
@@ -831,7 +839,7 @@ const BitcoinMinuteRefresh = (function () {
         terminalElement.id = DOM_IDS.TERMINAL;
         terminalElement.className = 'bitcoin-terminal';
 
-        // Terminal content - simplified for uptime-only
+        // Terminal content with multiple pages
         terminalElement.innerHTML = `
           <div class="terminal-header">
             <div class="terminal-title">SYSTEM MONITOR v.3</div>
@@ -845,31 +853,55 @@ const BitcoinMinuteRefresh = (function () {
             </div>
           </div>
           <div class="terminal-content">
-            <div class="status-row">
-              <div class="status-indicator">
-                <div class="status-dot connected"></div>
-                <span>LIVE</span>
+            <div class="monitor-page" data-page="0">
+              <div class="status-row">
+                <div class="status-indicator">
+                  <div class="status-dot connected"></div>
+                  <span>LIVE</span>
+                </div>
+                <span id="${DOM_IDS.CLOCK}" class="terminal-clock">00:00:00</span>
               </div>
-              <span id="${DOM_IDS.CLOCK}" class="terminal-clock">00:00:00</span>
+              <div id="uptime-timer" class="uptime-timer">
+                <div class="uptime-title">UPTIME</div>
+                <div class="uptime-display">
+                  <div class="uptime-value">
+                    <span id="${DOM_IDS.UPTIME_HOURS}" class="uptime-number">00</span>
+                    <span class="uptime-label">H</span>
+                  </div>
+                  <div class="uptime-separator">:</div>
+                  <div class="uptime-value">
+                    <span id="${DOM_IDS.UPTIME_MINUTES}" class="uptime-number">00</span>
+                    <span class="uptime-label">M</span>
+                  </div>
+                  <div class="uptime-separator">:</div>
+                  <div class="uptime-value">
+                    <span id="${DOM_IDS.UPTIME_SECONDS}" class="uptime-number">00</span>
+                    <span class="uptime-label">S</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div id="uptime-timer" class="uptime-timer">
-              <div class="uptime-title">UPTIME</div>
-              <div class="uptime-display">
-                <div class="uptime-value">
-                  <span id="${DOM_IDS.UPTIME_HOURS}" class="uptime-number">00</span>
-                  <span class="uptime-label">H</span>
-                </div>
-                <div class="uptime-separator">:</div>
-                <div class="uptime-value">
-                  <span id="${DOM_IDS.UPTIME_MINUTES}" class="uptime-number">00</span>
-                  <span class="uptime-label">M</span>
-                </div>
-                <div class="uptime-separator">:</div>
-                <div class="uptime-value">
-                  <span id="${DOM_IDS.UPTIME_SECONDS}" class="uptime-number">00</span>
-                  <span class="uptime-label">S</span>
-                </div>
-              </div>
+            <div class="monitor-page" data-page="1" style="display:none">
+              <div class="page-title">MEMORY USAGE</div>
+              <div class="memory-gauge"><div id="${DOM_IDS.MEM_GAUGE}" class="memory-gauge-fill"></div></div>
+              <div id="${DOM_IDS.MEM_TEXT}" class="memory-text">0%</div>
+            </div>
+            <div class="monitor-page" data-page="2" style="display:none">
+              <div class="page-title">CONNECTIONS</div>
+              <div id="${DOM_IDS.CONN_TEXT}" class="connections-text">0</div>
+            </div>
+            <div class="monitor-page" data-page="3" style="display:none">
+              <div class="page-title">SCHEDULER</div>
+              <div id="${DOM_IDS.SCHED_STATUS}" class="scheduler-text"></div>
+              <div id="${DOM_IDS.SCHED_LAST}" class="scheduler-last"></div>
+            </div>
+            <div class="monitor-page" data-page="4" style="display:none">
+              <div class="page-title">DATA AGE</div>
+              <div id="${DOM_IDS.DATA_AGE}" class="data-age"></div>
+            </div>
+            <div class="page-controls">
+              <span id="${DOM_IDS.PREV_BTN}" class="page-btn">&#9664;</span>
+              <span id="${DOM_IDS.NEXT_BTN}" class="page-btn">&#9654;</span>
             </div>
           </div>
           <div class="terminal-minimized">
@@ -1205,6 +1237,53 @@ const BitcoinMinuteRefresh = (function () {
         box-shadow: 0 0 10px rgba(var(--primary-color-rgb, ${theme.rgb}), 0.5);
         opacity: 0.85;
       }
+
+      /* Page system */
+      .monitor-page {
+        text-align: center;
+      }
+
+      .page-title {
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+
+      .page-controls {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+      }
+
+      .page-btn {
+        cursor: pointer;
+        user-select: none;
+        padding: 0 5px;
+        font-weight: bold;
+      }
+
+      .memory-gauge {
+        width: 100%;
+        height: 8px;
+        background: #222;
+        border: 1px solid rgba(var(--primary-color-rgb, ${theme.rgb}), 0.5);
+        margin-bottom: 4px;
+      }
+
+      .memory-gauge-fill {
+        height: 100%;
+        background: var(--primary-color, ${theme.color});
+        width: 0%;
+      }
+
+      .memory-text,
+      .connections-text,
+      .scheduler-text,
+      .scheduler-last,
+      .data-age {
+        font-size: 0.9rem;
+        margin-top: 4px;
+      }
       
       /* CRT scanline effect */
       .terminal-content::before {
@@ -1456,6 +1535,66 @@ const BitcoinMinuteRefresh = (function () {
         requestAnimationFrame(animationFrame);
     }
 
+    // Page handling and health data
+    let currentPage = 0;
+    let healthInterval = null;
+
+    function showPage(index) {
+        const pages = terminalElement ? terminalElement.querySelectorAll('.monitor-page') : [];
+        if (!pages.length) return;
+        currentPage = (index + pages.length) % pages.length;
+        pages.forEach((p, i) => {
+            p.style.display = i === currentPage ? 'block' : 'none';
+        });
+    }
+
+    function nextPage() { showPage(currentPage + 1); }
+    function prevPage() { showPage(currentPage - 1); }
+
+    async function fetchHealth() {
+        try {
+            const resp = await fetch('/api/health');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            updateHealth(data);
+        } catch (e) {
+            log('Health fetch error: ' + e.message, 'error');
+        }
+    }
+
+    function updateHealth(data) {
+        if (!data) return;
+        const memFill = document.getElementById(DOM_IDS.MEM_GAUGE);
+        const memText = document.getElementById(DOM_IDS.MEM_TEXT);
+        if (memFill && data.memory && data.memory.percent != null) {
+            const pct = Math.round(data.memory.percent);
+            memFill.style.width = pct + '%';
+            if (memText) memText.textContent = pct + '%';
+        }
+
+        const connText = document.getElementById(DOM_IDS.CONN_TEXT);
+        if (connText && typeof data.connections !== 'undefined') {
+            connText.textContent = data.connections;
+        }
+
+        const schedStatus = document.getElementById(DOM_IDS.SCHED_STATUS);
+        if (schedStatus) {
+            const running = data.scheduler && data.scheduler.running ? 'RUNNING' : 'STOPPED';
+            schedStatus.textContent = running;
+        }
+
+        const schedLast = document.getElementById(DOM_IDS.SCHED_LAST);
+        if (schedLast && data.scheduler && data.scheduler.last_successful_run) {
+            const age = Math.floor((Date.now() - data.scheduler.last_successful_run * 1000) / 1000);
+            schedLast.textContent = age + 's ago';
+        }
+
+        const dataAge = document.getElementById(DOM_IDS.DATA_AGE);
+        if (dataAge && data.data && data.data.age_seconds != null) {
+            dataAge.textContent = data.data.age_seconds + 's';
+        }
+    }
+
     /**
      * Notify other tabs that data has been refreshed
      */
@@ -1511,6 +1650,17 @@ const BitcoinMinuteRefresh = (function () {
         // Handle visibility changes
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Page controls
+        const prevBtn = document.getElementById(DOM_IDS.PREV_BTN);
+        const nextBtn = document.getElementById(DOM_IDS.NEXT_BTN);
+        if (prevBtn) prevBtn.addEventListener('click', prevPage);
+        if (nextBtn) nextBtn.addEventListener('click', nextPage);
+
+        showPage(0);
+        fetchHealth();
+        if (healthInterval) clearInterval(healthInterval);
+        healthInterval = setInterval(fetchHealth, 10000);
 
         // Mark as initialized
         isInitialized = true;
