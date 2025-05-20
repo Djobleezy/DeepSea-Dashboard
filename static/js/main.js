@@ -338,9 +338,6 @@ let connectionLostTimeout = null;
 // Add this to the top of main.js with other global variables
 let lastPayoutTracking = {
     lastUnpaidEarnings: null,
-    estimatedTime: null,
-    estimationTimestamp: null,
-    lastBlockTime: null,
     payoutHistory: [],
     avgDays: null
 };
@@ -889,250 +886,56 @@ function formatLuckPercentage(luckPercentage) {
 
 function trackPayoutPerformance(data) {
     // Check if we have the necessary data
-    if (!data || data.unpaid_earnings === undefined || !data.est_time_to_payout) {
+    if (!data || data.unpaid_earnings === undefined) {
         return;
     }
 
     const currentUnpaidEarnings = data.unpaid_earnings;
-    const currentEstimatedTime = data.est_time_to_payout;
     const currentTime = new Date();
 
     // First-time initialization
     if (lastPayoutTracking.lastUnpaidEarnings === null) {
         lastPayoutTracking.lastUnpaidEarnings = currentUnpaidEarnings;
-        lastPayoutTracking.estimatedTime = currentEstimatedTime;
-        lastPayoutTracking.estimationTimestamp = currentTime;
-        lastPayoutTracking.lastBlockTime = data.last_block_time;
         return;
     }
 
     // Check if unpaid earnings decreased significantly (potential payout)
     if (currentUnpaidEarnings < lastPayoutTracking.lastUnpaidEarnings * 0.5) {
-        // A payout likely occurred
         console.log("Payout detected! Unpaid earnings decreased from",
             lastPayoutTracking.lastUnpaidEarnings, "to", currentUnpaidEarnings);
 
-        let actualPayoutTime = null;
+        const actualPayoutTime = data.last_block_time ? new Date(data.last_block_time) : currentTime;
 
-        // If last_block_time changed since our last check, use that as the payout timestamp
-        if (data.last_block_time && data.last_block_time !== lastPayoutTracking.lastBlockTime) {
-            // Parse last_block_time (assuming it's in a standard datetime format)
-            actualPayoutTime = new Date(data.last_block_time);
-        } else {
-            // Fallback to current time if we can't determine the exact payout time
-            actualPayoutTime = currentTime;
+        const payoutRecord = {
+            timestamp: actualPayoutTime,
+            amountBTC: (lastPayoutTracking.lastUnpaidEarnings - currentUnpaidEarnings).toFixed(8),
+            verified: false,
+            status: 'pending'
+        };
+
+        lastPayoutTracking.payoutHistory.unshift(payoutRecord);
+        if (lastPayoutTracking.payoutHistory.length > 10) {
+            lastPayoutTracking.payoutHistory.pop();
         }
 
-        // Only calculate if we have valid timestamps
-        if (lastPayoutTracking.estimationTimestamp && actualPayoutTime) {
-            // Calculate expected payout time with improved parsing
-            const estimatedMinutes = parseEstimatedTimeToMinutes(lastPayoutTracking.estimatedTime);
-            if (estimatedMinutes > 0) {
-                // Store original estimated time string
-                const originalEstimateText = lastPayoutTracking.estimatedTime;
 
-                // Calculate expected payout time based on estimation
-                const expectedPayoutTime = new Date(lastPayoutTracking.estimationTimestamp.getTime() + (estimatedMinutes * 60 * 1000));
-
-                // Calculate the difference between expected and actual in minutes
-                const differenceMinutes = (actualPayoutTime.getTime() - expectedPayoutTime.getTime()) / (60 * 1000);
-
-                // Format the difference for display
-                const formattedDifference = formatTimeDifference(differenceMinutes);
-
-                // Calculate accuracy using a consistent formula
-                const actualMinutes = estimatedMinutes + differenceMinutes;
-                const accuracyPercent = calculatePayoutAccuracy(estimatedMinutes, actualMinutes);
-
-                // Historical prediction using average days between payouts
-                let histEstimate = 'N/A';
-                let histActual = 'N/A';
-                let histAccuracy = 'N/A';
-
-                if (lastPayoutTracking.avgDays) {
-                    const histMinutes = lastPayoutTracking.avgDays * 24 * 60;
-                    histEstimate = formatMinutesToTime(histMinutes);
-
-                    // Calculate actual interval from previous payout if available
-                    if (lastPayoutTracking.payoutHistory.length > 0) {
-                        const prev = new Date(lastPayoutTracking.payoutHistory[0].timestamp);
-                        const actualInterval = (actualPayoutTime - prev) / 60000;
-                        histActual = formatMinutesToTime(actualInterval);
-                    const acc = calculatePayoutAccuracy(histMinutes, actualInterval);
-                    histAccuracy = acc + '%';
-                }
-            }
-
-                // Store the payout comparison with enhanced data
-                const payoutComparison = {
-                    timestamp: actualPayoutTime,
-                    estimatedTime: originalEstimateText,
-                    expectedTime: formatMinutesToTime(estimatedMinutes), // Add this for clearer display
-                    actualTime: formatMinutesToTime(estimatedMinutes + differenceMinutes),
-                    difference: formattedDifference,
-                    accuracy: accuracyPercent + '%',
-                    historicalEstimate: histEstimate,
-                    historicalActual: histActual,
-                    historicalAccuracy: histAccuracy,
-                    amountBTC: (lastPayoutTracking.lastUnpaidEarnings - currentUnpaidEarnings).toFixed(8),
-                    // Store timing details for debugging/verification
-                    _debug: {
-                        estimationTimestamp: lastPayoutTracking.estimationTimestamp,
-                        actualTimestamp: actualPayoutTime,
-                        estimatedMinutes: estimatedMinutes,
-                        differenceMinutes: differenceMinutes
-                    }
-                };
-
-                // Add to history (limited to last 10 entries)
-                lastPayoutTracking.payoutHistory.unshift(payoutComparison);
-                if (lastPayoutTracking.payoutHistory.length > 10) {
-                    lastPayoutTracking.payoutHistory.pop();
-                }
-
-                // Update average payout interval
-                updateAvgDaysFromHistory();
-
-                // Save to local storage for persistence
-                try {
-                    localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
-                    console.log("Saved payout history to localStorage:", lastPayoutTracking.payoutHistory);
-                    fetch('/api/payout-history', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ record: payoutComparison })
-                    });
-                } catch (e) {
-                    console.error("Error saving payout history to localStorage:", e);
-                }
-
-                // Display the comparison
-                displayPayoutComparison(payoutComparison);
-
-                console.log("Payout detected! Estimated vs actual comparison:", payoutComparison);
-            } else {
-                console.warn("Could not parse estimated time to minutes:", lastPayoutTracking.estimatedTime);
-            }
+        try {
+            localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
+            fetch('/api/payout-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record: payoutRecord })
+            });
+        } catch (e) {
+            console.error("Error saving payout history to localStorage:", e);
         }
 
-        // Reset tracking with current values
-        lastPayoutTracking.lastUnpaidEarnings = currentUnpaidEarnings;
-        lastPayoutTracking.estimatedTime = currentEstimatedTime;
-        lastPayoutTracking.estimationTimestamp = currentTime;
-        lastPayoutTracking.lastBlockTime = data.last_block_time;
+        displayPayoutComparison(payoutRecord);
     }
-    // If the estimated time changes significantly, update our tracking
-    else if (currentEstimatedTime !== lastPayoutTracking.estimatedTime) {
-        lastPayoutTracking.estimatedTime = currentEstimatedTime;
-        lastPayoutTracking.estimationTimestamp = currentTime;
-        lastPayoutTracking.lastBlockTime = data.last_block_time;
-    }
+
+    lastPayoutTracking.lastUnpaidEarnings = currentUnpaidEarnings;
 }
 
-// Helper function to parse estimated time string to minutes
-function parseEstimatedTimeToMinutes(timeString) {
-    if (!timeString) return 0;
-
-    // Standardize string format
-    timeString = timeString.toLowerCase().trim();
-
-    // Handle "next block" meaning imminent payout
-    if (timeString.includes('next block')) {
-        return 5;
-    }
-
-    // Generic matcher supporting "1 day", "1d", "2 hours", "2h", etc.
-    let minutes = 0;
-
-    const dayMatch = timeString.match(/(\d+)\s*(?:d|day)/);
-    if (dayMatch) {
-        minutes += parseInt(dayMatch[1]) * 24 * 60;
-    }
-
-    const hourMatch = timeString.match(/(\d+)\s*(?:h|hour)/);
-    if (hourMatch) {
-        minutes += parseInt(hourMatch[1]) * 60;
-    }
-
-    const minuteMatch = timeString.match(/(\d+)\s*(?:m|min|minute)/);
-    if (minuteMatch) {
-        minutes += parseInt(minuteMatch[1]);
-    }
-
-    return minutes;
-}
-
-// Calculate how close the actual payout time was to the estimate
-function calculatePayoutAccuracy(expectedMinutes, actualMinutes) {
-    if (!expectedMinutes || expectedMinutes <= 0) {
-        return 0;
-    }
-
-    const diff = Math.abs(actualMinutes - expectedMinutes);
-    const accuracy = 100 - (diff / expectedMinutes) * 100;
-    return Math.max(0, Math.min(100, Math.round(accuracy)));
-}
-
-// Format time difference in minutes to a readable string
-function formatTimeDifference(differenceMinutes) {
-    const absMinutes = Math.abs(differenceMinutes);
-
-    if (differenceMinutes === 0) {
-        return "Exactly on time";
-    }
-
-    let result = "";
-    if (differenceMinutes < 0) {
-        result = "Earlier by ";
-    } else {
-        result = "Later by ";
-    }
-
-    if (absMinutes >= 24 * 60) {
-        const days = Math.floor(absMinutes / (24 * 60));
-        const hours = Math.floor((absMinutes % (24 * 60)) / 60);
-        result += `${days} day${days !== 1 ? 's' : ''}`;
-        if (hours > 0) {
-            result += `, ${hours} hour${hours !== 1 ? 's' : ''}`;
-        }
-    } else if (absMinutes >= 60) {
-        const hours = Math.floor(absMinutes / 60);
-        const mins = Math.floor(absMinutes % 60);
-        result += `${hours} hour${hours !== 1 ? 's' : ''}`;
-        if (mins > 0) {
-            result += `, ${mins} minute${mins !== 1 ? 's' : ''}`;
-        }
-    } else {
-        result += `${Math.round(absMinutes)} minute${Math.round(absMinutes) !== 1 ? 's' : ''}`;
-    }
-
-    return result;
-}
-
-// Convert minutes to formatted time string
-function formatMinutesToTime(minutes) {
-    if (minutes < 0) {
-        return "Already overdue";
-    }
-
-    if (minutes < 60) {
-        return `${Math.ceil(minutes)} minute${Math.ceil(minutes) !== 1 ? 's' : ''}`;
-    } else if (minutes < 24 * 60) {
-        const hours = Math.floor(minutes / 60);
-        const mins = Math.ceil(minutes % 60);
-        if (mins === 0) {
-            return `${hours} hour${hours !== 1 ? 's' : ''}`;
-        }
-        return `${hours} hour${hours !== 1 ? 's' : ''}, ${mins} minute${mins !== 1 ? 's' : ''}`;
-    } else {
-        const days = Math.floor(minutes / (24 * 60));
-        const hours = Math.ceil((minutes % (24 * 60)) / 60);
-        if (hours === 0) {
-            return `${days} day${days !== 1 ? 's' : ''}`;
-        }
-        return `${days} day${days !== 1 ? 's' : ''}, ${hours} hour${hours !== 1 ? 's' : ''}`;
-    }
-}
 
 // Update the displayPayoutComparison function to use better formatting
 function displayPayoutComparison(comparison) {
@@ -1146,27 +949,11 @@ function displayPayoutComparison(comparison) {
     // Create a new comparison element
     const comparisonElement = $("<p id='payout-comparison'></p>");
 
-    // Format with colors based on accuracy
-    const accuracyValue = comparison.historicalAccuracy || comparison.accuracy;
-    const accuracyNum = parseInt(accuracyValue);
-    // Get the current theme
-    const theme = getCurrentTheme();
-    let accuracyClass = "yellow"; // Default color class
-    let accuracyColor = theme.SHARED.YELLOW;
-    if (accuracyNum >= 90) {
-        accuracyClass = "green";
-        accuracyColor = theme.SHARED.GREEN;
-    } else if (accuracyNum < 70) {
-        accuracyClass = "red";
-        accuracyColor = theme.SHARED.RED;
-    }
-
     // Format date using the earnings.js style formatter
     const formattedDate = formatPayoutDate(comparison.timestamp);
 
     comparisonElement.html(`
         <strong>Last Payout:</strong>
-        <span class="metric-value ${accuracyClass}">${accuracyValue}</span>
         <span class="metric-note">${formattedDate} (${formatBTC(comparison.amountBTC)} BTC)</span>
     `);
 
@@ -1206,30 +993,6 @@ function loadLocalHistory() {
     } catch (e) {
         console.error("Error loading payout history from localStorage:", e);
     }
-}
-
-// Calculate the average number of days between consecutive payouts
-function updateAvgDaysFromHistory() {
-    const history = lastPayoutTracking.payoutHistory;
-    if (!Array.isArray(history) || history.length < 2) {
-        lastPayoutTracking.avgDays = null;
-        return;
-    }
-
-    let totalDays = 0;
-    let intervals = 0;
-
-    for (let i = 0; i < history.length - 1; i++) {
-        const current = new Date(history[i].timestamp);
-        const next = new Date(history[i + 1].timestamp);
-        const diff = current - next;
-        if (!isNaN(diff) && diff >= 0) {
-            totalDays += diff / (24 * 60 * 60 * 1000);
-            intervals++;
-        }
-    }
-
-    lastPayoutTracking.avgDays = intervals > 0 ? totalDays / intervals : null;
 }
 
 // Update the init function to add the summary display
@@ -1373,36 +1136,6 @@ function displayPayoutSummary() {
         }
     }
 
-    // Get accuracy color class
-    let accuracyClass = "badge bg-warning";  // Default - yellow
-    let accuracyDisplay = lastPayout.historicalAccuracy || lastPayout.accuracy || "N/A";
-    let accuracyNum = 0; // Initialize accuracyNum here
-
-    const accuracyBase = lastPayout.historicalAccuracy || lastPayout.accuracy;
-    if (!accuracyBase || accuracyBase === "N/A") {
-        accuracyClass = "badge bg-secondary";  // Gray for N/A
-    } else {
-        // Parse the accuracy percentage from string like "85%"
-        accuracyNum = parseInt(accuracyBase);
-
-        if (accuracyNum >= 90) {
-            accuracyClass = "badge bg-success";  // Green for 90-100%
-        } else if (accuracyNum >= 70) {
-            accuracyClass = "badge bg-info";     // Blue for 70-89%
-        } else if (accuracyNum >= 50) {
-            accuracyClass = "badge bg-warning";  // Yellow for 50-69%
-        } else {
-            accuracyClass = "badge bg-danger";   // Red for 0-49%
-        }
-
-        // Add a visual indicator based on accuracy
-        let indicator = '';
-        if (accuracyNum >= 90) indicator = ' 🎯'; // Perfect hit
-        else if (accuracyNum >= 70) indicator = ' ✓'; // Good
-        else if (accuracyNum < 50) indicator = ' ✗'; // Bad
-
-        accuracyDisplay = accuracyBase + indicator;
-    }
 
     // Format transaction status and link if available
     let statusDisplay = lastPayout.status || "pending";
@@ -1448,16 +1181,8 @@ function displayPayoutSummary() {
             <div class="col-md-6">
                 <div class="d-flex flex-column">
                     <p>
-                        <strong>Estimated Interval:</strong>
-                        <span class="metric-value yellow">${lastPayout.historicalEstimate || lastPayout.estimatedTime || "N/A"}</span>
-                    </p>
-                    <p>
-                        <strong>Actual Interval:</strong>
-                        <span class="metric-value white">${lastPayout.historicalActual || lastPayout.actualTime || "N/A"}</span>
-                    </p>
-                    <p>
-                        <strong>Prediction Accuracy:</strong>
-                        <span class="metric-value ${accuracyNum >= 90 ? 'green' : (accuracyNum >= 70 ? 'white' : 'red')}">${lastPayout.historicalAccuracy || accuracyDisplay}</span>
+                        <strong>Average Interval:</strong>
+                        <span class="metric-value yellow">${lastPayoutTracking.avgDays ? lastPayoutTracking.avgDays.toFixed(2) + ' days' : 'N/A'}</span>
                     </p>
                 </div>
             </div>
@@ -1580,45 +1305,15 @@ function verifyPayoutsAgainstOfficial() {
 
                 const matchingPayment = officialPayments.find(payment => {
                     const paymentDate = new Date(payment.date);
-                    // Match if within 2 hours and similar amount
                     return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
                         Math.abs(parseFloat(payment.amount_btc) - parseFloat(detectedPayout.amountBTC)) < 0.00001;
                 });
 
                 if (matchingPayment) {
-                    // Enrich detected payout with official data
                     detectedPayout.verified = true;
                     detectedPayout.officialId = matchingPayment.txid || '';
                     detectedPayout.status = matchingPayment.status || 'confirmed';
 
-                    // Calculate accuracy and timing details if missing
-                    if (!detectedPayout.accuracy && detectedPayout.estimatedTime && matchingPayment.date_iso) {
-                        const estMinutes = parseEstimatedTimeToMinutes(detectedPayout.estimatedTime);
-
-                        // Determine the timestamp when the estimate was made
-                        let estimateStart = null;
-                        if (detectedPayout._debug && detectedPayout._debug.estimationTimestamp) {
-                            estimateStart = new Date(detectedPayout._debug.estimationTimestamp);
-                        } else {
-                            // Fallback: approximate using payout time minus estimate
-                            estimateStart = new Date(new Date(detectedPayout.timestamp).getTime() - estMinutes * 60000);
-                        }
-
-                        const expectedTime = new Date(estimateStart.getTime() + estMinutes * 60000);
-                        const actual = new Date(matchingPayment.date_iso);
-                        const diffMinutes = (actual - expectedTime) / 60000;
-
-                        detectedPayout.actualTime = formatMinutesToTime((actual - estimateStart) / 60000);
-                        detectedPayout.expectedTime = formatMinutesToTime(estMinutes);
-                        detectedPayout.difference = formatTimeDifference(diffMinutes);
-
-                        const actualMinutes = (actual - estimateStart) / 60000;
-                        const accuracy = calculatePayoutAccuracy(estMinutes, actualMinutes);
-                        detectedPayout.accuracy = `${accuracy}%`;
-                        console.log(`Calculated accuracy for previous payout: ${detectedPayout.accuracy}`);
-                    }
-
-                    // Add exchange rate data if available
                     if (matchingPayment.rate) {
                         detectedPayout.rate = matchingPayment.rate;
                         detectedPayout.fiat_value = parseFloat(detectedPayout.amountBTC) * matchingPayment.rate;
@@ -1649,18 +1344,13 @@ function verifyPayoutsAgainstOfficial() {
                 });
 
                 if (!exists) {
-                    // This is a payment we didn't detect - add it to our list
                     const syntheticPayout = {
                         timestamp: paymentDate,
-                        estimatedTime: "Unknown",
-                        actualTime: "Official record",
-                        difference: "N/A",
-                        accuracy: "N/A",
                         amountBTC: payment.amount_btc,
                         verified: true,
                         officialId: payment.txid || '',
                         status: payment.status || 'confirmed',
-                        officialRecordOnly: true  // Flag to indicate this wasn't detected by our system
+                        officialRecordOnly: true
                     };
 
                     // Add exchange rate data if available
@@ -1683,9 +1373,6 @@ function verifyPayoutsAgainstOfficial() {
             if (lastPayoutTracking.payoutHistory.length > 30) {
                 lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
             }
-
-            // Recalculate average payout interval
-            updateAvgDaysFromHistory();
 
             // Update the display with enriched data if it's visible
             if ($("#payout-history-container").is(":visible")) {
