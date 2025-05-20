@@ -1031,35 +1031,27 @@ function parseEstimatedTimeToMinutes(timeString) {
     // Standardize string format
     timeString = timeString.toLowerCase().trim();
 
-    // Check for "next block" which means imminent payout (use 5 minutes as approximation)
+    // Handle "next block" meaning imminent payout
     if (timeString.includes('next block')) {
         return 5;
     }
 
-    // Initialize total minutes
+    // Generic matcher supporting "1 day", "1d", "2 hours", "2h", etc.
     let minutes = 0;
 
-    // Extract days
-    const daysMatch = timeString.match(/(\d+)\s*day/);
-    if (daysMatch) {
-        minutes += parseInt(daysMatch[1]) * 24 * 60;
+    const dayMatch = timeString.match(/(\d+)\s*(?:d|day)/);
+    if (dayMatch) {
+        minutes += parseInt(dayMatch[1]) * 24 * 60;
     }
 
-    // Extract hours
-    const hoursMatch = timeString.match(/(\d+)\s*hour/);
-    if (hoursMatch) {
-        minutes += parseInt(hoursMatch[1]) * 60;
+    const hourMatch = timeString.match(/(\d+)\s*(?:h|hour)/);
+    if (hourMatch) {
+        minutes += parseInt(hourMatch[1]) * 60;
     }
 
-    // Extract minutes
-    const minutesMatch = timeString.match(/(\d+)\s*minute/);
-    if (minutesMatch) {
-        minutes += parseInt(minutesMatch[1]);
-    }
-
-    // Handle the case of just "X hours" without days
-    if (!daysMatch && hoursMatch) {
-        console.log(`Parsed "${timeString}" as ${minutes} minutes (${parseInt(hoursMatch[1])} hours)`);
+    const minuteMatch = timeString.match(/(\d+)\s*(?:m|min|minute)/);
+    if (minuteMatch) {
+        minutes += parseInt(minuteMatch[1]);
     }
 
     return minutes;
@@ -1552,19 +1544,30 @@ function verifyPayoutsAgainstOfficial() {
                     detectedPayout.officialId = matchingPayment.txid || '';
                     detectedPayout.status = matchingPayment.status || 'confirmed';
 
-                    // Calculate and add accuracy if it doesn't exist
-                    if (!detectedPayout.accuracy) {
-                        if (detectedPayout.estimatedTime && matchingPayment.date_iso) {
-                            const est = new Date(detectedPayout.timestamp);
-                            est.setMinutes(est.getMinutes() - parseEstimatedTimeToMinutes(detectedPayout.estimatedTime));
+                    // Calculate accuracy and timing details if missing
+                    if (!detectedPayout.accuracy && detectedPayout.estimatedTime && matchingPayment.date_iso) {
+                        const estMinutes = parseEstimatedTimeToMinutes(detectedPayout.estimatedTime);
 
-                            const actual = new Date(matchingPayment.date_iso);
-                            const diffMinutes = Math.abs((actual - est) / 60000);
-
-                            let accuracy = Math.max(0, 100 - (diffMinutes / 10));
-                            detectedPayout.accuracy = `${accuracy.toFixed(0)}%`;
-                            console.log(`Calculated accuracy for previous payout: ${detectedPayout.accuracy}`);
+                        // Determine the timestamp when the estimate was made
+                        let estimateStart = null;
+                        if (detectedPayout._debug && detectedPayout._debug.estimationTimestamp) {
+                            estimateStart = new Date(detectedPayout._debug.estimationTimestamp);
+                        } else {
+                            // Fallback: approximate using payout time minus estimate
+                            estimateStart = new Date(new Date(detectedPayout.timestamp).getTime() - estMinutes * 60000);
                         }
+
+                        const expectedTime = new Date(estimateStart.getTime() + estMinutes * 60000);
+                        const actual = new Date(matchingPayment.date_iso);
+                        const diffMinutes = (actual - expectedTime) / 60000;
+
+                        detectedPayout.actualTime = formatMinutesToTime((actual - estimateStart) / 60000);
+                        detectedPayout.expectedTime = formatMinutesToTime(estMinutes);
+                        detectedPayout.difference = formatTimeDifference(diffMinutes);
+
+                        let accuracy = Math.max(0, 100 - (Math.abs(diffMinutes) / 10));
+                        detectedPayout.accuracy = `${accuracy.toFixed(0)}%`;
+                        console.log(`Calculated accuracy for previous payout: ${detectedPayout.accuracy}`);
                     }
 
                     // Add exchange rate data if available
