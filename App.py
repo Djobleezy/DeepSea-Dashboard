@@ -1344,7 +1344,7 @@ def block_events():
         limit = request.args.get("limit", 20, type=int)
         minutes = request.args.get("minutes", 180, type=int)
 
-        # Fetch a batch of recent block notifications
+        # Grab a single larger batch to avoid multiple fetches
         notifications = notification_service.get_notifications(
             limit=limit * 5,
             category=NotificationCategory.BLOCK.value,
@@ -1353,11 +1353,6 @@ def block_events():
         cutoff = notification_service._get_current_time() - timedelta(minutes=minutes)
         events = []
 
-        notifications = notification_service.get_notifications(
-            limit=limit,
-            category=NotificationCategory.BLOCK.value
-        )
-        events = []
         for n in notifications:
             ts = n.get("timestamp")
             data = n.get("data") or {}
@@ -1366,10 +1361,12 @@ def block_events():
                 when = notification_service._parse_timestamp(ts)
                 if when >= cutoff:
                     events.append({"timestamp": ts, "height": height})
-            if len(events) >= limit:
-                break
+                    if len(events) >= limit:
+                        break
 
-                events.append({"timestamp": ts, "height": height})
+        # Ensure newest events first
+        events.sort(key=lambda e: e["timestamp"], reverse=True)
+
         return jsonify({"events": events})
     except Exception as e:
         logging.error(f"Error fetching block events: {e}")

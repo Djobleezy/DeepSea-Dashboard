@@ -75,8 +75,55 @@ def test_payout_history_endpoint(client):
 
 
 def test_block_events_endpoint(client):
-    resp = client.get("/api/block-events?minutes=180")
+    import App
+    from datetime import datetime, timedelta
+
+    now = datetime.utcnow()
+    App.notification_service.notifications = [
+        {
+            "id": "1",
+            "timestamp": (now - timedelta(minutes=5)).isoformat(),
+            "message": "",
+            "level": "success",
+            "category": "block",
+            "read": False,
+            "data": {"block_height": 100},
+        },
+        {
+            "id": "2",
+            "timestamp": (now - timedelta(minutes=10)).isoformat(),
+            "message": "",
+            "level": "success",
+            "category": "block",
+            "read": False,
+            "data": {"block_height": 101},
+        },
+        {
+            "id": "3",
+            "timestamp": (now - timedelta(minutes=200)).isoformat(),
+            "message": "",
+            "level": "success",
+            "category": "block",
+            "read": False,
+            "data": {"block_height": 102},
+        },
+    ]
+
+    resp = client.get("/api/block-events?limit=2&minutes=180")
     assert resp.status_code == 200
     data = resp.get_json()
     assert "events" in data
+    events = data["events"]
+    assert len(events) <= 2
+
+    cutoff = now - timedelta(minutes=180)
+    timestamps = []
+    for ev in events:
+        ts = datetime.fromisoformat(ev["timestamp"])
+        assert ts >= cutoff
+        timestamps.append(ev["timestamp"])
+
+    assert len(timestamps) == len(set(timestamps))
+    if len(events) > 1:
+        assert events[0]["timestamp"] >= events[1]["timestamp"]
 
