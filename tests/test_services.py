@@ -225,3 +225,44 @@ def test_get_worker_data_api(monkeypatch):
     assert 'rig1' in names and 'rig2' in names
 
 
+def test_get_pool_stat_api(monkeypatch):
+    svc = MiningDashboardService(0, 0, 'w')
+
+    sample = {
+        'hashrate_60s': 1000,
+        'workers': 5,
+        'blocks': 10
+    }
+
+    def fake_get(url, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = sample
+        return resp
+
+    monkeypatch.setattr(svc.session, 'get', fake_get)
+    data = svc.get_pool_stat_api()
+
+    assert data['workers_hashing'] == 5
+    assert data['blocks_found'] == 10
+    assert data['pool_total_hashrate'] == 1000
+
+
+def test_get_blocks_api(monkeypatch):
+    svc = MiningDashboardService(0, 0, 'w')
+
+    sample = {'blocks': [{'height': 100, 'time': 1700000000}]}
+
+    def fake_get(url, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = sample
+        return resp
+
+    monkeypatch.setattr(svc.session, 'get', fake_get)
+    blocks = svc.get_blocks_api()
+
+    assert isinstance(blocks, list)
+    assert blocks[0]['height'] == 100
+
+

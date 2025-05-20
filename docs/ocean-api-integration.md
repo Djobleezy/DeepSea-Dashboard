@@ -16,7 +16,7 @@ https://api.ocean.xyz/v1/user_hashrate/3QomtEj5nfzEkxPXoVD3hvxgJDzA6M6evt
 |----------|-------------|-----------|---------|
 | /ping | Server status test | None | "PONG" |
 | /statsnap/{username} | Latest TIDES snapshot for a user or worker | username[.workername] | Hashrate, shares, earnings estimation |
-| /pool_stat | Pool-wide TIDES stats | None | Stats snapshot of active users, workers, difficulty, and rewards |
+| /pool_stat | Pool-wide stats (hashrate, workers, blocks) | None | Stats snapshot of active users, workers, and blocks found |
 | /pool_hashrate | Pool-wide hashrate info | None | Hashrate averages over 60s and 300s |
 | /userinfo_full/{username} | statsnap for all of a user’s workers | username | Array of statsnap results per worker |
 | /multitemplate_stats | Multitemplate share breakdown | None | Array of shares per mining template |

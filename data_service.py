@@ -251,7 +251,52 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error fetching statsnap API: {e}")
 
+        # Merge additional data from other endpoints
+        result.update(self.get_pool_stat_api())
+
+        # Pull latest block information using /blocks
+        blocks = self.get_blocks_api(page=0, page_size=1)
+        if blocks:
+            block = blocks[0]
+            result["last_block_height"] = block.get("height")
+            ts = block.get("time") or block.get("timestamp")
+            if ts:
+                dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+
         return result
+
+    def get_pool_stat_api(self):
+        """Fetch overall pool statistics using /pool_stat."""
+        api_base = "https://api.ocean.xyz/v1"
+        data = {}
+        try:
+            url = f"{api_base}/pool_stat"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                stat = resp.json()
+                data["pool_total_hashrate"] = stat.get("hashrate_60s") or stat.get("hashrate")
+                data["pool_total_hashrate_unit"] = "H/s"
+                data["workers_hashing"] = stat.get("workers") or stat.get("active_workers")
+                data["blocks_found"] = stat.get("blocks") or stat.get("blocks_found")
+        except Exception as e:
+            logging.error(f"Error fetching pool_stat API: {e}")
+        return data
+
+    def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
+        """Fetch recent block data using /blocks."""
+        api_base = "https://api.ocean.xyz/v1"
+        try:
+            url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                blocks = data.get("blocks") or data.get("result") or data
+                if isinstance(blocks, list):
+                    return blocks
+        except Exception as e:
+            logging.error(f"Error fetching blocks API: {e}")
+        return []
 
     def get_ocean_data(self):
         """
