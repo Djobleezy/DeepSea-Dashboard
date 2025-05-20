@@ -72,21 +72,23 @@
     }
   }
 
-body.easterEggActive p::after,
-body.easterEggActive h1::after,
-body.easterEggActive h2::after,
-body.easterEggActive h3::after,
-body.easterEggActive h4::after,
-body.easterEggActive h5::after,
-body.easterEggActive h6::after,
-body.easterEggActive li::after,
-body.easterEggActive a::after,
-body.easterEggActive span::after,
-body.easterEggActive td::after,
-body.easterEggActive th::after {
-  content: var(--egg-emoji);
-  margin-left: 4px;
-  opacity: 0.9;
-  color: #f7931a;
-  font-size: 1.3em;
+
+.cursor-whale {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  animation: whaleBurst 0.7s forwards;
+}
+
+@keyframes whaleBurst {
+  from {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x), var(--y)) scale(0.8);
+    opacity: 0;
+  }
 }
