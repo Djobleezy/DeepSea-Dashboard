@@ -2,6 +2,13 @@
   const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
   let index = 0;
   let cursorClicks = [];
+  const funFacts = [
+    'Did you know dolphins sleep with one eye open?',
+    'The ocean covers over 70% of the Earth.',
+    'Some crabs can grow back lost claws!',
+    'There will only ever be 21 million Bitcoin.',
+    'Whales can hold their breath for more than an hour!'
+  ];
 
   function applyEmojiMode() {
     const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
@@ -44,15 +51,22 @@
     text.textContent = active ? 'Easter Egg Disabled!' : (useDeepSea ? 'DeepSea Discovery!' : 'Bitcoin Surprise!');
     overlay.appendChild(text);
 
+    const fact = document.createElement('div');
+    fact.className = 'fact';
+    fact.textContent = funFacts[Math.floor(Math.random() * funFacts.length)];
+    overlay.appendChild(fact);
+
     const iconCount = window.innerWidth < 600
       ? 10
       : Math.max(20, Math.floor(window.innerHeight / 30));
 
+    const seaIcons = ['🐳', '🐠', '🦀', '💰'];
+
     for (let i = 0; i < iconCount; i++) {
       const icon = document.createElement('div');
       if (useDeepSea) {
-        icon.className = 'whale';
-        icon.textContent = '🐳';
+        icon.className = 'sea-icon';
+        icon.textContent = seaIcons[Math.floor(Math.random() * seaIcons.length)];
       } else {
         icon.className = 'btc';
         icon.textContent = '₿';

@@ -263,7 +263,7 @@ For optimal performance:
 
 ## Easter Egg
 
-Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief deep sea surprise!
+Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief deep sea surprise complete with random fun facts!
 
 ## Debug Logging
 

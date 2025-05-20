@@ -5,6 +5,7 @@
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   background: rgba(0, 0, 0, 0.9);
@@ -24,7 +25,8 @@
   color: #f7931a;
 }
 
-#easterEggOverlay .whale {
+#easterEggOverlay .whale,
+#easterEggOverlay .sea-icon {
   position: absolute;
   font-size: 3rem;
   animation: swim 12s linear infinite;
@@ -37,6 +39,12 @@
   animation: spin-move 12s linear infinite;
   pointer-events: none;
   color: #f7931a;
+}
+
+#easterEggOverlay .fact {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  text-transform: none;
 }
 
 @keyframes swim {
@@ -54,7 +62,8 @@
       font-size: 1.2rem;
     }
 
-    #easterEggOverlay .whale {
+    #easterEggOverlay .whale,
+    #easterEggOverlay .sea-icon {
       font-size: 2rem;
     }
 
