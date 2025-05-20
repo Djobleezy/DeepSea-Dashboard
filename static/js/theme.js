@@ -444,6 +444,14 @@ function toggleTheme() {
 
     document.body.appendChild(loadingMessage);
 
+    // Persist current chart point selection before reloading
+    try {
+        const points = window.chartPoints || 180;
+        localStorage.setItem('chartPointsPreference', points.toString());
+    } catch (e) {
+        console.error('Error saving chart points preference', e);
+    }
+
     // Short delay before refreshing
     setTimeout(() => {
         // Hard reload the page
