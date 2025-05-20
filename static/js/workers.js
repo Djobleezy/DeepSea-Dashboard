@@ -538,10 +538,16 @@ function updateServerTime() {
 // Utility functions to show/hide loader
 function showLoader() {
     $("#loader").show();
+    if (window.PageLoader) {
+        PageLoader.show('Loading workers...');
+    }
 }
 
 function hideLoader() {
     $("#loader").hide();
+    if (window.PageLoader) {
+        PageLoader.hide();
+    }
 }
 
 // Modified to properly fetch and store currency data 
