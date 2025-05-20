@@ -590,7 +590,7 @@ def stream():
         start_event_id = 0
 
     try:
-        num_points = int(request.args.get("points", 30))
+        num_points = int(request.args.get("points", 180))
         if num_points not in [30, 60, 180]:
             num_points = 180
     except Exception:

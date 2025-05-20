@@ -1404,6 +1404,19 @@ function setupEventSource() {
         window.eventSource = null;
     }
 
+    // Reload chart points preference in case the variable was reset
+    try {
+        const storedPreference = localStorage.getItem('chartPointsPreference');
+        if (storedPreference) {
+            const points = parseInt(storedPreference, 10);
+            if ([30, 60, 180].includes(points)) {
+                chartPoints = points;
+            }
+        }
+    } catch (e) {
+        console.error("Error loading chart points preference", e);
+    }
+
     // Always use absolute URL with origin to ensure it works from any path
     const baseUrl = window.location.origin;
     // Include points parameter in the stream URL
