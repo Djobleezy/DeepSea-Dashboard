@@ -1,15 +1,18 @@
 // earnings.js
-let earningsChart = null;
-
 document.addEventListener('DOMContentLoaded', function () {
     console.log('Earnings page loaded');
 
+    // Add refresh functionality if needed
     setupAutoRefresh();
+
+    // Format all currency values with commas
     formatCurrencyValues();
+
+    // Apply user timezone formatting to all dates
     applyUserTimezoneFormatting();
+
+    // Initialize the system monitor
     initializeSystemMonitor();
-    initEarningsChart();
-    fetchEarningsData();
 });
 
 // Initialize the BitcoinMinuteRefresh system monitor
@@ -17,7 +20,7 @@ function initializeSystemMonitor() {
     // Define refresh function for the system monitor
     window.manualRefresh = function () {
         console.log("Manual refresh triggered by system monitor");
-        fetchEarningsData();
+        location.reload();
     };
 
     // Initialize system monitor if it's available
@@ -120,10 +123,10 @@ function setupAutoRefresh() {
     // Check if refresh is enabled in the UI
     const refreshToggle = document.getElementById('refresh-toggle');
     if (refreshToggle && refreshToggle.checked) {
-        // Periodically fetch new data
+        // Set a refresh interval (e.g., every 5 minutes)
         setInterval(function () {
-            fetchEarningsData();
-        }, 3 * 60 * 1000);
+            location.reload();
+        }, 5 * 60 * 1000);
     }
 }
 
@@ -149,77 +152,6 @@ function applyUserTimezoneFormatting() {
 
     // This function would format dates according to user timezone preference
     // when dates are dynamically loaded or updated via JavaScript
-}
-
-// Fetch latest earnings data from the API and update the UI
-function fetchEarningsData() {
-    fetch('/api/earnings')
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                showErrorBanner('Failed to fetch earnings');
-                return;
-            }
-            hideErrorBanner();
-            updateEarningsUI(data);
-        })
-        .catch(() => showErrorBanner('Failed to fetch earnings'));
-}
-
-// Update DOM elements with latest earnings data
-function updateEarningsUI(data) {
-    if (!data) return;
-    document.getElementById('unpaid-sats').textContent = formatSats(data.unpaid_earnings_sats);
-    document.getElementById('unpaid-btc').textContent = formatBTC(data.unpaid_earnings);
-    document.getElementById('est-time-payout').textContent = data.est_time_to_payout || 'Unknown';
-    document.getElementById('total-paid-sats').textContent = formatSats(data.total_paid_sats);
-    document.getElementById('total-paid-btc').textContent = formatBTC(data.total_paid_btc);
-    if (data.total_paid_fiat !== undefined) {
-        document.getElementById('total-paid-fiat').innerHTML = `<span id="total-paid-currency-symbol">${currencySymbol}</span>${formatCurrency(parseFloat(data.total_paid_fiat).toFixed(2))}`;
-    }
-    document.getElementById('payment-count').textContent = formatCurrency(data.total_payments);
-    if (data.payments && data.payments.length > 0) {
-        document.getElementById('latest-payment').textContent = 'Latest: ' + formatDateToUserTimezone(data.payments[0].date);
-    }
-    if (earningsChart) {
-        updateEarningsChart(data.monthly_summaries || []);
-    }
-}
-
-// Initialize Chart.js bar chart for monthly totals
-function initEarningsChart() {
-    if (!window.Chart) return;
-    const canvas = document.getElementById('earningsChart');
-    if (!canvas) return;
-    const labels = monthlySummaries.map(m => m.month_name);
-    const values = monthlySummaries.map(m => m.total_fiat || m.total_usd || m.total_btc);
-    const theme = getCurrentTheme();
-    const ctx = canvas.getContext('2d');
-    earningsChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: labels, datasets: [{ data: values, backgroundColor: theme.PRIMARY }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-    });
-}
-
-function updateEarningsChart(summaries) {
-    if (!earningsChart) return;
-    earningsChart.data.labels = summaries.map(m => m.month_name);
-    earningsChart.data.datasets[0].data = summaries.map(m => m.total_fiat || m.total_usd || m.total_btc);
-    earningsChart.update();
-}
-
-function showErrorBanner(msg) {
-    const banner = document.querySelector('.error-banner');
-    if (banner) {
-        banner.textContent = msg;
-        banner.style.display = 'block';
-    }
-}
-
-function hideErrorBanner() {
-    const banner = document.querySelector('.error-banner');
-    if (banner) banner.style.display = 'none';
 }
 
 // Function to format a timestamp based on user timezone
