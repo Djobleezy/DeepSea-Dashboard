@@ -341,7 +341,8 @@ let lastPayoutTracking = {
     estimatedTime: null,
     estimationTimestamp: null,
     lastBlockTime: null,
-    payoutHistory: []
+    payoutHistory: [],
+    avgDays: null
 };
 
 // Server time variables for uptime calculation
@@ -964,6 +965,26 @@ function trackPayoutPerformance(data) {
                 // Round to nearest whole percent
                 accuracyPercent = Math.round(accuracyPercent);
 
+                // Historical prediction using average days between payouts
+                let histEstimate = 'N/A';
+                let histActual = 'N/A';
+                let histAccuracy = 'N/A';
+
+                if (lastPayoutTracking.avgDays) {
+                    const histMinutes = lastPayoutTracking.avgDays * 24 * 60;
+                    histEstimate = formatMinutesToTime(histMinutes);
+
+                    // Calculate actual interval from previous payout if available
+                    if (lastPayoutTracking.payoutHistory.length > 0) {
+                        const prev = new Date(lastPayoutTracking.payoutHistory[0].timestamp);
+                        const actualInterval = (actualPayoutTime - prev) / 60000;
+                        histActual = formatMinutesToTime(actualInterval);
+                        const diff = Math.abs(actualInterval - histMinutes);
+                        const acc = Math.max(0, 100 - (diff / histMinutes) * 100);
+                        histAccuracy = acc.toFixed(0) + '%';
+                    }
+                }
+
                 // Store the payout comparison with enhanced data
                 const payoutComparison = {
                     timestamp: actualPayoutTime,
@@ -972,6 +993,9 @@ function trackPayoutPerformance(data) {
                     actualTime: formatMinutesToTime(estimatedMinutes + differenceMinutes),
                     difference: formattedDifference,
                     accuracy: accuracyPercent + '%',
+                    historicalEstimate: histEstimate,
+                    historicalActual: histActual,
+                    historicalAccuracy: histAccuracy,
                     amountBTC: (lastPayoutTracking.lastUnpaidEarnings - currentUnpaidEarnings).toFixed(8),
                     // Store timing details for debugging/verification
                     _debug: {
@@ -1131,7 +1155,8 @@ function displayPayoutComparison(comparison) {
     const comparisonElement = $("<p id='payout-comparison'></p>");
 
     // Format with colors based on accuracy
-    const accuracyNum = parseInt(comparison.accuracy);
+    const accuracyValue = comparison.historicalAccuracy || comparison.accuracy;
+    const accuracyNum = parseInt(accuracyValue);
     // Get the current theme
     const theme = getCurrentTheme();
     let accuracyClass = "yellow"; // Default color class
@@ -1149,7 +1174,7 @@ function displayPayoutComparison(comparison) {
 
     comparisonElement.html(`
         <strong>Last Payout:</strong>
-        <span class="metric-value ${accuracyClass}">${comparison.accuracy}</span> 
+        <span class="metric-value ${accuracyClass}">${accuracyValue}</span>
         <span class="metric-note">${formattedDate} (${formatBTC(comparison.amountBTC)} BTC)</span>
     `);
 
@@ -1334,14 +1359,15 @@ function displayPayoutSummary() {
 
     // Get accuracy color class
     let accuracyClass = "badge bg-warning";  // Default - yellow
-    let accuracyDisplay = lastPayout.accuracy || "N/A";
+    let accuracyDisplay = lastPayout.historicalAccuracy || lastPayout.accuracy || "N/A";
     let accuracyNum = 0; // Initialize accuracyNum here
 
-    if (lastPayout.accuracy === "N/A") {
+    const accuracyBase = lastPayout.historicalAccuracy || lastPayout.accuracy;
+    if (!accuracyBase || accuracyBase === "N/A") {
         accuracyClass = "badge bg-secondary";  // Gray for N/A
     } else {
         // Parse the accuracy percentage from string like "85%"
-        accuracyNum = parseInt(lastPayout.accuracy);
+        accuracyNum = parseInt(accuracyBase);
 
         if (accuracyNum >= 90) {
             accuracyClass = "badge bg-success";  // Green for 90-100%
@@ -1359,7 +1385,7 @@ function displayPayoutSummary() {
         else if (accuracyNum >= 70) indicator = ' ✓'; // Good
         else if (accuracyNum < 50) indicator = ' ✗'; // Bad
 
-        accuracyDisplay = lastPayout.accuracy + indicator;
+        accuracyDisplay = accuracyBase + indicator;
     }
 
     // Format transaction status and link if available
@@ -1401,16 +1427,16 @@ function displayPayoutSummary() {
             <div class="col-md-6">
                 <div class="d-flex flex-column">
                     <p>
-                        <strong>Estimated Time:</strong>
-                        <span class="metric-value yellow">${lastPayout.estimatedTime || "N/A"}</span>
+                        <strong>Estimated Interval:</strong>
+                        <span class="metric-value yellow">${lastPayout.historicalEstimate || lastPayout.estimatedTime || "N/A"}</span>
                     </p>
                     <p>
-                        <strong>Actual Time:</strong>
-                        <span class="metric-value white">${lastPayout.actualTime || "N/A"}</span>
+                        <strong>Actual Interval:</strong>
+                        <span class="metric-value white">${lastPayout.historicalActual || lastPayout.actualTime || "N/A"}</span>
                     </p>
                     <p>
                         <strong>Prediction Accuracy:</strong>
-                        <span class="metric-value ${accuracyNum >= 90 ? 'green' : (accuracyNum >= 70 ? 'white' : 'red')}">${accuracyDisplay}</span>
+                        <span class="metric-value ${accuracyNum >= 90 ? 'green' : (accuracyNum >= 70 ? 'white' : 'red')}">${lastPayout.historicalAccuracy || accuracyDisplay}</span>
                     </p>
                     <p>
                         <strong>Status:</strong>
@@ -1518,6 +1544,11 @@ function verifyPayoutsAgainstOfficial() {
         method: 'GET',
         success: function (data) {
             if (!data || !data.payments || !data.payments.length) return;
+
+            // Store average days between payouts if available
+            if (data.avg_days_between_payouts !== undefined && data.avg_days_between_payouts !== null) {
+                lastPayoutTracking.avgDays = data.avg_days_between_payouts;
+            }
 
             // Get official payment records - newest first
             const officialPayments = data.payments.sort((a, b) =>
