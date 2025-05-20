@@ -3,6 +3,18 @@
   let index = 0;
   let cursorClicks = [];
 
+  function applyEmojiMode() {
+    const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+    const emoji = useDeepSea ? '🐳' : '₿';
+    document.body.classList.add('easterEggActive');
+    document.body.style.setProperty('--egg-emoji', '"' + emoji + '"');
+  }
+
+  function removeEmojiMode() {
+    document.body.classList.remove('easterEggActive');
+    document.body.style.removeProperty('--egg-emoji');
+  }
+
   function handleKey(e) {
     if (e.key === konami[index]) {
       index++;
@@ -28,7 +40,8 @@
     }
 
     const text = document.createElement('div');
-    text.textContent = useDeepSea ? 'DeepSea Discovery!' : 'Bitcoin Surprise!';
+    const active = localStorage.getItem('easterEggActive') === 'true';
+    text.textContent = active ? 'Easter Egg Disabled!' : (useDeepSea ? 'DeepSea Discovery!' : 'Bitcoin Surprise!');
     overlay.appendChild(text);
 
     const iconCount = window.innerWidth < 600
@@ -52,8 +65,16 @@
       overlay.appendChild(icon);
     }
 
+    if (active) {
+      removeEmojiMode();
+      localStorage.setItem('easterEggActive', 'false');
+    } else {
+      applyEmojiMode();
+      localStorage.setItem('easterEggActive', 'true');
+    }
+
     document.body.appendChild(overlay);
-    setTimeout(() => overlay.remove(), 10000);
+    setTimeout(() => overlay.remove(), 3000);
   }
 
   window.addEventListener('keydown', handleKey);
@@ -77,4 +98,8 @@
 
   window.addEventListener('click', cursorListener);
   window.addEventListener('touchstart', cursorListener);
+
+  if (localStorage.getItem('easterEggActive') === 'true') {
+    applyEmojiMode();
+  }
 })();
