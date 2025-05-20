@@ -10,60 +10,16 @@
     'Whales can hold their breath for more than an hour!'
   ];
 
-  let lastWhaleTime = 0;
-
-  function spawnWhales(x, y) {
-    const count = 8;
-    for (let i = 0; i < count; i++) {
-      const emoji = document.createElement('span');
-      emoji.className = 'cursor-whale';
-      emoji.textContent = '🐳';
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 60 + Math.random() * 40;
-      const xMove = Math.cos(angle) * distance;
-      const yMove = Math.sin(angle) * distance;
-      emoji.style.left = x + 'px';
-      emoji.style.top = y + 'px';
-      emoji.style.setProperty('--x', xMove + 'px');
-      emoji.style.setProperty('--y', yMove + 'px');
-      document.body.appendChild(emoji);
-      emoji.addEventListener('animationend', () => emoji.remove());
-    }
-  }
-
-  function handleMove(e) {
-    const now = Date.now();
-    if (now - lastWhaleTime > 50) {
-      lastWhaleTime = now;
-      spawnWhales(e.clientX, e.clientY);
-    }
-  }
-
-  function handleTouch(e) {
-    const t = e.touches[0];
-    if (t) {
-      spawnWhales(t.clientX, t.clientY);
-    }
-  }
-
-  function addWhaleListeners() {
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('touchstart', handleTouch);
-  }
-
-  function removeWhaleListeners() {
-    window.removeEventListener('mousemove', handleMove);
-    window.removeEventListener('touchstart', handleTouch);
-  }
-
   function applyEmojiMode() {
+    const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+    const emoji = useDeepSea ? '🐳' : '₿';
     document.body.classList.add('easterEggActive');
-    addWhaleListeners();
+    document.body.style.setProperty('--egg-emoji', '"' + emoji + '"');
   }
 
   function removeEmojiMode() {
     document.body.classList.remove('easterEggActive');
-    removeWhaleListeners();
+    document.body.style.removeProperty('--egg-emoji');
   }
 
   function handleKey(e) {
