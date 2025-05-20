@@ -1,0 +1,33 @@
+#easterEggOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  overflow: hidden;
+  color: var(--primary-color);
+  font-family: var(--terminal-font);
+  text-transform: uppercase;
+  font-size: 2rem;
+}
+
+#easterEggOverlay.deepsea {
+  color: #00aaff;
+}
+
+#easterEggOverlay .whale {
+  position: absolute;
+  font-size: 3rem;
+  animation: swim 12s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes swim {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
