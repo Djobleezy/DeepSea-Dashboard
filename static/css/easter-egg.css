@@ -36,6 +36,7 @@
   font-size: 3rem;
   animation: spin-move 12s linear infinite;
   pointer-events: none;
+  color: #f7931a;
 }
 
 @keyframes swim {
@@ -77,4 +78,6 @@ body.easterEggActive th::after {
   content: var(--egg-emoji);
   margin-left: 4px;
   opacity: 0.9;
+  color: #f7931a;
+  font-size: 1.3em;
 }

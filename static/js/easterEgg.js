@@ -61,7 +61,12 @@
       icon.style.left = '-150px';
       icon.style.animationDuration = 8 + Math.random() * 4 + 's';
       icon.style.animationDelay = Math.random() * 6 + 's';
-      icon.style.fontSize = 2 + Math.random() * 2 + 'rem';
+      if (useDeepSea) {
+        icon.style.fontSize = 2 + Math.random() * 2 + 'rem';
+      } else {
+        icon.style.fontSize = 4 + Math.random() * 2 + 'rem';
+        icon.style.color = '#f7931a';
+      }
       overlay.appendChild(icon);
     }
 
