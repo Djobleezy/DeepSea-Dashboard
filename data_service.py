@@ -867,9 +867,16 @@ class MiningDashboardService:
 
         # Add mempool.guide APIs
         mempool_urls = {
-            "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d", # Includes network difficulty
+            "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d",  # Includes network difficulty
             "prices": "https://mempool.guide/api/v1/prices",
             "block_height": "https://mempool.guide/api/blocks/tip/height"  # New API endpoint for block height
+        }
+
+        # Fallback mempool.space APIs (same format as mempool.guide)
+        mempool_space_urls = {
+            "hashrate": "https://mempool.space/api/v1/mining/hashrate/3d",
+            "prices": "https://mempool.space/api/v1/prices",
+            "block_height": "https://mempool.space/api/blocks/tip/height"
         }
 
         # Use previous cached values as defaults if available
@@ -893,6 +900,16 @@ class MiningDashboardService:
             # Get all responses
             responses = {key: futures[key].result(timeout=5) for key in futures}
 
+            # Fallback to mempool.space if any mempool.guide request failed
+            for key, url in mempool_space_urls.items():
+                mempool_key = f"mempool_{key}"
+                resp = responses.get(mempool_key)
+                if not resp or not resp.ok:
+                    logging.warning(
+                        f"mempool.guide {key} API failed, falling back to mempool.space"
+                    )
+                    responses[mempool_key] = self.fetch_url(url)
+
             # Process mempool.guide price data (primary source)
             price_data = {}
             mempool_price_response = responses.get("mempool_prices")
@@ -911,7 +928,9 @@ class MiningDashboardService:
                 except (ValueError, TypeError, json.JSONDecodeError) as e:
                     logging.error(f"Error parsing mempool.guide price data: {e}")
             else:
-                logging.warning("Could not fetch price data from mempool.guide, falling back to blockchain.info")
+                logging.warning(
+                    "Could not fetch price data from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
 
             # Fall back to blockchain.info for price if mempool.guide failed or currency not available
             if btc_price is None and responses["ticker"] and responses["ticker"].ok:
@@ -934,7 +953,9 @@ class MiningDashboardService:
                     logging.error(f"Error parsing block height from mempool.guide: {e}")
                     # Will fall back to blockchain.info below if this fails
             else:
-                logging.warning("Could not fetch block height from mempool.guide, falling back to blockchain.info")
+                logging.warning(
+                    "Could not fetch block height from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
 
             # Process mempool.guide hashrate data (primary source)
             mempool_hashrate_response = responses.get("mempool_hashrate")
@@ -956,7 +977,9 @@ class MiningDashboardService:
                 except (ValueError, TypeError, json.JSONDecodeError) as e:
                     logging.error(f"Error parsing mempool.guide hashrate data: {e}")
             else:
-                logging.warning("Could not fetch hashrate from mempool.guide, falling back to blockchain.info")
+                logging.warning(
+                    "Could not fetch hashrate from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
     
                 # Process blockchain.info hashrate as fallback
             if network_hashrate is None and responses["hashrate"] and responses["hashrate"].ok:

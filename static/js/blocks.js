@@ -19,7 +19,11 @@ const POOL_CONFIG = {
 // Global variables
 let currentStartHeight = null;        // height currently displayed at the top of the grid
 let latestBlockHeight = null;         // most recent block height fetched
-const mempoolBaseUrl = "https://mempool.guide"; // Switched from mempool.space to mempool.guide - more aligned with Ocean.xyz ethos
+
+// Primary and fallback mempool API URLs
+const MEMPOOL_GUIDE_BASE_URL = "https://mempool.guide";
+const MEMPOOL_SPACE_BASE_URL = "https://mempool.space";
+const mempoolLinkBaseUrl = MEMPOOL_GUIDE_BASE_URL; // links should still point to mempool.guide
 let blocksCache = {};
 let isLoading = false;
 let minerChart = null;
@@ -36,6 +40,21 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
+}
+
+// Helper function to fetch from mempool.guide with a fallback to mempool.space
+function fetchMempoolApi(endpoint) {
+    return $.ajax({
+        url: `${MEMPOOL_GUIDE_BASE_URL}${endpoint}`,
+        method: "GET",
+        dataType: "json",
+        timeout: 10000
+    }).catch(() => $.ajax({
+        url: `${MEMPOOL_SPACE_BASE_URL}${endpoint}`,
+        method: "GET",
+        dataType: "json",
+        timeout: 10000
+    }));
 }
 
 // Helper function to validate block height
@@ -63,12 +82,7 @@ function addToCache(height, data) {
 // Recursively fetch additional blocks until the desired count is reached
 function fetchAdditionalBlocks(height, remaining) {
     if (remaining <= 0) return Promise.resolve([]);
-    return $.ajax({
-        url: `${mempoolBaseUrl}/api/v1/blocks/${height}`,
-        method: "GET",
-        dataType: "json",
-        timeout: 10000
-    }).then(data => {
+    return fetchMempoolApi(`/api/v1/blocks/${height}`).then(data => {
         if (!Array.isArray(data) || data.length === 0) {
             return [];
         }
@@ -686,12 +700,8 @@ function loadBlocksFromHeight(height) {
     $("#blocks-grid").html('<div class="loader"><span class="loader-text">Loading blocks from height ' + height + '<span class="terminal-cursor"></span></span></div>');
 
     // Fetch blocks from the API
-    $.ajax({
-        url: `${mempoolBaseUrl}/api/v1/blocks/${height}`,
-        method: "GET",
-        dataType: "json",
-        timeout: 10000,
-        success: function (data) {
+    fetchMempoolApi(`/api/v1/blocks/${height}`)
+        .then(function (data) {
             // Cache the data using helper
             addToCache(height, data);
 
@@ -706,18 +716,17 @@ function loadBlocksFromHeight(height) {
             if (data.length > 0) {
                 updateLatestBlockStats(data[0]);
             }
-        },
-        error: function (xhr, status, error) {
+        })
+        .catch(function (error) {
             console.error("Error fetching blocks:", error);
             $("#blocks-grid").html('<div class="error">Error fetching blocks. Please try again later.</div>');
 
             // Show error toast
             showToast("Failed to load blocks. Please try again later.");
-        },
-        complete: function () {
+        })
+        .finally(function () {
             isLoading = false;
-        }
-    });
+        });
 }
 
 // Function to load the latest blocks and return a promise with the latest block height
@@ -730,12 +739,7 @@ function loadLatestBlocks() {
     $("#blocks-grid").html('<div class="loader"><span class="loader-text">Loading latest blocks<span class="terminal-cursor"></span></span></div>');
 
     // Fetch the latest blocks from the API
-    return $.ajax({
-        url: `${mempoolBaseUrl}/api/v1/blocks`,
-        method: "GET",
-        dataType: "json",
-        timeout: 10000,
-        success: function (data) {
+    return fetchMempoolApi(`/api/v1/blocks`).then(function (data) {
             // Cache the data (use the first block's height as the key)
             if (data.length > 0) {
                 currentStartHeight = data[0].height;
@@ -753,18 +757,18 @@ function loadLatestBlocks() {
             displayBlocks(data.slice(0, BLOCKS_PER_PAGE));
             // Update miner distribution chart
             prepareChartData(data);
-        },
-        error: function (xhr, status, error) {
+        })
+        .catch(function (error) {
             console.error("Error fetching latest blocks:", error);
             $("#blocks-grid").html('<div class="error">Error fetching blocks. Please try again later.</div>');
 
             // Show error toast
             showToast("Failed to load latest blocks. Please try again later.");
-        },
-        complete: function () {
+        })
+        .finally(function () {
             isLoading = false;
-        }
-    }).then(data => data.length > 0 ? data[0].height : null);
+        })
+        .then(data => data.length > 0 ? data[0].height : null);
 }
 
 // Refresh blocks page every 60 seconds if there are new blocks - with smart refresh
@@ -1059,7 +1063,7 @@ function showBlockDetails(block) {
     }));
 
     const mempoolLink = $("<a>", {
-        href: `${mempoolBaseUrl}/block/${block.id}`,
+        href: `${mempoolLinkBaseUrl}/block/${block.id}`,
         target: "_blank",
         class: "mempool-link",
         text: "View on mempool.guide",
