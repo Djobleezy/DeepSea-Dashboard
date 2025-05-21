@@ -3260,6 +3260,14 @@ function updateUI() {
             updateElementText("daily_power_cost", formatCurrencyValue(0, currency));
         }
 
+        // Show or hide estimated power indicator
+        if (data.power_usage_estimated !== undefined) {
+            const icon = document.getElementById("power-estimated-icon");
+            if (icon) {
+                icon.style.display = data.power_usage_estimated ? "inline-block" : "none";
+            }
+        }
+
         // Daily profit with currency conversion and color
         if (data.daily_profit_usd != null) {
             const dailyProfit = data.daily_profit_usd;

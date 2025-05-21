@@ -837,6 +837,53 @@ html.deepsea-theme h1::after {
   color: #ff2d95 !important;
 }
 
+/* ----- TOOLTIP STYLING ----- */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  margin-left: 5px;
+  width: 14px;
+  height: 14px;
+  background-color: #333;
+  color: var(--text-color);
+  border-radius: 50%;
+  text-align: center;
+  line-height: 14px;
+  font-size: 10px;
+  cursor: help;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: 200px;
+  background-color: #000;
+  color: var(--text-color);
+  text-align: center;
+  border-radius: 3px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 14px;
+  border: 1px solid var(--primary-color);
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Icon shown when power usage is estimated */
+.estimated-icon {
+  color: #ffd700;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
 /* ----- FOOTER ----- */
 .footer {
   padding: 10px 0;

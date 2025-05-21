@@ -357,6 +357,15 @@
                 </p>
                 <p>
                     <strong>Daily Power Cost:</strong>
+                    {% if metrics and metrics.power_usage_estimated %}
+                    <span id="power-estimated-icon" class="tooltip estimated-icon">*
+                        <span class="tooltip-text">Using estimated power consumption</span>
+                    </span>
+                    {% else %}
+                    <span id="power-estimated-icon" class="tooltip estimated-icon" style="display:none;">*
+                        <span class="tooltip-text">Using estimated power consumption</span>
+                    </span>
+                    {% endif %}
                     <span id="daily_power_cost" class="metric-value red">
                         {% if metrics and metrics.daily_power_cost is defined and metrics.daily_power_cost is not none %}
                         ${{ "%.2f"|format(metrics.daily_power_cost) }}
