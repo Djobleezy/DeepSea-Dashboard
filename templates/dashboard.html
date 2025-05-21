@@ -342,7 +342,7 @@
 
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header" id="currency-earnings-header">{{ user_currency|default('') }} EARNINGS</div>
+            <div class="card-header" id="currency-earnings-header">{{ user_currency|default('') }} EARNINGS{% if metrics and metrics.power_usage_estimated %} Est.{% endif %}</div>
             <div class="card-body">
                 <p>
                     <strong>Daily Revenue:</strong>

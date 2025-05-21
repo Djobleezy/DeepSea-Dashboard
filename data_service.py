@@ -140,11 +140,13 @@ class MiningDashboardService:
 
             power_usage_for_calc = self.power_usage
             power_cost_for_calc = self.power_cost
+            power_usage_estimated = False
 
             if power_usage_for_calc is None or power_usage_for_calc <= 0:
                 estimated_power = self.estimate_total_power()
                 if estimated_power:
                     power_usage_for_calc = estimated_power
+                    power_usage_estimated = True
                     if power_cost_for_calc is None or power_cost_for_calc <= 0:
                         power_cost_for_calc = 0.07
 
@@ -188,6 +190,7 @@ class MiningDashboardService:
                 'daily_power_cost': daily_power_cost,
                 'daily_profit_usd': daily_profit_usd,
                 'monthly_profit_usd': monthly_profit_usd,
+                'power_usage_estimated': power_usage_estimated,
                 'daily_mined_sats': daily_mined_sats,
                 'monthly_mined_sats': monthly_mined_sats,
                 'estimated_earnings_next_block': estimated_earnings_next_block,

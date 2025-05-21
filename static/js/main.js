@@ -2866,20 +2866,20 @@ function updateUI() {
             data.exchange_rates[currency] : 1.0;
 
         // Update only the currency earnings header, not SATOSHI EARNINGS
-        function updateDashboardHeaders(currency) {
+        function updateDashboardHeaders(currency, powerEstimated) {
             // Find card headers but exclude "SATOSHI EARNINGS"
             const earningsHeaders = document.querySelectorAll('.card-header');
             earningsHeaders.forEach(header => {
                 // Check if it's a currency header (contains EARNINGS but isn't SATOSHI EARNINGS)
                 if (header.textContent.includes('EARNINGS') &&
                     !header.textContent.includes('SATOSHI EARNINGS')) {
-                    header.textContent = `${currency} EARNINGS`;
+                    header.textContent = `${currency} EARNINGS${powerEstimated ? ' Est.' : ''}`;
                 }
             });
         }
 
         // Call this inside the updateUI function where currency is processed
-        updateDashboardHeaders(currency);
+        updateDashboardHeaders(currency, data.power_usage_estimated);
 
         // If this is the initial load, force a reset of all arrows
         if (initialLoad) {
@@ -3756,10 +3756,10 @@ function formatCurrencyValue(value, currency) {
 }
 
 // Update the BTC price and earnings card header with the selected currency
-function updateCurrencyLabels(currency) {
+function updateCurrencyLabels(currency, powerEstimated) {
     const earningsHeader = document.querySelector('.card-header:contains("USD EARNINGS")');
     if (earningsHeader) {
-        earningsHeader.textContent = `${currency} EARNINGS`;
+        earningsHeader.textContent = `${currency} EARNINGS${powerEstimated ? ' Est.' : ''}`;
     }
 }
 
