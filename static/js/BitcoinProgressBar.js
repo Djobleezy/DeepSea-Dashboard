@@ -1587,6 +1587,8 @@ const BitcoinMinuteRefresh = (function () {
         if (schedStatus) {
             const running = data.scheduler && data.scheduler.running ? 'RUNNING' : 'STOPPED';
             schedStatus.textContent = running;
+            // Highlight scheduler status when healthy
+            schedStatus.style.color = running === 'RUNNING' ? 'limegreen' : '#ffffff';
         }
 
         const schedLast = document.getElementById(DOM_IDS.SCHED_LAST);
