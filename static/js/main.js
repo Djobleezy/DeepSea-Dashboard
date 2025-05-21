@@ -911,8 +911,7 @@ function trackPayoutPerformance(data) {
             timestamp: actualPayoutTime,
             amountBTC: (lastPayoutTracking.lastUnpaidEarnings - currentUnpaidEarnings).toFixed(8),
             verified: false,
-            status: 'pending',
-            lightningId: ''
+            status: 'pending'
         };
 
         lastPayoutTracking.payoutHistory.unshift(payoutRecord);
@@ -1144,27 +1143,16 @@ function displayPayoutSummary() {
     let statusDisplay = lastPayout.status || "pending";
     const statusClass = lastPayout.verified ? "text-success" : "text-warning";
 
-    // Build HTML for the transaction links
+    // Build HTML for the transaction link
     let txLink = '';
     if (lastPayout.officialId) {
-        txLink += `
-            <a href="https://mempool.guide/tx/${lastPayout.officialId}"
-               target="_blank"
+        txLink = `
+            <a href="https://mempool.guide/tx/${lastPayout.officialId}" 
+               target="_blank" 
                class="btn btn-sm btn-secondary ms-2"
                style="font-size: 12px; width: 90px;"
                title="View transaction on mempool.guide">
                 <i class="fa-solid fa-external-link-alt"></i> View TX
-            </a>`;
-    }
-
-    if (lastPayout.lightningId) {
-        txLink += `
-            <a href="https://ocean.xyz/info/tx/lightning/${lastPayout.lightningId}"
-               target="_blank"
-               class="btn btn-sm btn-secondary ms-2"
-               style="font-size: 12px; width: 90px;"
-               title="View Lightning transaction">
-                <i class="fa-solid fa-bolt"></i> LN TX
             </a>`;
     }
 
@@ -1322,7 +1310,6 @@ function verifyPayoutsAgainstOfficial() {
                 if (matchingPayment) {
                     detectedPayout.verified = true;
                     detectedPayout.officialId = matchingPayment.txid || '';
-                    detectedPayout.lightningId = matchingPayment.lightning_txid || '';
                     detectedPayout.status = matchingPayment.status || 'confirmed';
 
                     if (matchingPayment.rate) {
@@ -1360,7 +1347,6 @@ function verifyPayoutsAgainstOfficial() {
                         amountBTC: payment.amount_btc,
                         verified: true,
                         officialId: payment.txid || '',
-                        lightningId: payment.lightning_txid || '',
                         status: payment.status || 'confirmed',
                         officialRecordOnly: true
                     };

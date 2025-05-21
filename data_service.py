@@ -700,7 +700,6 @@ class MiningDashboardService:
             for item in payouts:
                 ts = item.get("ts")
                 txid = item.get("on_chain_txid", "")
-                lightning_txid = item.get("lightning_txid", "")
                 sats = item.get("total_satoshis_net_paid", 0) or 0
                 amount_btc = sats / self.sats_per_btc
 
@@ -721,7 +720,6 @@ class MiningDashboardService:
                 payment = {
                     "date": date_str,
                     "txid": txid,
-                    "lightning_txid": lightning_txid,
                     "amount_btc": amount_btc,
                     "amount_sats": int(sats),
                     "status": "confirmed",
@@ -797,7 +795,6 @@ class MiningDashboardService:
                     payment = {
                         "date": date_str,
                         "txid": txid,
-                        "lightning_txid": "",
                         "amount_btc": amount_btc,
                         "amount_sats": sats,
                         "status": "confirmed",

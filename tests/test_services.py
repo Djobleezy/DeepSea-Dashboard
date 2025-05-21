@@ -136,7 +136,6 @@ def test_get_payment_history_api_nested_result(monkeypatch):
                 {
                     'ts': 1700000000,
                     'on_chain_txid': 'abcd',
-                    'lightning_txid': 'ln1',
                     'total_satoshis_net_paid': 100
                 }
             ]
@@ -157,7 +156,6 @@ def test_get_payment_history_api_nested_result(monkeypatch):
     assert len(payments) == 1
     p = payments[0]
     assert p['txid'] == 'abcd'
-    assert p['lightning_txid'] == 'ln1'
     assert p['amount_sats'] == 100
     assert abs(p['amount_btc'] - 100 / svc.sats_per_btc) < 1e-9
     assert p['fiat_value'] == (100 / svc.sats_per_btc) * 20000
@@ -175,7 +173,6 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
                 {
                     'ts': 1700000000,
                     'on_chain_txid': 'abcd',
-                    'lightning_txid': 'ln1',
                     'total_satoshis_net_paid': 100
                 }
             ]
@@ -198,7 +195,6 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
 
     assert len(data['payments']) == 1
     assert data['payments'][0]['txid'] == 'abcd'
-    assert data['payments'][0]['lightning_txid'] == 'ln1'
     assert data['total_paid_btc'] == 100 / svc.sats_per_btc
 
 
