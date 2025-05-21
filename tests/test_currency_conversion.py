@@ -43,7 +43,6 @@ class MetricsConversionTest(unittest.TestCase):
         self.assertAlmostEqual(metrics['daily_revenue'], 2.25)
         self.assertAlmostEqual(metrics['daily_profit_usd'], 2.25)
         self.assertEqual(metrics['currency'], 'EUR')
-        self.assertFalse(metrics['power_estimated'])
 
 class EarningsConversionTest(unittest.TestCase):
     @patch('config.get_currency', return_value='EUR')
