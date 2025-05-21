@@ -934,10 +934,12 @@ def health_check():
         mem_info = process.memory_info()
         memory_usage_mb = mem_info.rss / 1024 / 1024
         memory_percent = process.memory_percent()
+        memory_total_mb = psutil.virtual_memory().total / 1024 / 1024
     except Exception as e:
         logging.error(f"Error getting memory usage: {e}")
         memory_usage_mb = 0
         memory_percent = 0
+        memory_total_mb = 0
     
     # Check data freshness
     data_age = 0
@@ -963,7 +965,8 @@ def health_check():
         "connections": active_sse_connections,
         "memory": {
             "usage_mb": round(memory_usage_mb, 2),
-            "percent": round(memory_percent, 2)
+            "percent": round(memory_percent, 2),
+            "total_mb": round(memory_total_mb, 2)
         },
         "data": {
             "last_update": cached_metrics.get("server_timestamp") if cached_metrics else None,

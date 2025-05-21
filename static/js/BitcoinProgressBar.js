@@ -1247,6 +1247,7 @@ const BitcoinMinuteRefresh = (function () {
         font-size: 0.8rem;
         font-weight: bold;
         margin-bottom: 4px;
+        color: var(--primary-color, ${theme.color});
       }
 
       .page-controls {
@@ -1283,6 +1284,7 @@ const BitcoinMinuteRefresh = (function () {
       .data-age {
         font-size: 0.9rem;
         margin-top: 4px;
+        color: #ffffff;
       }
       
       /* CRT scanline effect */
@@ -1569,7 +1571,11 @@ const BitcoinMinuteRefresh = (function () {
         if (memFill && data.memory && data.memory.percent != null) {
             const pct = Math.round(data.memory.percent);
             memFill.style.width = pct + '%';
-            if (memText) memText.textContent = pct + '%';
+            if (memText) {
+                const used = Math.round(data.memory.usage_mb);
+                const total = data.memory.total_mb ? Math.round(data.memory.total_mb) : 0;
+                memText.textContent = `${used}MB / ${total}MB (${pct}%)`;
+            }
         }
 
         const connText = document.getElementById(DOM_IDS.CONN_TEXT);
