@@ -886,12 +886,15 @@ def update_config():
                 new_config.get("power_cost", 0.0),
                 new_config.get("power_usage", 0.0),
                 new_config.get("wallet"),
-                network_fee=new_config.get("network_fee", 0.0)  # Include network fee
+                network_fee=new_config.get("network_fee", 0.0),
+                worker_service=worker_service
             )
             logging.info(f"Dashboard service reinitialized with new wallet: {new_config.get('wallet')}")
 
             # Update worker service to use the new dashboard service (with the updated wallet)
             worker_service.set_dashboard_service(dashboard_service)
+            if hasattr(dashboard_service, 'set_worker_service'):
+                dashboard_service.set_worker_service(worker_service)
             notification_service.dashboard_service = dashboard_service
             logging.info(f"Worker service updated with the new dashboard service")
             
@@ -1565,10 +1568,13 @@ dashboard_service = MiningDashboardService(
     config.get("power_cost", 0.0),
     config.get("power_usage", 0.0),
     config.get("wallet"),
-    network_fee=config.get("network_fee", 0.0)  # Add network fee parameter
+    network_fee=config.get("network_fee", 0.0),
+    worker_service=None
 )
 worker_service = WorkerService()
 # Connect the services
+if hasattr(dashboard_service, 'set_worker_service'):
+    dashboard_service.set_worker_service(worker_service)
 worker_service.set_dashboard_service(dashboard_service)
 notification_service.dashboard_service = dashboard_service
 

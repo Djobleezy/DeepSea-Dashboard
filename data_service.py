@@ -18,7 +18,7 @@ from miner_specs import parse_worker_name
 class MiningDashboardService:
     """Service for fetching and processing mining dashboard data."""
     
-    def __init__(self, power_cost, power_usage, wallet, network_fee=0.0):
+    def __init__(self, power_cost, power_usage, wallet, network_fee=0.0, worker_service=None):
         """
         Initialize the mining dashboard service.
     
@@ -32,6 +32,7 @@ class MiningDashboardService:
         self.power_usage = power_usage
         self.wallet = wallet
         self.network_fee = network_fee
+        self.worker_service = worker_service
         self.cache = {}
         self.sats_per_btc = 100_000_000
         self.previous_values = {}
@@ -42,6 +43,25 @@ class MiningDashboardService:
         self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
         # Time-to-live (TTL) for exchange rate cache in seconds (~2 hours)
         self.exchange_rate_ttl = 7200
+
+    def set_worker_service(self, worker_service):
+        """Associate a WorkerService instance for power estimation."""
+        self.worker_service = worker_service
+
+    def estimate_total_power(self):
+        """Estimate total power usage from worker data if available."""
+        if not self.worker_service:
+            return 0
+        try:
+            data = self.worker_service.get_workers_data({}, force_refresh=False)
+            if data:
+                if "total_power" in data and data["total_power"]:
+                    return data["total_power"]
+                if data.get("workers"):
+                    return sum(w.get("power_consumption", 0) for w in data["workers"])
+        except Exception as e:
+            logging.error(f"Error estimating power usage: {e}")
+        return 0
 
     def close(self):
         """Close any open network resources."""
@@ -117,7 +137,18 @@ class MiningDashboardService:
             logging.info(f"Total fee rate: {total_fee_rate}, Daily BTC gross: {daily_btc_gross}, Daily BTC net: {daily_btc_net}")
 
             daily_revenue = round(daily_btc_net * btc_price, 2) if btc_price is not None else None
-            daily_power_cost = round((self.power_usage / 1000) * self.power_cost * 24, 2)
+
+            power_usage_for_calc = self.power_usage
+            power_cost_for_calc = self.power_cost
+
+            if power_usage_for_calc is None or power_usage_for_calc <= 0:
+                estimated_power = self.estimate_total_power()
+                if estimated_power:
+                    power_usage_for_calc = estimated_power
+                    if power_cost_for_calc is None or power_cost_for_calc <= 0:
+                        power_cost_for_calc = 0.07
+
+            daily_power_cost = round((power_usage_for_calc / 1000) * power_cost_for_calc * 24, 2)
             daily_profit_usd = round(daily_revenue - daily_power_cost, 2) if daily_revenue is not None else None
             monthly_profit_usd = round(daily_profit_usd * 30, 2) if daily_profit_usd is not None else None
 

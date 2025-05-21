@@ -266,3 +266,22 @@ def test_get_blocks_api(monkeypatch):
     assert blocks[0]['height'] == 100
 
 
+def test_fetch_metrics_estimates_power(monkeypatch):
+    class DummyWS:
+        def get_workers_data(self, cached_metrics, force_refresh=False):
+            return {"workers": [
+                {"power_consumption": 1000},
+                {"power_consumption": 1500}
+            ]}
+
+    svc = MiningDashboardService(0, 0, 'w', worker_service=DummyWS())
+
+    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
+    monkeypatch.setattr(svc, 'get_ocean_data', lambda: data_service.OceanData(hashrate_3hr=100, hashrate_3hr_unit='TH/s', pool_fees_percentage=0.0))
+    monkeypatch.setattr(svc, 'get_bitcoin_stats', lambda: (0, 100e18, 50000, 0))
+
+    metrics = svc.fetch_metrics()
+
+    assert metrics['daily_power_cost'] == 4.2
+
+
