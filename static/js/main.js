@@ -2785,6 +2785,57 @@ function updateUI() {
         return dividerContainer;
     }
 
+    // Helper to attach a 3hr variance divider to a metric row
+    function updateVarianceDivider(metricId, varianceId, varianceValue) {
+        const para = document.getElementById(metricId).parentNode;
+        ensureElementStyles();
+
+        if (!para.querySelector('.main-metric')) {
+            const metricEl = document.getElementById(metricId);
+            const indicatorEl = document.getElementById(`indicator_${metricId}`);
+
+            const mainMetric = document.createElement('span');
+            mainMetric.className = 'main-metric';
+
+            if (metricEl && indicatorEl) {
+                let node = metricEl.nextSibling;
+                while (node && node !== indicatorEl) {
+                    const nextNode = node.nextSibling;
+                    if (node.nodeType === 3) {
+                        para.removeChild(node);
+                    }
+                    node = nextNode;
+                }
+
+                metricEl.parentNode.insertBefore(mainMetric, metricEl);
+                mainMetric.appendChild(metricEl);
+                mainMetric.appendChild(indicatorEl);
+            }
+
+            const dividerContainer = document.createElement('span');
+            dividerContainer.className = 'metric-divider-container';
+            para.appendChild(dividerContainer);
+        }
+
+        let container = para.querySelector('.metric-divider-container');
+        if (!container) {
+            container = document.createElement('span');
+            container.className = 'metric-divider-container';
+            para.appendChild(container);
+        }
+
+        const formatted = (varianceValue >= 0 ? '+' : '') +
+            numberWithCommas(Math.round(varianceValue)) + ' SATS';
+
+        const existing = document.getElementById(varianceId);
+        if (existing) {
+            existing.textContent = formatted;
+        } else {
+            const div = createDivider(varianceId, formatted, '[3hr \u0394]');
+            container.appendChild(div);
+        }
+    }
+
     if (!latestMetrics) {
         console.warn("No metrics data available");
         return;
@@ -3284,6 +3335,29 @@ function updateUI() {
         updateElementText("estimated_earnings_per_day_sats", numberWithCommas(data.estimated_earnings_per_day_sats) + " SATS");
         updateElementText("estimated_earnings_next_block_sats", numberWithCommas(data.estimated_earnings_next_block_sats) + " SATS");
         updateElementText("estimated_rewards_in_window_sats", numberWithCommas(data.estimated_rewards_in_window_sats) + " SATS");
+
+        // Add 3hr variance dividers for estimated earnings metrics
+        if (data.estimated_earnings_per_day_sats_variance_3hr !== undefined) {
+            updateVarianceDivider(
+                "estimated_earnings_per_day_sats",
+                "variance_earnings_day",
+                data.estimated_earnings_per_day_sats_variance_3hr
+            );
+        }
+        if (data.estimated_earnings_next_block_sats_variance_3hr !== undefined) {
+            updateVarianceDivider(
+                "estimated_earnings_next_block_sats",
+                "variance_earnings_block",
+                data.estimated_earnings_next_block_sats_variance_3hr
+            );
+        }
+        if (data.estimated_rewards_in_window_sats_variance_3hr !== undefined) {
+            updateVarianceDivider(
+                "estimated_rewards_in_window_sats",
+                "variance_rewards_window",
+                data.estimated_rewards_in_window_sats_variance_3hr
+            );
+        }
 
         // Update last updated timestamp
         try {

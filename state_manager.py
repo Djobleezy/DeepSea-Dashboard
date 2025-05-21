@@ -20,6 +20,8 @@ from config import get_timezone
 
 # Limits for data collections to prevent memory growth
 MAX_HISTORY_ENTRIES = 180  # 3 hours worth at 1 min intervals
+# Separate history for short-term variance calculations (3 hours)
+MAX_VARIANCE_HISTORY_ENTRIES = 180  # 3 hours at 1 min intervals
 
 # Lock for thread safety
 state_lock = threading.Lock()
@@ -44,6 +46,8 @@ class StateManager:
         self.hashrate_history = []
         self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
         self.payout_history = []
+        # Maintain short-term history for 3hr variance calculations
+        self.variance_history = {}
 
         # Cache for last successful earnings fetch
         self.last_earnings = {}
@@ -398,6 +402,7 @@ class StateManager:
         # --- Bucket by second (Los Angeles Time) with thread safety ---
         from datetime import datetime
         from zoneinfo import ZoneInfo
+        from datetime import timedelta
         
         current_second = datetime.now(ZoneInfo(get_timezone())).strftime("%H:%M:%S")
         
@@ -480,6 +485,38 @@ class StateManager:
                         # Update unit if available
                         if current_unit:
                             self.arrow_history[key][-1]["unit"] = current_unit
+
+            # --- Update history for variance calculations ---
+            variance_keys = [
+                "estimated_earnings_per_day_sats",
+                "estimated_earnings_next_block_sats",
+                "estimated_rewards_in_window_sats",
+            ]
+            now = datetime.now(ZoneInfo(get_timezone()))
+            window_start = now - timedelta(hours=3)
+
+            for key in variance_keys:
+                if metrics.get(key) is None:
+                    continue
+
+                if key not in self.variance_history:
+                    self.variance_history[key] = deque(maxlen=MAX_VARIANCE_HISTORY_ENTRIES)
+
+                history = self.variance_history[key]
+                # Remove entries older than 3 hours
+                while history and history[0]["time"] < window_start:
+                    history.popleft()
+
+                history.append({"time": now, "value": metrics[key]})
+
+                if history and history[0]["time"] <= window_start:
+                    baseline = history[0]["value"]
+                    metrics[f"{key}_variance_3hr"] = metrics[key] - baseline
+                elif len(history) > 1:
+                    baseline = history[0]["value"]
+                    metrics[f"{key}_variance_3hr"] = metrics[key] - baseline
+                else:
+                    metrics[f"{key}_variance_3hr"] = 0
 
             # --- Aggregate arrow_history by minute for the graph ---
             aggregated_history = {}
