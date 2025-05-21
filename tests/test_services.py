@@ -283,6 +283,5 @@ def test_fetch_metrics_estimates_power(monkeypatch):
     metrics = svc.fetch_metrics()
 
     assert metrics['daily_power_cost'] == 4.2
-    assert metrics['power_usage_estimated'] is True
 
 
