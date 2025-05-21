@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 
 from models import OceanData, WorkerData, convert_to_ths
 from config import get_timezone
+from miner_specs import parse_worker_name
 
 class MiningDashboardService:
     """Service for fetching and processing mining dashboard data."""
@@ -1280,17 +1281,25 @@ class MiningDashboardService:
                         except Exception as e:
                             logging.error(f"Error parsing earnings '{earnings_text}': {e}")
                     
-                    # Set worker type based on name (if it can be inferred)
-                    lower_name = worker["name"].lower()
-                    if 'antminer' in lower_name:
-                        worker["type"] = 'ASIC'
-                        worker["model"] = 'Bitmain Antminer'
-                    elif 'whatsminer' in lower_name:
-                        worker["type"] = 'ASIC'
-                        worker["model"] = 'MicroBT Whatsminer'
-                    elif 'bitaxe' in lower_name or 'nerdqaxe' in lower_name:
-                        worker["type"] = 'Bitaxe'
-                        worker["model"] = 'BitAxe Gamma 601'
+                    # Determine model specs from worker name
+                    specs = parse_worker_name(worker["name"])
+                    if specs:
+                        worker["type"] = specs["type"]
+                        worker["model"] = specs["model"]
+                        worker["efficiency"] = specs["efficiency"]
+                        hr_ths = convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                        worker["power_consumption"] = round(hr_ths * specs["efficiency"])
+                    else:
+                        lower_name = worker["name"].lower()
+                        if 'antminer' in lower_name:
+                            worker["type"] = 'ASIC'
+                            worker["model"] = 'Bitmain Antminer'
+                        elif 'whatsminer' in lower_name:
+                            worker["type"] = 'ASIC'
+                            worker["model"] = 'MicroBT Whatsminer'
+                        elif 'bitaxe' in lower_name or 'nerdqaxe' in lower_name:
+                            worker["type"] = 'Bitaxe'
+                            worker["model"] = 'BitAxe Gamma 601'
                     
                     workers.append(worker)
                     
@@ -1447,17 +1456,25 @@ class MiningDashboardService:
                             except Exception:
                                 pass
 
-                    # Set worker type based on name
-                    lower_name = worker["name"].lower()
-                    if 'antminer' in lower_name:
-                        worker["type"] = 'ASIC'
-                        worker["model"] = 'Bitmain Antminer'
-                    elif 'whatsminer' in lower_name:
-                        worker["type"] = 'ASIC'
-                        worker["model"] = 'MicroBT Whatsminer'
-                    elif 'bitaxe' in lower_name or 'nerdqaxe' in lower_name:
-                        worker["type"] = 'Bitaxe'
-                        worker["model"] = 'BitAxe Gamma 601'
+                    # Determine model specs from worker name
+                    specs = parse_worker_name(worker["name"])
+                    if specs:
+                        worker["type"] = specs["type"]
+                        worker["model"] = specs["model"]
+                        worker["efficiency"] = specs["efficiency"]
+                        hr_ths = convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                        worker["power_consumption"] = round(hr_ths * specs["efficiency"])
+                    else:
+                        lower_name = worker["name"].lower()
+                        if 'antminer' in lower_name:
+                            worker["type"] = 'ASIC'
+                            worker["model"] = 'Bitmain Antminer'
+                        elif 'whatsminer' in lower_name:
+                            worker["type"] = 'ASIC'
+                            worker["model"] = 'MicroBT Whatsminer'
+                        elif 'bitaxe' in lower_name or 'nerdqaxe' in lower_name:
+                            worker["type"] = 'Bitaxe'
+                            worker["model"] = 'BitAxe Gamma 601'
 
                     if worker["name"].lower() not in invalid_names:
                         workers.append(worker)
@@ -1551,6 +1568,14 @@ class MiningDashboardService:
                     workers_online += 1
                 else:
                     workers_offline += 1
+
+                specs = parse_worker_name(worker["name"])
+                if specs:
+                    worker["type"] = specs["type"]
+                    worker["model"] = specs["model"]
+                    worker["efficiency"] = specs["efficiency"]
+                    hr_ths = convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                    worker["power_consumption"] = round(hr_ths * specs["efficiency"])
 
                 total_hashrate += convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
                 workers.append(worker)
