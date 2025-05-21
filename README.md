@@ -80,6 +80,7 @@ Comprehensive guides have been moved to the `docs` directory:
 - [Installation guide](docs/INSTALL.md)
 - [Deployment guide](docs/DEPLOYMENT.md)
 - [Configuration options](docs/CONFIGURATION.md)
+- [Worker naming guide](docs/WORKER-NAMING.md)
 
 ### Customization
 
