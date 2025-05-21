@@ -750,6 +750,7 @@ def dashboard():
                 "monthly_profit_usd": 0,
                 "daily_mined_sats": 0,
                 "monthly_mined_sats": 0,
+                "power_estimated": False,
                 "unpaid_earnings": "0",
                 "est_time_to_payout": None,
                 "last_block_height": None,

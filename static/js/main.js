@@ -3292,6 +3292,16 @@ function updateUI() {
             }
         }
 
+        // Show indicator if power usage was estimated
+        const powerIcon = document.getElementById("power-estimate-icon");
+        if (powerIcon) {
+            if (data.power_estimated) {
+                powerIcon.style.display = "inline-block";
+            } else {
+                powerIcon.style.display = "none";
+            }
+        }
+
         updateElementText("daily_mined_sats", numberWithCommas(data.daily_mined_sats) + " SATS");
         updateElementText("monthly_mined_sats", numberWithCommas(data.monthly_mined_sats) + " SATS");
 

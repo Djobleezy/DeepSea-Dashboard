@@ -579,6 +579,13 @@ html.deepsea-theme .satellite-dish-connected {
     0 0 3px #32cd32;
 }
 
+/* ----- POWER ESTIMATE ICON ----- */
+#power-estimate-icon {
+  color: #ffa500;
+  margin-left: 4px;
+  font-size: 0.85rem;
+}
+
 @keyframes pulse-satellite {
   0%,
   100% {
