@@ -198,63 +198,6 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
     assert data['total_paid_btc'] == 100 / svc.sats_per_btc
 
 
-def test_get_payment_history_scrape(monkeypatch):
-    svc = MiningDashboardService(0, 0, 'w')
-
-    html = """
-    <table><tbody id='payouts-tablerows'>
-    <tr class='table-row'>
-        <td class='table-cell'>2025-05-01 00:00</td>
-        <td class='table-cell'>abcd</td>
-        <td class='table-cell'>0.00000100 BTC</td>
-    </tr>
-    </tbody></table>
-    """
-
-    def fake_get(url, headers=None, timeout=10):
-        resp = MagicMock()
-        resp.ok = True
-        resp.text = html
-        return resp
-
-    monkeypatch.setattr(svc.session, 'get', fake_get)
-    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
-    import importlib, sys
-    sys.modules.pop('bs4', None)
-    real_bs4 = importlib.import_module('bs4')
-    monkeypatch.setattr(data_service, 'BeautifulSoup', real_bs4.BeautifulSoup)
-
-    payments = svc.get_payment_history_scrape(btc_price=20000)
-    assert len(payments) == 1
-    p = payments[0]
-    assert p['txid'] == 'abcd'
-    assert p['amount_sats'] == 100
-    assert p['fiat_value'] == (100 / svc.sats_per_btc) * 20000
-
-
-def test_get_earnings_data_fallback_to_scrape(monkeypatch):
-    svc = MiningDashboardService(0, 0, 'w')
-
-    monkeypatch.setattr(svc, 'get_payment_history_api', lambda days=360, btc_price=None: [])
-    sample = [{
-        'date': '2025-05-01 00:00',
-        'txid': 'abcd',
-        'amount_btc': 0.000001,
-        'amount_sats': 100,
-        'status': 'confirmed',
-        'date_iso': '2025-05-01T00:00:00+00:00'
-    }]
-    monkeypatch.setattr(svc, 'get_payment_history_scrape', lambda btc_price=None: sample)
-    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
-    monkeypatch.setattr('config.get_currency', lambda: 'USD')
-    monkeypatch.setattr(svc, 'get_ocean_data', lambda: data_service.OceanData())
-    monkeypatch.setattr(svc, 'get_bitcoin_stats', lambda: (0, 0, 20000, 0))
-
-    data = svc.get_earnings_data()
-    assert len(data['payments']) == 1
-    assert data['payments'][0]['txid'] == 'abcd'
-
-
 def test_get_worker_data_api(monkeypatch):
     svc = MiningDashboardService(0, 0, 'w')
 

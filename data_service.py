@@ -738,65 +738,6 @@ class MiningDashboardService:
             logging.error(f"Error fetching payment history from API: {e}")
             return None
 
-    def get_payment_history_scrape(self, btc_price=None):
-        """Scrape payout history from the stats page as a fallback."""
-        base_url = "https://ocean.xyz"
-        url = f"{base_url}/stats/{self.wallet}"
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Cache-Control": "no-cache"
-        }
-        payments = []
-        try:
-            resp = self.session.get(url, headers=headers, timeout=10)
-            if not resp.ok:
-                logging.error(f"Error fetching payout page: {resp.status_code}")
-                return None
-            soup = BeautifulSoup(resp.text, "html.parser")
-            table = (soup.find("tbody", id="payouts-tablerows") or soup.find("tbody", id="payout-tablerows"))
-            if not table:
-                logging.error("Payout table not found")
-                return None
-            for row in table.find_all("tr", class_="table-row"):
-                cells = row.find_all("td")
-                if len(cells) < 3:
-                    continue
-                date_text = cells[0].get_text(strip=True)
-                txid = cells[1].get_text(strip=True)
-                amount_text = cells[-1].get_text(strip=True)
-                amount_clean = amount_text.replace("BTC", "").replace(",", "").strip()
-                try:
-                    amount_btc = float(amount_clean)
-                except Exception:
-                    continue
-                sats = int(round(amount_btc * self.sats_per_btc))
-                date_iso = None
-                date_str = date_text
-                try:
-                    dt = datetime.strptime(date_text, "%Y-%m-%d %H:%M")
-                    dt = dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
-                    date_iso = dt.isoformat()
-                    date_str = dt.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    pass
-                payment = {
-                    "date": date_str,
-                    "txid": txid,
-                    "amount_btc": amount_btc,
-                    "amount_sats": sats,
-                    "status": "confirmed",
-                    "date_iso": date_iso,
-                }
-                if btc_price is not None:
-                    payment["rate"] = btc_price
-                    payment["fiat_value"] = amount_btc * btc_price
-                payments.append(payment)
-            return payments
-        except Exception as e:
-            logging.error(f"Error scraping payment history: {e}")
-            return None
-
     def get_earnings_data(self):
         """
         Get comprehensive earnings data from Ocean.xyz with improved error handling.
@@ -816,9 +757,8 @@ class MiningDashboardService:
 
             # Prefer the official API for payout history
             payments = self.get_payment_history_api(days=360, btc_price=btc_price)
-            if not payments:
-                logging.info("Falling back to scraping payout history")
-                payments = self.get_payment_history_scrape(btc_price=btc_price) or []
+            if payments is None:
+                payments = []
     
             # Get basic Ocean data for summary metrics (with timeout handling)
             try:
