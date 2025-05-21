@@ -700,6 +700,7 @@ class MiningDashboardService:
             for item in payouts:
                 ts = item.get("ts")
                 txid = item.get("on_chain_txid", "")
+                lightning_txid = item.get("lightning_txid", "")
                 sats = item.get("total_satoshis_net_paid", 0) or 0
                 amount_btc = sats / self.sats_per_btc
 
@@ -720,6 +721,7 @@ class MiningDashboardService:
                 payment = {
                     "date": date_str,
                     "txid": txid,
+                    "lightning_txid": lightning_txid,
                     "amount_btc": amount_btc,
                     "amount_sats": int(sats),
                     "status": "confirmed",
@@ -775,7 +777,16 @@ class MiningDashboardService:
                     if len(cells) < 3:
                         continue
                     date_text = cells[0].get_text(strip=True)
+                    link = cells[1].find('a')
                     txid = cells[1].get_text(strip=True)
+                    lightning_txid = ""
+                    if link and link.get('href'):
+                        href = link['href']
+                        if 'lightning' in href:
+                            lightning_txid = href.rstrip('/').split('/')[-1]
+                            txid = ""
+                        else:
+                            txid = href.rstrip('/').split('/')[-1]
                     amount_text = cells[-1].get_text(strip=True)
                     amount_clean = amount_text.replace("BTC", "").replace(",", "").strip()
                     try:
@@ -795,6 +806,7 @@ class MiningDashboardService:
                     payment = {
                         "date": date_str,
                         "txid": txid,
+                        "lightning_txid": lightning_txid,
                         "amount_btc": amount_btc,
                         "amount_sats": sats,
                         "status": "confirmed",

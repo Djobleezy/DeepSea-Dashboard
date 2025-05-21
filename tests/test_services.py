@@ -136,6 +136,7 @@ def test_get_payment_history_api_nested_result(monkeypatch):
                 {
                     'ts': 1700000000,
                     'on_chain_txid': 'abcd',
+                    'lightning_txid': 'ln1',
                     'total_satoshis_net_paid': 100
                 }
             ]
@@ -156,6 +157,7 @@ def test_get_payment_history_api_nested_result(monkeypatch):
     assert len(payments) == 1
     p = payments[0]
     assert p['txid'] == 'abcd'
+    assert p['lightning_txid'] == 'ln1'
     assert p['amount_sats'] == 100
     assert abs(p['amount_btc'] - 100 / svc.sats_per_btc) < 1e-9
     assert p['fiat_value'] == (100 / svc.sats_per_btc) * 20000
@@ -173,6 +175,7 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
                 {
                     'ts': 1700000000,
                     'on_chain_txid': 'abcd',
+                    'lightning_txid': 'ln1',
                     'total_satoshis_net_paid': 100
                 }
             ]
@@ -195,6 +198,7 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
 
     assert len(data['payments']) == 1
     assert data['payments'][0]['txid'] == 'abcd'
+    assert data['payments'][0]['lightning_txid'] == 'ln1'
     assert data['total_paid_btc'] == 100 / svc.sats_per_btc
 
 
@@ -235,6 +239,44 @@ def test_get_payment_history_scrape(monkeypatch):
     assert p['txid'] == 'abcd'
     assert p['amount_sats'] == 100
     assert p['fiat_value'] == (100 / svc.sats_per_btc) * 20000
+
+
+def test_get_payment_history_scrape_lightning(monkeypatch):
+    svc = MiningDashboardService(0, 0, 'w')
+
+    html = """
+    <table><tbody id='payouts-tablerows'>
+    <tr class='table-row'>
+        <td class='table-cell'>2025-05-01 00:00</td>
+        <td class='table-cell'><a href='/info/tx/lightning/ln1'>⚡ ln1</a></td>
+        <td class='table-cell'>0.00000100 BTC</td>
+    </tr>
+    </tbody></table>
+    """
+
+    html_empty = "<table><tbody id='payouts-tablerows'></tbody></table>"
+
+    def fake_get(url, headers=None, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        if 'ppage=0' in url:
+            resp.text = html
+        else:
+            resp.text = html_empty
+        return resp
+
+    monkeypatch.setattr(svc.session, 'get', fake_get)
+    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
+    import importlib, sys
+    sys.modules.pop('bs4', None)
+    real_bs4 = importlib.import_module('bs4')
+    monkeypatch.setattr(data_service, 'BeautifulSoup', real_bs4.BeautifulSoup)
+
+    payments = svc.get_payment_history_scrape()
+    assert len(payments) == 1
+    p = payments[0]
+    assert p['txid'] == ''
+    assert p['lightning_txid'] == 'ln1'
 
 
 def test_get_payment_history_scrape_pagination(monkeypatch):
