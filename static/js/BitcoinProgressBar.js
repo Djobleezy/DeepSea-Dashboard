@@ -588,70 +588,70 @@ const BitcoinMinuteRefresh = (function () {
         const expandedSnapPoints = [
             // Original points
             { name: 'topLeft', x: 20, y: 20 },
-            { name: 'topRight', x: window.innerWidth - 250, y: 20 },
+            { name: 'topRight', x: window.innerWidth - getTerminalWidth() - 20, y: 20 },
             { name: 'bottomLeft', x: 20, y: calculateBottomY() },
-            { name: 'bottomRight', x: window.innerWidth - 250, y: calculateBottomY() },
-            { name: 'center', x: (window.innerWidth - 230) / 2, y: 20 },
-            { name: 'centerBottom', x: (window.innerWidth - 230) / 2, y: calculateBottomY() },
+            { name: 'bottomRight', x: window.innerWidth - getTerminalWidth() - 20, y: calculateBottomY() },
+            { name: 'center', x: (window.innerWidth - getTerminalWidth()) / 2, y: 20 },
+            { name: 'centerBottom', x: (window.innerWidth - getTerminalWidth()) / 2, y: calculateBottomY() },
 
             // New edge snap points
-            { name: 'topCenter', x: (window.innerWidth - 230) / 2, y: 20 },
+            { name: 'topCenter', x: (window.innerWidth - getTerminalWidth()) / 2, y: 20 },
             { name: 'leftCenter', x: 20, y: (window.innerHeight - getTerminalHeight()) / 2 },
-            { name: 'rightCenter', x: window.innerWidth - 250, y: (window.innerHeight - getTerminalHeight()) / 2 },
-            { name: 'trueCenter', x: (window.innerWidth - 230) / 2, y: (window.innerHeight - getTerminalHeight()) / 2 },
+            { name: 'rightCenter', x: window.innerWidth - getTerminalWidth() - 20, y: (window.innerHeight - getTerminalHeight()) / 2 },
+            { name: 'trueCenter', x: (window.innerWidth - getTerminalWidth()) / 2, y: (window.innerHeight - getTerminalHeight()) / 2 },
 
             // Quarter positions
-            { name: 'topLeftQuarter', x: window.innerWidth / 4 - 115, y: 20 },
-            { name: 'topRightQuarter', x: (window.innerWidth / 4) * 3 - 115, y: 20 },
-            { name: 'bottomLeftQuarter', x: window.innerWidth / 4 - 115, y: calculateBottomY() },
-            { name: 'bottomRightQuarter', x: (window.innerWidth / 4) * 3 - 115, y: calculateBottomY() },
+            { name: 'topLeftQuarter', x: window.innerWidth / 4 - getTerminalWidth() / 2, y: 20 },
+            { name: 'topRightQuarter', x: (window.innerWidth / 4) * 3 - getTerminalWidth() / 2, y: 20 },
+            { name: 'bottomLeftQuarter', x: window.innerWidth / 4 - getTerminalWidth() / 2, y: calculateBottomY() },
+            { name: 'bottomRightQuarter', x: (window.innerWidth / 4) * 3 - getTerminalWidth() / 2, y: calculateBottomY() },
 
             // Side positions at thirds
             { name: 'leftUpperThird', x: 20, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
             { name: 'leftLowerThird', x: 20, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
-            { name: 'rightUpperThird', x: window.innerWidth - 250, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
-            { name: 'rightLowerThird', x: window.innerWidth - 250, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
+            { name: 'rightUpperThird', x: window.innerWidth - getTerminalWidth() - 20, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
+            { name: 'rightLowerThird', x: window.innerWidth - getTerminalWidth() - 20, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
 
             // Top and bottom third positions
-            { name: 'topLeftThird', x: window.innerWidth / 3 - 115, y: 20 },
-            { name: 'topRightThird', x: (window.innerWidth / 3) * 2 - 115, y: 20 },
-            { name: 'bottomLeftThird', x: window.innerWidth / 3 - 115, y: calculateBottomY() },
-            { name: 'bottomRightThird', x: (window.innerWidth / 3) * 2 - 115, y: calculateBottomY() }
+            { name: 'topLeftThird', x: window.innerWidth / 3 - getTerminalWidth() / 2, y: 20 },
+            { name: 'topRightThird', x: (window.innerWidth / 3) * 2 - getTerminalWidth() / 2, y: 20 },
+            { name: 'bottomLeftThird', x: window.innerWidth / 3 - getTerminalWidth() / 2, y: calculateBottomY() },
+            { name: 'bottomRightThird', x: (window.innerWidth / 3) * 2 - getTerminalWidth() / 2, y: calculateBottomY() }
         ];
 
         // Define snap points for minimized/collapsed state - optimized for smaller height
         const collapsedSnapPoints = [
             // Original points
             { name: 'topLeft', x: 20, y: 20 },
-            { name: 'topRight', x: window.innerWidth - 250, y: 20 },
+            { name: 'topRight', x: window.innerWidth - getTerminalWidth() - 20, y: 20 },
             { name: 'bottomLeft', x: 20, y: calculateBottomY() },
-            { name: 'bottomRight', x: window.innerWidth - 250, y: calculateBottomY() },
-            { name: 'center', x: (window.innerWidth - 230) / 2, y: 20 },
-            { name: 'centerBottom', x: (window.innerWidth - 230) / 2, y: calculateBottomY() },
+            { name: 'bottomRight', x: window.innerWidth - getTerminalWidth() - 20, y: calculateBottomY() },
+            { name: 'center', x: (window.innerWidth - getTerminalWidth()) / 2, y: 20 },
+            { name: 'centerBottom', x: (window.innerWidth - getTerminalWidth()) / 2, y: calculateBottomY() },
 
             // New edge snap points - same names as expanded for consistency
-            { name: 'topCenter', x: (window.innerWidth - 230) / 2, y: 20 },
+            { name: 'topCenter', x: (window.innerWidth - getTerminalWidth()) / 2, y: 20 },
             { name: 'leftCenter', x: 20, y: (window.innerHeight - getTerminalHeight()) / 2 },
-            { name: 'rightCenter', x: window.innerWidth - 250, y: (window.innerHeight - getTerminalHeight()) / 2 },
-            { name: 'trueCenter', x: (window.innerWidth - 230) / 2, y: (window.innerHeight - getTerminalHeight()) / 2 },
+            { name: 'rightCenter', x: window.innerWidth - getTerminalWidth() - 20, y: (window.innerHeight - getTerminalHeight()) / 2 },
+            { name: 'trueCenter', x: (window.innerWidth - getTerminalWidth()) / 2, y: (window.innerHeight - getTerminalHeight()) / 2 },
 
             // Quarter positions
-            { name: 'topLeftQuarter', x: window.innerWidth / 4 - 115, y: 20 },
-            { name: 'topRightQuarter', x: (window.innerWidth / 4) * 3 - 115, y: 20 },
-            { name: 'bottomLeftQuarter', x: window.innerWidth / 4 - 115, y: calculateBottomY() },
-            { name: 'bottomRightQuarter', x: (window.innerWidth / 4) * 3 - 115, y: calculateBottomY() },
+            { name: 'topLeftQuarter', x: window.innerWidth / 4 - getTerminalWidth() / 2, y: 20 },
+            { name: 'topRightQuarter', x: (window.innerWidth / 4) * 3 - getTerminalWidth() / 2, y: 20 },
+            { name: 'bottomLeftQuarter', x: window.innerWidth / 4 - getTerminalWidth() / 2, y: calculateBottomY() },
+            { name: 'bottomRightQuarter', x: (window.innerWidth / 4) * 3 - getTerminalWidth() / 2, y: calculateBottomY() },
 
             // Side positions at thirds
             { name: 'leftUpperThird', x: 20, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
             { name: 'leftLowerThird', x: 20, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
-            { name: 'rightUpperThird', x: window.innerWidth - 250, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
-            { name: 'rightLowerThird', x: window.innerWidth - 250, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
+            { name: 'rightUpperThird', x: window.innerWidth - getTerminalWidth() - 20, y: window.innerHeight / 3 - getTerminalHeight() / 2 },
+            { name: 'rightLowerThird', x: window.innerWidth - getTerminalWidth() - 20, y: (window.innerHeight / 3) * 2 - getTerminalHeight() / 2 },
 
             // Top and bottom third positions
-            { name: 'topLeftThird', x: window.innerWidth / 3 - 115, y: 20 },
-            { name: 'topRightThird', x: (window.innerWidth / 3) * 2 - 115, y: 20 },
-            { name: 'bottomLeftThird', x: window.innerWidth / 3 - 115, y: calculateBottomY() },
-            { name: 'bottomRightThird', x: (window.innerWidth / 3) * 2 - 115, y: calculateBottomY() }
+            { name: 'topLeftThird', x: window.innerWidth / 3 - getTerminalWidth() / 2, y: 20 },
+            { name: 'topRightThird', x: (window.innerWidth / 3) * 2 - getTerminalWidth() / 2, y: 20 },
+            { name: 'bottomLeftThird', x: window.innerWidth / 3 - getTerminalWidth() / 2, y: calculateBottomY() },
+            { name: 'bottomRightThird', x: (window.innerWidth / 3) * 2 - getTerminalWidth() / 2, y: calculateBottomY() }
         ];
 
         // Snap sensitivity - how close the terminal needs to be to snap (in pixels)
