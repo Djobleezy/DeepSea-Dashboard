@@ -6,8 +6,11 @@ import os
 import json
 import logging
 
-# Default configuration file path
-CONFIG_FILE = "config.json"
+# Default configuration file path. When the module is reloaded for testing,
+# a previously patched value for ``CONFIG_FILE`` should be preserved.  Using
+# ``globals().get`` allows tests to monkeypatch ``CONFIG_FILE`` before
+# reloading the module and have that value persist across the reload.
+CONFIG_FILE = globals().get("CONFIG_FILE", "config.json")
 
 # Cached configuration and its modification time
 _cached_config = None

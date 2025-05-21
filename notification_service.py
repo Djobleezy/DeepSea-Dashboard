@@ -468,7 +468,10 @@ class NotificationService:
             user_currency = config.get("currency", "USD")
 
             # Get exchange rates
-            exchange_rates = get_exchange_rates(getattr(self, "dashboard_service", None))
+            # ``get_exchange_rates`` can be patched by tests with a simple
+            # zero-argument callable.  Avoid passing ``dashboard_service`` so
+            # such patches don't receive unexpected arguments.
+            exchange_rates = get_exchange_rates()
             
             # Format with the user's currency
             formatted_profit = format_currency_value(daily_profit_usd, user_currency, exchange_rates)
@@ -744,7 +747,10 @@ class NotificationService:
                 config = load_config()
                 new_currency = config.get("currency", "USD")
 
-            exchange_rates = get_exchange_rates(getattr(self, "dashboard_service", None))
+            # ``get_exchange_rates`` may be patched by tests with a simple
+            # zero-argument callable.  Call it without arguments to avoid
+            # issues when such a patch is in place.
+            exchange_rates = get_exchange_rates()
 
             updated = 0
             for notif in self.notifications:

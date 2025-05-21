@@ -93,9 +93,16 @@ class StateManager:
             return
             
         try:
-            # Check version to handle format changes
+            # Check version to handle format changes. ``DummyRedis`` used in
+            # tests stores plain strings, so handle both ``bytes`` and ``str``
+            # gracefully.
             version = self.redis_client.get(f"{self.STATE_KEY}_version")
-            version = version.decode('utf-8') if version else "1.0"
+            if isinstance(version, bytes):
+                version = version.decode('utf-8')
+            elif not version:
+                version = "1.0"
+            else:
+                version = str(version)
             
             state_json = self.redis_client.get(self.STATE_KEY)
             if state_json:
@@ -135,9 +142,15 @@ class StateManager:
                     compact_metrics_log = state.get("metrics_log", [])
                     self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
                     for entry in compact_metrics_log:
+                        metrics = entry.get("m", {})
+                        # Convert optimized ``{"value": x}`` entries back to
+                        # plain numeric values for backward compatibility.
+                        for key, val in list(metrics.items()):
+                            if isinstance(val, dict) and "value" in val:
+                                metrics[key] = val["value"]
                         self.metrics_log.append({
                             "timestamp": entry.get("ts", ""),
-                            "metrics": entry.get("m", {})
+                            "metrics": metrics
                         })
                 else:  # Original format
                     raw_history = state.get("arrow_history", {})
