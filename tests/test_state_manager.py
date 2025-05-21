@@ -15,7 +15,7 @@ if 'redis' not in sys.modules:
     sys.modules['redis'] = redis_mod
 
 from collections import deque
-from state_manager import StateManager
+from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES
 from datetime import timedelta
 
 class DummyRedis:
@@ -58,16 +58,17 @@ def test_variance_history_calculation(monkeypatch):
         "estimated_rewards_in_window_sats": 10,
     }
     mgr.update_metrics_history(first)
-    assert first["estimated_earnings_per_day_sats_variance_3hr"] == 0
+    assert first["estimated_earnings_per_day_sats_variance_3hr"] is None
 
-    # Move the stored entry 3 hours back to simulate passage of time
+    # Pre-fill variance history to simulate 3 hours of data
     for key in [
         "estimated_earnings_per_day_sats",
         "estimated_earnings_next_block_sats",
         "estimated_rewards_in_window_sats",
     ]:
         history = mgr.variance_history[key]
-        history[0]["time"] -= timedelta(hours=3) - timedelta(seconds=1)
+        for _ in range(MAX_VARIANCE_HISTORY_ENTRIES - 1):
+            history.append({"time": history[0]["time"], "value": first[key]})
 
     second = {
         "estimated_earnings_per_day_sats": 120,

@@ -2824,15 +2824,30 @@ function updateUI() {
             para.appendChild(container);
         }
 
-        const formatted = (varianceValue >= 0 ? '+' : '') +
-            numberWithCommas(Math.round(varianceValue)) + ' SATS';
+        let formatted;
+        const needsData = varianceValue === null || varianceValue === undefined;
+        if (needsData) {
+            formatted = 'Loading...';
+        } else {
+            formatted = (varianceValue >= 0 ? '+' : '') +
+                numberWithCommas(Math.round(varianceValue)) + ' SATS';
+        }
 
         const existing = document.getElementById(varianceId);
         if (existing) {
             existing.textContent = formatted;
+            if (needsData) {
+                existing.setAttribute('title', 'Variance requires about 3 hours of data');
+            } else {
+                existing.removeAttribute('title');
+            }
         } else {
             const div = createDivider(varianceId, formatted, '[3hr \u0394]');
             container.appendChild(div);
+            const valueSpan = div.querySelector('#' + varianceId);
+            if (needsData) {
+                valueSpan.setAttribute('title', 'Variance requires about 3 hours of data');
+            }
         }
     }
 

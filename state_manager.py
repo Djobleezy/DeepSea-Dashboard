@@ -509,14 +509,14 @@ class StateManager:
 
                 history.append({"time": now, "value": metrics[key]})
 
-                if history and history[0]["time"] <= window_start:
-                    baseline = history[0]["value"]
-                    metrics[f"{key}_variance_3hr"] = metrics[key] - baseline
-                elif len(history) > 1:
-                    baseline = history[0]["value"]
+                # Find the earliest non-zero value to use as baseline
+                baseline_entry = next((h for h in history if h["value"] != 0), None)
+
+                if baseline_entry and len(history) >= MAX_VARIANCE_HISTORY_ENTRIES:
+                    baseline = baseline_entry["value"]
                     metrics[f"{key}_variance_3hr"] = metrics[key] - baseline
                 else:
-                    metrics[f"{key}_variance_3hr"] = 0
+                    metrics[f"{key}_variance_3hr"] = None
 
             # --- Aggregate arrow_history by minute for the graph ---
             aggregated_history = {}
