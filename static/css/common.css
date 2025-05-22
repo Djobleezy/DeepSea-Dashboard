@@ -1258,6 +1258,23 @@ html.deepsea-theme #congratsMessage {
   margin-bottom: 4px;
   writing-mode: bt-lr;
   -webkit-appearance: slider-vertical;
+  accent-color: var(--primary-color);
+}
+
+.volume-slider::-webkit-slider-thumb,
+.volume-slider::-moz-range-thumb {
+    background-color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-runnable-track,
+.volume-slider::-moz-range-track {
+    background-color: rgba(var(--primary-color-rgb), 0.5);
+    border-radius: 2px;
 }
 
 .audio-controls:hover .volume-slider {
