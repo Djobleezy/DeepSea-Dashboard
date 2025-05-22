@@ -127,3 +127,84 @@ def test_block_events_endpoint(client):
     if len(events) > 1:
         assert events[0]["timestamp"] >= events[1]["timestamp"]
 
+
+def test_metrics_endpoint(client, monkeypatch):
+    import App
+
+    metrics = {"value": 1}
+
+    def fake_update(force=False):
+        App.cached_metrics = metrics
+
+    monkeypatch.setattr(App, "update_metrics_job", fake_update)
+    App.cached_metrics = None
+    resp = client.get("/api/metrics")
+    assert resp.status_code == 200
+    assert resp.get_json() == metrics
+
+
+def test_notifications_unread_count_endpoint(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": False},
+        {"id": "2", "read": True},
+        {"id": "3", "read": False},
+    ]
+
+    resp = client.get("/api/notifications/unread_count")
+    assert resp.status_code == 200
+    assert resp.get_json()["unread_count"] == 2
+
+
+def test_mark_read_endpoint(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": False},
+        {"id": "2", "read": False},
+    ]
+
+    resp = client.post("/api/notifications/mark_read", json={"notification_id": "1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["unread_count"] == 1
+    assert App.notification_service.notifications[0]["read"] is True
+
+
+def test_delete_notification_endpoint(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": False},
+        {"id": "2", "read": False},
+    ]
+
+    resp = client.post("/api/notifications/delete", json={"notification_id": "1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["unread_count"] == 1
+    assert len(App.notification_service.notifications) == 1
+    assert App.notification_service.notifications[0]["id"] == "2"
+
+
+def test_clear_notifications_endpoint(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": True, "category": "system", "timestamp": "2023-01-01T00:00:00"},
+        {"id": "2", "read": False, "category": "system", "timestamp": "2023-01-02T00:00:00"},
+        {"id": "3", "read": True, "category": "system", "timestamp": "2023-01-03T00:00:00"},
+    ]
+
+    resp = client.post("/api/notifications/clear", json={"read_only": True})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["cleared_count"] == 2
+    assert data["unread_count"] == 1
+    assert len(App.notification_service.notifications) == 1
+    assert App.notification_service.notifications[0]["id"] == "2"
+
