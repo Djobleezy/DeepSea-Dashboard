@@ -1,0 +1,100 @@
+import types
+import sys
+
+# Provide lightweight stubs for external deps if missing
+if 'pytz' not in sys.modules:
+    tz_module = types.ModuleType('pytz')
+    class DummyTZInfo:
+        def utcoffset(self, dt):
+            return None
+        def dst(self, dt):
+            return None
+        def tzname(self, dt):
+            return 'UTC'
+        def localize(self, dt_obj):
+            return dt_obj.replace(tzinfo=self)
+    tz_module.timezone = lambda name: DummyTZInfo()
+    sys.modules['pytz'] = tz_module
+
+if 'requests' not in sys.modules:
+    req_module = types.ModuleType('requests')
+    class DummySession:
+        def get(self, *args, **kwargs):
+            raise NotImplementedError
+    req_module.Session = DummySession
+    req_module.exceptions = types.SimpleNamespace(Timeout=Exception, ConnectionError=Exception)
+    sys.modules['requests'] = req_module
+
+if 'bs4' not in sys.modules:
+    bs4_module = types.ModuleType('bs4')
+    class DummySoup:
+        pass
+    bs4_module.BeautifulSoup = DummySoup
+    sys.modules['bs4'] = bs4_module
+
+from worker_service import WorkerService
+
+
+def test_generate_fallback_data_counts(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    svc = WorkerService()
+    metrics = {
+        'workers_hashing': 2,
+        'hashrate_3hr': 60,
+        'hashrate_3hr_unit': 'TH/s',
+        'unpaid_earnings': 0.1,
+        'daily_mined_sats': 500,
+    }
+    data = svc.generate_fallback_data(metrics)
+    assert data['workers_total'] == 2
+    assert data['workers_online'] == 1
+    assert data['workers_offline'] == 1
+    assert data['daily_sats'] == 500
+
+
+def test_generate_fallback_data_zero_workers(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    svc = WorkerService()
+    metrics = {
+        'workers_hashing': 0,
+        'hashrate_3hr': 0,
+        'hashrate_3hr_unit': 'TH/s',
+        'unpaid_earnings': 0.01,
+        'daily_mined_sats': 0,
+        'daily_btc_net': 0.000003,
+    }
+    data = svc.generate_fallback_data(metrics)
+    assert data['workers_total'] == 1  # forced minimum
+    assert data['workers_online'] == 1
+    assert data['workers_offline'] == 0
+    assert data['total_hashrate'] == 50.0
+    assert data['daily_sats'] == 300
+
+
+def test_sync_worker_counts_with_dashboard(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    svc = WorkerService()
+    worker_data = {
+        'workers_total': 2,
+        'workers_online': 1,
+        'workers_offline': 1,
+        'total_hashrate': 60,
+        'hashrate_unit': 'TH/s',
+        'daily_sats': 50,
+        'total_earnings': 0.1,
+    }
+    metrics = {
+        'workers_hashing': 4,
+        'hashrate_3hr': 100,
+        'hashrate_3hr_unit': 'TH/s',
+        'daily_mined_sats': 150,
+        'unpaid_earnings': 0.2,
+    }
+    svc.sync_worker_counts_with_dashboard(worker_data, metrics)
+    assert worker_data['workers_total'] == 4
+    assert worker_data['workers_online'] == 2
+    assert worker_data['workers_offline'] == 2
+    assert worker_data['total_hashrate'] == 100
+    assert worker_data['hashrate_unit'] == 'TH/s'
+    assert worker_data['daily_sats'] == 150
+    assert worker_data['total_earnings'] == 0.2
