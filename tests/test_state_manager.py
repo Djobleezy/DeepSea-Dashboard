@@ -49,6 +49,24 @@ def test_save_and_load_graph_state_gzip():
     assert new_mgr.metrics_log[0]["metrics"]["hashrate_60sec"] == 1
 
 
+def test_load_graph_state_plain_json():
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+    state = {
+        "arrow_history": {"hashrate_60sec": [{"time": "t", "value": 1, "arrow": "", "unit": "th/s"}]},
+        "hashrate_history": [1],
+        "metrics_log": [{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}],
+    }
+    mgr.redis_client.set(f"{mgr.STATE_KEY}_version", "1.0")
+    mgr.redis_client.set(mgr.STATE_KEY, json.dumps(state))
+
+    new_mgr = StateManager()
+    new_mgr.redis_client = mgr.redis_client
+    new_mgr.load_graph_state()
+
+    assert new_mgr.arrow_history["hashrate_60sec"][0]["value"] == 1
+
+
 def test_variance_history_calculation(monkeypatch):
     mgr = StateManager()
     monkeypatch.setattr('state_manager.get_timezone', lambda: 'UTC')

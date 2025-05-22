@@ -111,16 +111,17 @@ class StateManager:
             state_json = self.redis_client.get(self.STATE_KEY)
             if state_json:
                 try:
-                    if isinstance(state_json, bytes):
+                    if isinstance(state_json, (bytes, bytearray)):
                         try:
                             state_json = gzip.decompress(state_json).decode("utf-8")
                         except OSError:
                             state_json = state_json.decode("utf-8")
                     else:
-                        state_json = gzip.decompress(state_json).decode("utf-8")
+                        # Stored as plain JSON string
+                        state_json = str(state_json)
                 except Exception as e:
                     logging.error(f"Error decompressing graph state: {e}")
-                    state_json = state_json.decode('utf-8') if isinstance(state_json, bytes) else str(state_json)
+                    state_json = state_json.decode("utf-8") if isinstance(state_json, (bytes, bytearray)) else str(state_json)
 
                 state = json.loads(state_json)
                 
