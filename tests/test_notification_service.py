@@ -95,5 +95,13 @@ class NotificationCurrencyTest(unittest.TestCase):
         self.assertAlmostEqual(notif['data']['daily_profit_usd'], 10.0)
         self.assertIn('$', notif['message'])
 
+    def test_parse_timestamp_with_z_suffix(self):
+        with patch('notification_service.get_timezone', return_value='UTC'):
+            svc = NotificationService(DummyStateManager())
+            dt = svc._parse_timestamp('2024-01-02T03:04:05Z')
+        self.assertIsNotNone(dt.tzinfo)
+        self.assertEqual(dt.year, 2024)
+        self.assertEqual(dt.minute, 4)
+
 if __name__ == '__main__':
     unittest.main()
