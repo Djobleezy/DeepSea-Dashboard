@@ -119,9 +119,12 @@ def log_memory_usage():
         logging.info(f"Memory usage: {mem_info.rss / 1024 / 1024:.2f} MB (RSS)")
         
         # Log the size of key data structures
-        logging.info(
-            f"Arrow history entries: {sum(len(v) for v in state_manager.get_history().values() if isinstance(v, (list, deque)))}"
+        arrow_entries = sum(
+            len(v)
+            for v in state_manager.get_history().values()
+            if isinstance(v, (list, deque))
         )
+        logging.info(f"Arrow history entries: {arrow_entries}")
         logging.info(f"Metrics log entries: {len(state_manager.get_metrics_log())}")
         logging.info(f"Active SSE connections: {active_sse_connections}")
     except Exception as e:
@@ -292,8 +295,9 @@ def memory_watchdog():
                 logging.error(f"Error pruning history data: {e}")
             
             # 3. Clear any non-critical caches
-            if hasattr(dashboard_service, 'cache'):
-                dashboard_service.cache.clear()
+            ds = globals().get('dashboard_service')
+            if ds and hasattr(ds, 'cache'):
+                ds.cache.clear()
                 logging.info("Cleared dashboard service cache")
             
             # 4. Notify about the memory issue
@@ -306,7 +310,10 @@ def memory_watchdog():
             
             # Log memory after cleanup
             new_mem_percent = process.memory_percent()
-            logging.info(f"Memory after emergency cleanup: {new_mem_percent:.1f}% (reduced by {mem_percent - new_mem_percent:.1f}%)")
+            reduction = mem_percent - new_mem_percent
+            logging.info(
+                f"Memory after emergency cleanup: {new_mem_percent:.1f}% (reduced by {reduction:.1f}%)"
+            )
             
     except Exception as e:
         logging.error(f"Error in memory watchdog: {e}")
@@ -431,7 +438,11 @@ def update_metrics_job(force=False):
                 logging.info(f"Updated scheduler_last_successful_run: {scheduler_last_successful_run}")
 
                 # Persist critical state
-                state_manager.persist_critical_state(cached_metrics, scheduler_last_successful_run, last_metrics_update_time)
+                state_manager.persist_critical_state(
+                    cached_metrics,
+                    scheduler_last_successful_run,
+                    last_metrics_update_time,
+                )
                 
                 # Periodically check and prune data to prevent memory growth
                 if current_time % 300 < 60:  # Every ~5 minutes
@@ -451,8 +462,11 @@ def update_metrics_job(force=False):
                             log_memory_usage()  # Log memory usage after GC
                 else:
                     # Fixed interval full garbage collection
-                    if current_time % MEMORY_CONFIG['GC_INTERVAL_SECONDS'] < 60:  
-                        logging.info(f"Scheduled full memory cleanup (every {MEMORY_CONFIG['GC_INTERVAL_SECONDS']//60} minutes)")
+                    if current_time % MEMORY_CONFIG['GC_INTERVAL_SECONDS'] < 60:
+                        interval = MEMORY_CONFIG['GC_INTERVAL_SECONDS'] // 60
+                        logging.info(
+                            f"Scheduled full memory cleanup (every {interval} minutes)"
+                        )
                         gc.collect(generation=2)  # Force full collection
                         log_memory_usage()
             else:
@@ -615,6 +629,7 @@ def stream():
             # Set a maximum connection time - increased to 15 minutes for better user experience
             end_time = time.time() + MAX_SSE_CONNECTION_TIME
             last_timestamp = None
+            last_ping_time = time.time()
 
             logging.info(f"SSE {client_id}: Streaming {num_points} history points")
 
@@ -648,8 +663,12 @@ def stream():
                         yield f"data: {data}\n\n"
                     
                     # Send regular pings about every 30 seconds to keep connection alive
-                    if int(time.time()) % 30 == 0:
-                        yield f"data: {{\"type\": \"ping\", \"time\": {int(time.time())}, \"connections\": {active_sse_connections}}}\n\n"
+                    if time.time() - last_ping_time >= 30:
+                        last_ping_time = time.time()
+                        yield (
+                            f"data: {{\"type\": \"ping\", \"time\": {int(last_ping_time)}, "
+                            f"\"connections\": {active_sse_connections}}}\n\n"
+                        )
                     
                     # Sleep to reduce CPU usage
                     time.sleep(1)
@@ -878,14 +897,22 @@ def update_config():
         logging.info(f"Saving configuration: {new_config}")
         if save_config(new_config):
             # Important: Reinitialize the dashboard service with the new configuration
+            if dashboard_service:
+                try:
+                    dashboard_service.close()
+                except Exception as e:
+                    logging.error(f"Error closing old dashboard service: {e}")
+
             dashboard_service = MiningDashboardService(
                 new_config.get("power_cost", 0.0),
                 new_config.get("power_usage", 0.0),
                 new_config.get("wallet"),
                 network_fee=new_config.get("network_fee", 0.0),
-                worker_service=worker_service
+                worker_service=worker_service,
             )
-            logging.info(f"Dashboard service reinitialized with new wallet: {new_config.get('wallet')}")
+            logging.info(
+                f"Dashboard service reinitialized with new wallet: {new_config.get('wallet')}"
+            )
 
             # Update worker service to use the new dashboard service (with the updated wallet)
             worker_service.set_dashboard_service(dashboard_service)
@@ -897,7 +924,10 @@ def update_config():
             # If currency changed, update notifications to use the new currency
             if currency_changed:
                 try:
-                    logging.info(f"Currency changed from {current_config.get('currency', 'USD')} to {new_config['currency']}")
+                    old_currency = current_config.get('currency', 'USD')
+                    logging.info(
+                        f"Currency changed from {old_currency} to {new_config['currency']}"
+                    )
                     updated_count = notification_service.update_notification_currency(new_config["currency"])
                     logging.info(f"Updated {updated_count} notifications to use {new_config['currency']} currency")
                 except Exception as e:
@@ -960,7 +990,11 @@ def health_check():
     status = {
         "status": health_status,
         "uptime": uptime_seconds,
-        "uptime_formatted": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m {int(uptime_seconds % 60)}s",
+        "uptime_formatted": (
+            f"{int(uptime_seconds // 3600)}h "
+            f"{int((uptime_seconds % 3600) // 60)}m "
+            f"{int(uptime_seconds % 60)}s"
+        ),
         "connections": active_sse_connections,
         "memory": {
             "usage_mb": round(memory_usage_mb, 2),
@@ -984,7 +1018,9 @@ def health_check():
     
     # Log health check if status is not healthy
     if health_status != "healthy":
-        logging.warning(f"Health check returning {health_status} status: {status}")
+        logging.warning(
+            f"Health check returning {health_status} status: {status}"
+        )
     
     return jsonify(status)
 
@@ -996,11 +1032,19 @@ def scheduler_health():
         scheduler_status = {
             "running": scheduler.running if hasattr(scheduler, "running") else False,
             "job_count": len(scheduler.get_jobs()) if hasattr(scheduler, "get_jobs") else 0,
-            "next_run": str(scheduler.get_jobs()[0].next_run_time) if hasattr(scheduler, "get_jobs") and scheduler.get_jobs() else None,
+            "next_run": (
+                str(scheduler.get_jobs()[0].next_run_time)
+                if hasattr(scheduler, "get_jobs") and scheduler.get_jobs()
+                else None
+            ),
             "last_update": last_metrics_update_time,
-            "time_since_update": time.time() - last_metrics_update_time if last_metrics_update_time else None,
+            "time_since_update": (
+                time.time() - last_metrics_update_time if last_metrics_update_time else None
+            ),
             "last_successful_run": scheduler_last_successful_run,
-            "time_since_successful": time.time() - scheduler_last_successful_run if scheduler_last_successful_run else None
+            "time_since_successful": (
+                time.time() - scheduler_last_successful_run if scheduler_last_successful_run else None
+            ),
         }
         return jsonify(scheduler_status)
     except Exception as e:
@@ -1033,8 +1077,17 @@ def force_refresh():
             global cached_metrics, scheduler_last_successful_run
             cached_metrics = metrics
             scheduler_last_successful_run = time.time()
-            logging.info(f"Force refresh successful, new timestamp: {metrics['server_timestamp']}")
-            return jsonify({"status": "success", "message": "Metrics refreshed", "timestamp": metrics['server_timestamp']})
+            timestamp = metrics['server_timestamp']
+            logging.info(
+                f"Force refresh successful, new timestamp: {timestamp}"
+            )
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": "Metrics refreshed",
+                    "timestamp": timestamp,
+                }
+            )
         else:
             return jsonify({"status": "error", "message": "Failed to fetch metrics"}), 500
     except Exception as e:

@@ -224,6 +224,7 @@ class WorkerService:
         """
         current_workers = worker_data.get("workers", [])
         current_count = len(current_workers)
+        next_index = current_count + 1
         
         if current_count == target_count:
             return
@@ -243,31 +244,31 @@ class WorkerService:
             
             # Copy and adjust existing workers to create new ones
             if online_workers and new_online > 0:
-                for i in range(new_online):
-                    # Pick a random online worker as template
+                for _ in range(new_online):
                     template = random.choice(online_workers).copy()
-                    # Give it a new name to avoid duplicates
-                    template["name"] = f"{template['name']}_{current_count + i + 1}"
+                    template["name"] = f"{template['name']}_{next_index}"
                     current_workers.append(template)
+                    next_index += 1
                     
             if offline_workers and new_offline > 0:
-                for i in range(new_offline):
-                    # Pick a random offline worker as template
+                for _ in range(new_offline):
                     template = random.choice(offline_workers).copy()
-                    # Give it a new name to avoid duplicates
-                    template["name"] = f"{template['name']}_{current_count + new_online + i + 1}"
+                    template["name"] = f"{template['name']}_{next_index}"
                     current_workers.append(template)
+                    next_index += 1
                     
             # If no existing workers of either type, create new ones from scratch
             if not online_workers and new_online > 0:
-                for i in range(new_online):
-                    worker = self.create_default_worker(f"Miner_{current_count + i + 1}", "online")
+                for _ in range(new_online):
+                    worker = self.create_default_worker(f"Miner_{next_index}", "online")
                     current_workers.append(worker)
+                    next_index += 1
                     
             if not offline_workers and new_offline > 0:
-                for i in range(new_offline):
-                    worker = self.create_default_worker(f"Miner_{current_count + new_online + i + 1}", "offline")
+                for _ in range(new_offline):
+                    worker = self.create_default_worker(f"Miner_{next_index}", "offline")
                     current_workers.append(worker)
+                    next_index += 1
                     
         elif current_count > target_count:
             # Need to remove some workers
