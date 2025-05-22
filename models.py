@@ -4,6 +4,7 @@ Data models for the Bitcoin Mining Dashboard.
 from dataclasses import dataclass
 from typing import Dict, Any
 import logging
+import re
 
 @dataclass
 class OceanData:
@@ -154,10 +155,18 @@ def convert_to_ths(value, unit):
     Returns:
         float: The hashrate value in TH/s
     """
-    if value is None or value <= 0:
+    if value is None:
         return 0
-        
+
     try:
+        if isinstance(value, str):
+            cleaned = value.replace(',', '').strip()
+            match = re.match(r"[-+]?\d*\.?\d+", cleaned)
+            value = float(match.group(0)) if match else 0
+        value = float(value)
+        if value <= 0:
+            return 0
+
         unit = unit.lower() if unit else 'th/s'
         
         if 'ph/s' in unit:
