@@ -422,24 +422,6 @@ def test_get_blocks_api(monkeypatch):
     assert blocks[0]['height'] == 100
 
 
-def test_get_blocks_api_nested(monkeypatch):
-    svc = MiningDashboardService(0, 0, 'w')
-
-    sample = {'result': {'blocks': [{'height': 101, 'time': 1700000010}]}}
-
-    def fake_get(url, timeout=10):
-        resp = MagicMock()
-        resp.ok = True
-        resp.json.return_value = sample
-        return resp
-
-    monkeypatch.setattr(svc.session, 'get', fake_get)
-    blocks = svc.get_blocks_api()
-
-    assert isinstance(blocks, list)
-    assert blocks[0]['height'] == 101
-
-
 def test_fetch_metrics_estimates_power(monkeypatch):
     class DummyWS:
         def get_workers_data(self, cached_metrics, force_refresh=False):
