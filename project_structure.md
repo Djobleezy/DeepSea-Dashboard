@@ -20,6 +20,7 @@ DeepSea-Dashboard/
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Docker configuration
 ├── docker-compose.yml          # Docker Compose configuration
+├── routes/                  # Flask route modules (main_routes.py, memory_routes.py, notification_routes.py)
 │
 ├── templates/                  # HTML templates
 │   ├── base.html              # Base template with common elements
@@ -64,7 +65,7 @@ DeepSea-Dashboard/
 #### App.py
 The main Flask application that serves as the entry point. It:
 - Initializes the application and its components
-- Configures routes and middleware
+- Registers routes from `routes/main_routes.py` (where most route handlers reside) and configures middleware
 - Sets up the background scheduler for data updates
 - Manages Server-Sent Events (SSE) connections
 - Handles error recovery and graceful shutdown

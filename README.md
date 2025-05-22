@@ -241,6 +241,7 @@ DeepSea-Dashboard/
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Docker configuration
 ├── docker-compose.yml          # Docker Compose configuration
+├── routes/                  # Flask route modules (main_routes.py, memory_routes.py, notification_routes.py)
 DeepSea-Dashboard/
 │
 ├── templates/                  # HTML templates
@@ -281,6 +282,7 @@ DeepSea-Dashboard/
 ├── LICENSE.md                  # License information
 └── logs/                       # Application logs (generated at runtime)
 ```
+Most Flask routes are defined in `routes/main_routes.py`. `App.py` registers them during startup.
 
 For more details on the architecture and component interactions,
 see [project_structure.md](project_structure.md).
