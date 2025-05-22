@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py .
 COPY config.json .
 COPY setup.py .
+COPY routes/ routes/
 
 # Create all necessary directories in one command
 RUN mkdir -p static/css static/js static/favicon templates logs /app/logs
