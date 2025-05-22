@@ -5,7 +5,9 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 import time
+import gc
 import psutil
+from collections import deque
 import signal
 import sys
 import threading
@@ -15,6 +17,7 @@ from flask import Flask, render_template, jsonify, Response, request, stream_wit
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask_caching import Cache
+from apscheduler.schedulers.background import BackgroundScheduler
 from notification_service import NotificationService, NotificationLevel, NotificationCategory
 
 # Import custom modules
@@ -23,9 +26,15 @@ from data_service import MiningDashboardService
 from worker_service import WorkerService
 from state_manager import StateManager, MAX_HISTORY_ENTRIES
 from config import get_timezone
-from scheduler_utils import update_metrics_job, create_scheduler
-from routes.memory_routes import register_memory_routes
-from routes.notification_routes import register_notification_routes
+from memory_utils import (
+    MEMORY_CONFIG,
+    memory_usage_history,
+    memory_usage_lock,
+    log_memory_usage,
+    adaptive_gc,
+    check_for_memory_leaks,
+    memory_watchdog,
+)
 
 
 # Initialize Flask app
@@ -95,6 +104,255 @@ def add_header(response):
     return response
 
 
+# --- Modified update_metrics_job function ---
+def update_metrics_job(force=False):
+    """
+    Background job to update metrics.
+    
+    Args:
+        force (bool): Whether to force update regardless of timing
+    """
+    global cached_metrics, last_metrics_update_time, scheduler, scheduler_last_successful_run
+    
+    logging.info("Starting update_metrics_job")
+
+    try:
+        # Check scheduler health - enhanced logic to detect failed executors
+        if not scheduler or not hasattr(scheduler, 'running'):
+            logging.error("Scheduler object is invalid, attempting to recreate")
+            with scheduler_recreate_lock:
+                create_scheduler()
+            return
+            
+        if not scheduler.running:
+            logging.warning("Scheduler stopped unexpectedly, attempting to restart")
+            try:
+                scheduler.start()
+                logging.info("Scheduler restarted successfully")
+            except Exception as e:
+                logging.error(f"Failed to restart scheduler: {e}")
+                # More aggressive recovery - recreate scheduler entirely
+                with scheduler_recreate_lock:
+                    create_scheduler()
+                return
+        
+        # Test the scheduler's executor by checking its state
+        try:
+            # Check if any jobs exist and are scheduled 
+            jobs = scheduler.get_jobs()
+            if not jobs:
+                logging.error("No jobs found in scheduler - recreating")
+                with scheduler_recreate_lock:
+                    create_scheduler()
+                return
+                
+            # Check if the next run time is set for any job
+            next_runs = [job.next_run_time for job in jobs]
+            if not any(next_runs):
+                logging.error("No jobs with next_run_time found - recreating scheduler")
+                with scheduler_recreate_lock:
+                    create_scheduler()
+                return
+        except RuntimeError as e:
+            # Properly handle the "cannot schedule new futures after shutdown" error
+            if "cannot schedule new futures after shutdown" in str(e):
+                logging.error("Detected dead executor, recreating scheduler")
+                with scheduler_recreate_lock:
+                    create_scheduler()
+                return
+        except Exception as e:
+            logging.error(f"Error checking scheduler state: {e}")
+        
+        # Skip update if the last one was too recent (prevents overlapping runs)
+        # Unless force=True is specified
+        current_time = time.time()
+        if not force and last_metrics_update_time and (current_time - last_metrics_update_time < 30):
+            logging.info("Skipping metrics update - previous update too recent")
+            return
+            
+        # Set last update time to now
+        last_metrics_update_time = current_time
+        logging.info(f"Updated last_metrics_update_time: {last_metrics_update_time}")
+        
+        # Add timeout handling with a timer
+        job_timeout = 45  # seconds
+        job_successful = False
+        
+        def timeout_handler():
+            """Log an error if the metrics update exceeds the timeout."""
+            if not job_successful:
+                logging.error("Background job timed out after 45 seconds")
+        
+        # Set timeout timer
+        timer = threading.Timer(job_timeout, timeout_handler)
+        timer.daemon = True
+        timer.start()
+        
+        try:
+            # Use the dashboard service to fetch metrics
+            metrics = dashboard_service.fetch_metrics()
+            if metrics:
+                logging.info("Fetched metrics successfully")
+                
+                # Add config_reset flag to metrics from the config
+                config = load_config()
+                metrics["config_reset"] = config.get("config_reset", False)
+                logging.info(f"Added config_reset flag to metrics: {metrics.get('config_reset')}")
+    
+                # First check for notifications by comparing new metrics with old cached metrics
+                notification_service.check_and_generate_notifications(metrics, cached_metrics)
+    
+                # Then update cached metrics after comparison
+                cached_metrics = metrics
+                
+                # Clear the config_reset flag after it's been used
+                if metrics.get("config_reset"):
+                    config = load_config()
+                    if "config_reset" in config:
+                        del config["config_reset"]
+                        save_config(config)
+                        logging.info("Cleared config_reset flag from configuration after use")
+    
+                # Update state history (only once)
+                state_manager.update_metrics_history(metrics)
+    
+                logging.info("Background job: Metrics updated successfully")
+                job_successful = True
+                
+                # Mark successful run time for watchdog
+                scheduler_last_successful_run = time.time()
+                logging.info(f"Updated scheduler_last_successful_run: {scheduler_last_successful_run}")
+
+                # Persist critical state
+                state_manager.persist_critical_state(cached_metrics, scheduler_last_successful_run, last_metrics_update_time)
+                
+                # Periodically check and prune data to prevent memory growth
+                if current_time % 300 < 60:  # Every ~5 minutes
+                    logging.info("Pruning old data")
+                    state_manager.prune_old_data()
+                    
+                # Only save state to Redis on a similar schedule, not every update
+                if current_time % 300 < 60:  # Every ~5 minutes
+                    logging.info("Saving graph state")
+                    state_manager.save_graph_state()
+                    
+                # Adaptive memory cleanup
+                if MEMORY_CONFIG['ADAPTIVE_GC_ENABLED']:
+                    # Check memory usage every 10 minutes or on cache update
+                    if current_time % 600 < 60 or force:  
+                        if adaptive_gc():
+                            log_memory_usage()  # Log memory usage after GC
+                else:
+                    # Fixed interval full garbage collection
+                    if current_time % MEMORY_CONFIG['GC_INTERVAL_SECONDS'] < 60:  
+                        logging.info(f"Scheduled full memory cleanup (every {MEMORY_CONFIG['GC_INTERVAL_SECONDS']//60} minutes)")
+                        gc.collect(generation=2)  # Force full collection
+                        log_memory_usage()
+            else:
+                logging.error("Background job: Metrics update returned None")
+        except Exception as e:
+            logging.error(f"Background job: Unexpected error: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            log_memory_usage()
+        finally:
+            # Cancel timer in finally block to ensure it's always canceled
+            timer.cancel()
+    except Exception as e:
+        logging.error(f"Background job: Unhandled exception: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
+    logging.info("Completed update_metrics_job")
+
+# --- SchedulerWatchdog to monitor and recover ---
+def scheduler_watchdog():
+    """Periodically check if the scheduler is running and healthy."""
+    global scheduler, scheduler_last_successful_run
+    
+    try:
+        # If no successful run in past 2 minutes, consider the scheduler dead
+        if (scheduler_last_successful_run is None or
+            time.time() - scheduler_last_successful_run > 120):
+            logging.warning("Scheduler watchdog: No successful runs detected in last 2 minutes")
+            
+            # Check if actual scheduler exists and is reported as running
+            if not scheduler or not getattr(scheduler, 'running', False):
+                logging.error("Scheduler watchdog: Scheduler appears to be dead, recreating")
+                
+                # Use the lock to avoid multiple threads recreating simultaneously
+                with scheduler_recreate_lock:
+                    create_scheduler()
+    except Exception as e:
+        logging.error(f"Error in scheduler watchdog: {e}")
+
+# --- Create Scheduler ---
+def create_scheduler():
+    """Create and configure a new scheduler instance with proper error handling."""
+    try:
+        # Stop existing scheduler if it exists
+        global scheduler
+        if 'scheduler' in globals() and scheduler:
+            try:
+                # Check if scheduler is running before attempting to shut it down
+                if hasattr(scheduler, 'running') and scheduler.running:
+                    logging.info("Shutting down existing scheduler before creating a new one")
+                    scheduler.shutdown(wait=False)
+            except Exception as e:
+                logging.error(f"Error shutting down existing scheduler: {e}")
+        
+        # Create a new scheduler with more robust configuration
+        new_scheduler = BackgroundScheduler(
+            job_defaults={
+                'coalesce': True,  # Combine multiple missed runs into a single one
+                'max_instances': 1,  # Prevent job overlaps
+                'misfire_grace_time': 30  # Allow misfires up to 30 seconds
+            }
+        )
+        
+        # Add the update job
+        new_scheduler.add_job(
+            func=update_metrics_job,
+            trigger="interval",
+            seconds=60,
+            id='update_metrics_job',
+            replace_existing=True
+        )
+        
+        # Add watchdog job - runs every 30 seconds to check scheduler health
+        new_scheduler.add_job(
+            func=scheduler_watchdog,
+            trigger="interval",
+            seconds=30,
+            id='scheduler_watchdog',
+            replace_existing=True
+        )
+        
+        # Add memory watchdog job - runs every 5 minutes
+        new_scheduler.add_job(
+            func=memory_watchdog,
+            trigger="interval",
+            minutes=5,
+            id='memory_watchdog',
+            replace_existing=True
+        )
+        
+        # Add memory leak check job - runs every hour
+        new_scheduler.add_job(
+            func=check_for_memory_leaks,
+            trigger="interval",
+            hours=1,
+            id='memory_leak_check',
+            replace_existing=True
+        )
+        
+        # Start the scheduler
+        new_scheduler.start()
+        logging.info("Scheduler created and started successfully")
+        scheduler = new_scheduler
+        return new_scheduler
+    except Exception as e:
+        logging.error(f"Error creating scheduler: {e}")
+        return None
 
 # --- Custom Template Filter ---
 @app.template_filter('commafy')
@@ -576,6 +834,222 @@ def force_refresh():
         logging.error(f"Force refresh error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route("/api/memory-profile")
+def memory_profile():
+    """API endpoint for detailed memory profiling."""
+    try:
+        process = psutil.Process(os.getpid())
+        
+        # Get detailed memory info
+        mem_info = process.memory_info()
+        
+        # Count objects by type
+        type_counts = {}
+        for obj in gc.get_objects():
+            obj_type = type(obj).__name__
+            if obj_type not in type_counts:
+                type_counts[obj_type] = 0
+            type_counts[obj_type] += 1
+        
+        # Sort types by count
+        most_common = sorted([(k, v) for k, v in type_counts.items()], 
+                           key=lambda x: x[1], reverse=True)[:15]
+        
+        # Get memory usage history stats
+        memory_trend = {}
+        if memory_usage_history:
+            recent = memory_usage_history[-1]
+            oldest = memory_usage_history[0] if len(memory_usage_history) > 1 else recent
+            memory_trend = {
+                "oldest_timestamp": oldest.get("timestamp"),
+                "recent_timestamp": recent.get("timestamp"),
+                "growth_mb": recent.get("rss_mb", 0) - oldest.get("rss_mb", 0),
+                "growth_percent": recent.get("percent", 0) - oldest.get("percent", 0)
+            }
+        
+        # Return comprehensive memory profile
+        return jsonify({
+            "memory": {
+                "rss_mb": mem_info.rss / 1024 / 1024,
+                "vms_mb": mem_info.vms / 1024 / 1024,
+                "percent": process.memory_percent(),
+                "data_structures": {
+                    "arrow_history": {
+                        "entries": sum(
+                            len(v) for v in state_manager.get_history().values() if isinstance(v, (list, deque))
+                        ),
+                        "keys": list(state_manager.get_history().keys())
+                    },
+                    "metrics_log": {
+                        "entries": len(state_manager.get_metrics_log())
+                    },
+                    "memory_usage_history": {
+                        "entries": len(memory_usage_history)
+                    },
+                    "sse_connections": active_sse_connections
+                },
+                "most_common_objects": dict(most_common),
+                "trend": memory_trend
+            },
+            "gc": {
+                "garbage": len(gc.garbage),
+                "counts": gc.get_count(),
+                "threshold": gc.get_threshold(),
+                "enabled": gc.isenabled()
+            },
+            "system": {
+                "uptime_seconds": (datetime.now(ZoneInfo(get_timezone())) - SERVER_START_TIME).total_seconds(),
+                "python_version": sys.version
+            }
+        })
+    except Exception as e:
+        logging.error(f"Error in memory profiling: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/memory-history")
+def memory_history():
+    """API endpoint for memory usage history."""
+    with memory_usage_lock:
+        history_copy = list(memory_usage_history)
+    return jsonify({
+        "history": history_copy,
+        "current": {
+            "rss_mb": psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024,
+            "percent": psutil.Process(os.getpid()).memory_percent()
+        }
+    })
+
+@app.route("/api/force-gc", methods=["POST"])
+def force_gc():
+    """API endpoint to force garbage collection."""
+    try:
+        generation = request.json.get('generation', 2) if request.is_json else 2
+        
+        # Validate generation parameter
+        if generation not in [0, 1, 2]:
+            generation = 2
+            
+        # Run GC and time it
+        start_time = time.time()
+        objects_before = len(gc.get_objects())
+        
+        # Perform collection
+        collected = gc.collect(generation)
+        
+        # Get stats
+        duration = time.time() - start_time
+        objects_after = len(gc.get_objects())
+        
+        # Log memory usage after collection
+        log_memory_usage()
+        
+        return jsonify({
+            "status": "success",
+            "collected": collected,
+            "duration_seconds": duration,
+            "objects_removed": objects_before - objects_after,
+            "generation": generation
+        })
+    except Exception as e:
+        logging.error(f"Error during forced GC: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/notifications")
+def api_notifications():
+    """API endpoint for notification data."""
+    limit = request.args.get('limit', 50, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    unread_only = request.args.get('unread_only', 'false').lower() == 'true'
+    category = request.args.get('category')
+    level = request.args.get('level')
+    
+    notifications = notification_service.get_notifications(
+        limit=limit,
+        offset=offset,
+        unread_only=unread_only,
+        category=category,
+        level=level
+    )
+    
+    unread_count = notification_service.get_unread_count()
+    
+    return jsonify({
+        "notifications": notifications,
+        "unread_count": unread_count,
+        "total": len(notifications),
+        "limit": limit,
+        "offset": offset
+    })
+
+@app.route("/api/notifications/unread_count")
+def api_unread_count():
+    """API endpoint for unread notification count."""
+    return jsonify({
+        "unread_count": notification_service.get_unread_count()
+    })
+
+@app.route("/api/notifications/mark_read", methods=["POST"])
+def api_mark_read():
+    """API endpoint to mark notifications as read."""
+    notification_id = request.json.get('notification_id')
+    
+    success = notification_service.mark_as_read(notification_id)
+    
+    return jsonify({
+        "success": success,
+        "unread_count": notification_service.get_unread_count()
+    })
+
+@app.route("/api/notifications/delete", methods=["POST"])
+def api_delete_notification():
+    """API endpoint to delete a notification."""
+    notification_id = request.json.get('notification_id')
+    
+    if not notification_id:
+        return jsonify({"error": "notification_id is required"}), 400
+    
+    success = notification_service.delete_notification(notification_id)
+    
+    return jsonify({
+        "success": success,
+        "unread_count": notification_service.get_unread_count()
+    })
+
+@app.route("/api/notifications/clear", methods=["POST"])
+def api_clear_notifications():
+    """API endpoint to clear notifications."""
+    category = request.json.get('category')
+    older_than_days = request.json.get('older_than_days')
+    read_only = request.json.get('read_only', False)  # Get the read_only parameter with default False
+    
+    cleared_count = notification_service.clear_notifications(
+        category=category,
+        older_than_days=older_than_days,
+        read_only=read_only  # Pass the parameter to the method
+    )
+    
+    return jsonify({
+        "success": True,
+        "cleared_count": cleared_count,
+        "unread_count": notification_service.get_unread_count()
+    })
+
+# Add notifications page route
+@app.route("/notifications")
+def notifications_page():
+    """Serve the notifications page."""
+    current_time = datetime.now(ZoneInfo(get_timezone())).strftime("%b %d, %Y, %I:%M:%S %p")
+    return render_template("notifications.html", current_time=current_time)
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """Error handler for 404 errors."""
+    return render_template("error.html", message="Page not found."), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    """Error handler for 500 errors."""
+    logging.error("Internal server error: %s", e)
     return render_template("error.html", message="Internal server error."), 500
 
 class RobustMiddleware:
@@ -897,8 +1371,6 @@ notification_service.dashboard_service = dashboard_service
 
 # Restore critical state if available
 last_run, last_update = state_manager.load_critical_state()
-register_memory_routes(app, state_manager, lambda: active_sse_connections, SERVER_START_TIME)
-register_notification_routes(app, notification_service)
 if last_run:
     scheduler_last_successful_run = last_run
 if last_update:
