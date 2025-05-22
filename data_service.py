@@ -326,7 +326,13 @@ class MiningDashboardService:
             resp = self.session.get(url, timeout=10)
             if resp.ok:
                 data = resp.json()
-                blocks = data.get("blocks") or data.get("result") or data
+                blocks = data.get("blocks")
+                if blocks is None:
+                    result = data.get("result")
+                    if isinstance(result, dict):
+                        blocks = result.get("blocks")
+                    elif isinstance(result, list):
+                        blocks = result
                 if isinstance(blocks, list):
                     return blocks
         except Exception as e:
