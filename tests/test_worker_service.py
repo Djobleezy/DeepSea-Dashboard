@@ -137,3 +137,17 @@ def test_generate_simulated_workers_deterministic(monkeypatch):
 
     total_earnings = round(sum(w['earnings'] for w in workers), 8)
     assert total_earnings == 0.5
+
+
+def test_adjust_worker_instances_removes_excess(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    svc = WorkerService()
+    worker_data = {
+        'workers': [svc.create_default_worker(f'w{i}', 'online') for i in range(5)],
+        'workers_total': 5,
+        'workers_online': 5,
+        'workers_offline': 0,
+    }
+
+    svc.adjust_worker_instances(worker_data, 3)
+    assert len(worker_data['workers']) == 3

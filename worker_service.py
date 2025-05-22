@@ -273,8 +273,8 @@ class WorkerService:
             # Need to remove some workers
 
             # Remove workers from the end of the list to preserve earlier ones
-            worker_data["workers"] = current_workers[:target_count]
-            
+            current_workers = current_workers[:target_count]
+
         # Update the worker data
         worker_data["workers"] = current_workers
 
