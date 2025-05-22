@@ -2,7 +2,10 @@
 
 ## A Retro Mining Monitoring Solution
 
-This open-source dashboard provides real-time monitoring for Ocean.xyz pool miners, offering detailed insights on hashrate, profitability, worker status, and network metrics. Designed with a retro terminal aesthetic and focused on reliability, it helps miners maintain complete oversight of their operations.
+This open-source dashboard monitors Ocean.xyz pool miners in real time.
+It presents hashrate, profitability, worker status and network metrics
+through a retro terminal interface. The goal is to keep miners fully
+informed with minimal fuss.
 
 ---
 ## Gallery:
@@ -28,7 +31,8 @@ This open-source dashboard provides real-time monitoring for Ocean.xyz pool mine
 - **Payout Monitoring**: View unpaid balance and estimated time to next payout
 - **Pool Fee Analysis**: Monitor pool fee percentages with visual indicator when optimal rates (0.9-1.3%) are detected
 - **Official Ocean API**: Supplement scraping with data from the official Ocean.xyz API for greater accuracy
-- **Scraping Fallback**: If the API does not provide payout history, the dashboard scrapes the stats page (iterating through all payout pages) to fill in missing records
+- **Scraping Fallback**: When the API lacks payout history, the dashboard
+  scrapes each stats page to fill in missing records.
 
 ### Multi-Currency Support
 - **Flexible Currency Configuration**: Set your preferred fiat currency for displaying Bitcoin value and earnings
@@ -51,7 +55,9 @@ This open-source dashboard provides real-time monitoring for Ocean.xyz pool mine
 
 ### Earnings Page
 - **Detailed Earnings Breakdown**: View earnings by time period (daily, weekly, monthly)
- - **Currency Conversion**: Automatically convert earnings to your preferred fiat currency. All profitability metrics are calculated in USD first and converted using live exchange rates.
+- **Currency Conversion**: Automatically convert earnings to your preferred
+  fiat currency. Profitability metrics are calculated in USD first and
+  converted using live rates.
 - **Historical Data**: Access past earnings data for analysis
 
 ### System Resilience
@@ -92,9 +98,13 @@ You can modify the following environment variables in the `docker-compose.yml` f
 - `NETWORK_FEE`: Additional fees beyond pool fees (e.g., firmware fees).
 - `TIMEZONE`: Local timezone for displaying time information.
 - `CURRENCY`: Preferred fiat currency for earnings display.
-- `EXCHANGE_RATE_API_KEY`: ExchangeRate-API key used for fetching currency rates. Falls back to `config.json` if unset. Metrics requiring currency conversion will not work without a valid key.
+- `EXCHANGE_RATE_API_KEY`: ExchangeRate-API key used for fetching currency rates.
+  Falls back to `config.json` if unset. Metrics requiring currency conversion
+  will not work without a valid key.
 
-Redis data is stored in a persistent volume (`redis_data`), and application logs are saved in the `./logs` directory. Logs rotate automatically when they reach 5MB, with up to five backups kept.
+Redis data is stored in a persistent volume (`redis_data`), and application logs
+are saved in the `./logs` directory. Logs rotate automatically when they reach
+5MB, with up to five backups kept.
 
 For more details, refer to the [docker-compose documentation](https://docs.docker.com/compose/).
 
@@ -272,7 +282,8 @@ DeepSea-Dashboard/
 └── logs/                       # Application logs (generated at runtime)
 ```
 
-For more detailed information on the architecture and component interactions, see [project_structure.md](project_structure.md).
+For more details on the architecture and component interactions,
+see [project_structure.md](project_structure.md).
 
 ## Troubleshooting
 
@@ -287,18 +298,20 @@ For optimal performance:
 7. Check the currency settings if financial calculations appear incorrect
 8. Verify timezone settings for accurate time displays
 9. Alt + W on Dashboard resets wallet configuration and redirects to Boot sequence
-10. If block event lines persist across sessions, use `window.clearBlockAnnotations()` in the browser console to clear them. Older annotations are automatically pruned.
+10. If block event lines persist, run `window.clearBlockAnnotations()` in your
+    browser console to remove them. Older annotations are pruned automatically.
 
 ## Easter Egg
 
-Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief deep sea surprise complete with random fun facts!
+Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief
+deep sea surprise complete with random fun facts!
 
 ## Debug Logging
 
-Client-side logging can be noisy in production. All `console.log` calls are now
-wrapped with a simple debug flag. Set `localStorage.setItem('debugLogging', 'true')`
-in your browser to enable verbose logging. Remove the item or set it to `false`
-to silence debug output.
+Client-side logging can be noisy in production. All `console.log` calls are
+wrapped with a simple debug flag. Set `localStorage.setItem('debugLogging',
+'true')` in your browser to enable verbose logging. Remove the item or set it to
+`false` to silence debug output.
 
 ## License
 
