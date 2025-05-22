@@ -71,11 +71,7 @@ function fetchServerTimeAndInitializeMonitor() {
 
 // Function to format currency values with commas
 function formatCurrency(amount) {
-    const num = Number(amount);
-    if (num == null || isNaN(num)) {
-        return '0';
-    }
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 // Format all currency values on the page
@@ -130,29 +126,17 @@ function setupAutoRefresh() {
 
 // Function to format BTC values
 function formatBTC(btcValue) {
-    const num = parseFloat(btcValue);
-    if (isNaN(num)) {
-        return '0.00000000';
-    }
-    return num.toFixed(8);
+    return parseFloat(btcValue).toFixed(8);
 }
 
 // Function to format sats with commas
 function formatSats(satsValue) {
-    const num = parseInt(satsValue);
-    if (isNaN(num)) {
-        return '0';
-    }
-    return formatCurrency(num);
+    return formatCurrency(parseInt(satsValue));
 }
 
 // Function to format USD values with commas
 function formatUSD(usdValue) {
-    const num = parseFloat(usdValue);
-    if (isNaN(num)) {
-        return '0.00';
-    }
-    return formatCurrency(num.toFixed(2));
+    return formatCurrency(parseFloat(usdValue).toFixed(2));
 }
 
 // Function to apply user timezone formatting to dates
