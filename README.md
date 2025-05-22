@@ -27,6 +27,7 @@ informed with minimal fuss.
 - **Live Hashrate Tracking**: Monitor 60-second, 10-minute, 3-hour, and 24-hour average hashrates
 - **Profitability Analysis**: View daily and monthly earnings in both BTC and USD
 - **Financial Calculations**: Automatically calculate revenue, power costs, and net profit
+- **Break-Even Electricity Price**: Shows the maximum power rate that still yields profit
 - **Network Statistics**: Track current Bitcoin price, difficulty, and network hashrate
 - **Payout Monitoring**: View unpaid balance and estimated time to next payout
 - **Pool Fee Analysis**: Monitor pool fee percentages with visual indicator when optimal rates (0.9-1.3%) are detected

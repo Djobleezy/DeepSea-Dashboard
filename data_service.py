@@ -154,6 +154,12 @@ class MiningDashboardService:
             daily_profit_usd = round(daily_revenue - daily_power_cost, 2) if daily_revenue is not None else None
             monthly_profit_usd = round(daily_profit_usd * 30, 2) if daily_profit_usd is not None else None
 
+            # Calculate break-even electricity price in $/kWh
+            daily_energy_kwh = (power_usage_for_calc / 1000) * 24
+            break_even_electricity_price = round(
+                daily_revenue / daily_energy_kwh, 4
+            ) if daily_energy_kwh > 0 else None
+
             daily_mined_sats = int(round(daily_btc_net * self.sats_per_btc))
             monthly_mined_sats = daily_mined_sats * 30
 
@@ -190,6 +196,7 @@ class MiningDashboardService:
                 'daily_power_cost': daily_power_cost,
                 'daily_profit_usd': daily_profit_usd,
                 'monthly_profit_usd': monthly_profit_usd,
+                'break_even_electricity_price': break_even_electricity_price,
                 'power_usage_estimated': power_usage_estimated,
                 'daily_mined_sats': daily_mined_sats,
                 'monthly_mined_sats': monthly_mined_sats,
@@ -227,6 +234,10 @@ class MiningDashboardService:
                 metrics["daily_power_cost"] = round(metrics["daily_power_cost"] * rate, 2)
                 metrics["daily_profit_usd"] = round(metrics["daily_profit_usd"] * rate, 2)
                 metrics["monthly_profit_usd"] = round(metrics["monthly_profit_usd"] * rate, 2)
+                if metrics["break_even_electricity_price"] is not None:
+                    metrics["break_even_electricity_price"] = round(
+                        metrics["break_even_electricity_price"] * rate, 4
+                    )
                 metrics["exchange_rates"] = exchange_rates
             else:
                 metrics["exchange_rates"] = {}

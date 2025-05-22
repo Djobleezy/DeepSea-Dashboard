@@ -458,6 +458,7 @@ def test_fetch_metrics_estimates_power(monkeypatch):
 
     assert metrics['daily_power_cost'] == 4.2
     assert metrics['power_usage_estimated'] is True
+    assert abs(metrics['break_even_electricity_price'] - 0.375) < 1e-6
 
 
 def test_fetch_metrics_power_configured(monkeypatch):
@@ -474,5 +475,6 @@ def test_fetch_metrics_power_configured(monkeypatch):
     metrics = svc.fetch_metrics()
 
     assert metrics['power_usage_estimated'] is False
+    assert abs(metrics['break_even_electricity_price'] - 0.46875) < 1e-4
 
 

@@ -3285,6 +3285,52 @@ function updateUI() {
             updateElementText("daily_power_cost", formatCurrencyValue(0, currency));
         }
 
+        // Break-even electricity price divider
+        const bePrice = data.break_even_electricity_price;
+        const formattedBe = bePrice != null
+            ? formatCurrencyValue(bePrice, currency) + '/kWh'
+            : formatCurrencyValue(0, currency) + '/kWh';
+
+        const powerCostPara = document.getElementById('daily_power_cost').parentNode;
+        ensureElementStyles();
+        if (!powerCostPara.querySelector('.main-metric')) {
+            const metricEl = document.getElementById('daily_power_cost');
+            const indicatorEl = document.getElementById('indicator_daily_power_cost');
+            const mainMetric = document.createElement('span');
+            mainMetric.className = 'main-metric';
+            if (metricEl && indicatorEl) {
+                let node = metricEl.nextSibling;
+                while (node && node !== indicatorEl) {
+                    const nextNode = node.nextSibling;
+                    if (node.nodeType === 3) {
+                        powerCostPara.removeChild(node);
+                    }
+                    node = nextNode;
+                }
+                metricEl.parentNode.insertBefore(mainMetric, metricEl);
+                mainMetric.appendChild(metricEl);
+                mainMetric.appendChild(indicatorEl);
+            }
+            const dividerContainer = document.createElement('span');
+            dividerContainer.className = 'metric-divider-container';
+            powerCostPara.appendChild(dividerContainer);
+        }
+
+        let beContainer = powerCostPara.querySelector('.metric-divider-container');
+        if (!beContainer) {
+            beContainer = document.createElement('span');
+            beContainer.className = 'metric-divider-container';
+            powerCostPara.appendChild(beContainer);
+        }
+
+        const existingBe = document.getElementById('break_even_price');
+        if (existingBe) {
+            existingBe.textContent = formattedBe;
+        } else {
+            const beDiv = createDivider('break_even_price', formattedBe, '[Break-Even]');
+            beContainer.appendChild(beDiv);
+        }
+
         // Daily profit with currency conversion and color
         if (data.daily_profit_usd != null) {
             const dailyProfit = data.daily_profit_usd;
