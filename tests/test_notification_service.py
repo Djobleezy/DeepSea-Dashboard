@@ -95,5 +95,11 @@ class NotificationCurrencyTest(unittest.TestCase):
         self.assertAlmostEqual(notif['data']['daily_profit_usd'], 10.0)
         self.assertIn('$', notif['message'])
 
+    def test_parse_timestamp_with_z_suffix(self):
+        ts = "2023-01-01T12:34:56Z"
+        parsed = self.service._parse_timestamp(ts)
+        self.assertIsNotNone(parsed.tzinfo)
+        self.assertEqual(parsed.year, 2023)
+
 if __name__ == '__main__':
     unittest.main()

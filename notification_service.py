@@ -125,21 +125,21 @@ class NotificationService:
             return datetime.now()
     
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
-        """Parse an ISO format timestamp string into a timezone-aware datetime."""
+        """Parse an ISO timestamp string into a timezone-aware datetime."""
         try:
-            # Parse the naive datetime from the string
-            dt = datetime.fromisoformat(timestamp_str)
-            
-            # If it's already timezone-aware, return it
+            # Handle ``Z`` suffix by converting to ``+00:00`` for ``fromisoformat``
+            ts = timestamp_str.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts)
+
+            # If timestamp already has timezone info, return as-is
             if dt.tzinfo is not None:
                 return dt
-                
-            # Otherwise, make it timezone-aware
+
+            # Otherwise, localize to configured timezone
             tz = pytz.timezone(get_timezone())
             return tz.localize(dt)
         except Exception as e:
             logging.error(f"[NotificationService] Error parsing timestamp: {e}")
-            # Return current time as fallback
             return self._get_current_time()
     
     def _get_redis_value(self, key: str, default: Any = None) -> Any:
