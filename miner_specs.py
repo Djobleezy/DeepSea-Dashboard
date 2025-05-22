@@ -20,6 +20,7 @@ MODEL_SPECS = [
     (r"s21\s*xp\s*hydro", {"model": "Bitmain Antminer S21 XP Hydro", "type": "ASIC", "hashrate": 300, "efficiency": 12}),
     (r"s21[-_\s]*pro", {"model": "Bitmain Antminer S21 Pro", "type": "ASIC", "hashrate": 234, "efficiency": 15.0}),
     (r"s21\b", {"model": "Bitmain Antminer S21", "type": "ASIC", "hashrate": 200, "efficiency": 17.5}),
+    (r"t21\b", {"model": "Bitmain Antminer T21", "type": "ASIC", "hashrate": 162, "efficiency": 20.2}),
 
     # MicroBT Whatsminer series
     (r"m20s", {"model": "MicroBT Whatsminer M20S", "type": "ASIC", "hashrate": 68, "efficiency": 49.4}),
