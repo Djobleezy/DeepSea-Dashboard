@@ -203,6 +203,8 @@ The dashboard stores a rolling window of historical metrics in memory. Each
 dataset (arrow history, metrics log and hashrate history) is capped at 180
 entries, equating to roughly three hours of data. Older points are pruned by the
 `StateManager` before saving to Redis, ensuring memory usage remains stable.
+Short-term variance history for earnings metrics is also persisted so 3-hour
+variance values remain visible after restarts.
 
 ## API Endpoints
 - `/api/metrics`: Provides real-time mining metrics.

@@ -101,6 +101,33 @@ def test_variance_history_calculation(monkeypatch):
     assert second["estimated_rewards_in_window_sats_variance_3hr"] == 10
 
 
+def test_variance_history_persistence(monkeypatch):
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+    monkeypatch.setattr('state_manager.get_timezone', lambda: 'UTC')
+
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    now = datetime(2024, 1, 1, tzinfo=ZoneInfo('UTC'))
+    mgr.arrow_history = {"hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)}
+    mgr.hashrate_history = [1]
+    mgr.metrics_log = deque([{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}], maxlen=180)
+    mgr.variance_history = {
+        "estimated_earnings_per_day_sats": deque([{"time": now, "value": 100}], maxlen=MAX_VARIANCE_HISTORY_ENTRIES)
+    }
+
+    mgr.save_graph_state()
+
+    new_mgr = StateManager()
+    new_mgr.redis_client = mgr.redis_client
+    new_mgr.load_graph_state()
+
+    original = list(mgr.variance_history["estimated_earnings_per_day_sats"])
+    loaded = list(new_mgr.variance_history["estimated_earnings_per_day_sats"])
+    assert loaded == original
+
+
 def test_persist_critical_state_and_load():
     mgr = StateManager()
     mgr.redis_client = DummyRedis()

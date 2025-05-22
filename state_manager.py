@@ -13,6 +13,7 @@ import threading
 import gzip
 import redis
 from collections import deque
+from datetime import datetime
 from config import get_timezone
 
 # Historical data structures are now managed by the StateManager instance
@@ -126,7 +127,7 @@ class StateManager:
                 state = json.loads(state_json)
                 
                 # Handle different versions of the data format
-                if version == "2.0":  # Optimized format
+                if version in ["2.0", "2.1"]:  # Optimized format
                     # Restore arrow_history
                     compact_arrow_history = state.get("arrow_history", {})
                     for key, values in compact_arrow_history.items():
@@ -142,6 +143,20 @@ class StateManager:
 
                     # Restore hashrate_history
                     self.hashrate_history = state.get("hashrate_history", [])
+
+                    # Restore variance_history if present
+                    compact_variance = state.get("variance_history", {})
+                    for key, values in compact_variance.items():
+                        self.variance_history[key] = deque(
+                            [
+                                {
+                                    "time": datetime.fromisoformat(entry.get("t")),
+                                    "value": entry.get("v", 0),
+                                }
+                                for entry in values
+                            ],
+                            maxlen=MAX_VARIANCE_HISTORY_ENTRIES,
+                        )
 
                     # Restore metrics_log
                     compact_metrics_log = state.get("metrics_log", [])
@@ -243,10 +258,20 @@ class StateManager:
                         "m": metrics_copy
                     })
 
+            # Compact variance_history
+            compact_variance_history = {}
+            for key, values in self.variance_history.items():
+                if values:
+                    compact_variance_history[key] = [
+                        {"t": entry["time"].isoformat(), "v": entry["value"]}
+                        for entry in list(values)[-MAX_VARIANCE_HISTORY_ENTRIES:]
+                    ]
+
             state = {
                 "arrow_history": compact_arrow_history,
                 "hashrate_history": compact_hashrate_history,
-                "metrics_log": compact_metrics_log
+                "metrics_log": compact_metrics_log,
+                "variance_history": compact_variance_history,
             }
 
             state_json = json.dumps(state)
@@ -256,7 +281,7 @@ class StateManager:
                 f"Saving graph state to Redis: {data_size_kb:.2f} KB (optimized format, gzipped)"
             )
 
-            self.redis_client.set(f"{self.STATE_KEY}_version", "2.0")
+            self.redis_client.set(f"{self.STATE_KEY}_version", "2.1")
             self.redis_client.set(self.STATE_KEY, compressed_state)
             logging.info(
                 f"Successfully saved graph state to Redis ({data_size_kb:.2f} KB)"
