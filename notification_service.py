@@ -127,7 +127,7 @@ class NotificationService:
             return datetime.now()
     
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
-        """Parse an ISO format timestamp string into a timezone-aware datetime."""
+        """Parse an ISO timestamp string into a timezone-aware datetime."""
         try:
             # Support timestamps that end with 'Z' for UTC designator
             ts = timestamp_str.replace("Z", "+00:00")
@@ -136,13 +136,12 @@ class NotificationService:
             # If it's already timezone-aware, return it
             if dt.tzinfo is not None:
                 return dt
-                
-            # Otherwise, make it timezone-aware
+
+            # Otherwise, localize to configured timezone
             tz = pytz.timezone(get_timezone())
             return tz.localize(dt)
         except Exception as e:
             logging.error(f"[NotificationService] Error parsing timestamp: {e}")
-            # Return current time as fallback
             return self._get_current_time()
     
     def _get_redis_value(self, key: str, default: Any = None) -> Any:
