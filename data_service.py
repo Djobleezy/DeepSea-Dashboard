@@ -694,8 +694,14 @@ class MiningDashboardService:
                 return None
 
             data = resp.json()
-            result_obj = data.get("result", {})
-            payouts = result_obj.get("payouts", [])
+            payouts = []
+            result_obj = data.get("result") if isinstance(data.get("result"), dict) else None
+            if result_obj and "payouts" in result_obj:
+                payouts = result_obj.get("payouts", [])
+            elif "payouts" in data:
+                payouts = data.get("payouts", [])
+            else:
+                return []
 
             for item in payouts:
                 ts = item.get("ts")

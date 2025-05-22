@@ -166,6 +166,43 @@ def test_get_payment_history_api_nested_result(monkeypatch):
     assert p['date'] == expected_dt.strftime('%Y-%m-%d %H:%M')
 
 
+def test_get_payment_history_api_top_level_payouts(monkeypatch):
+    svc = MiningDashboardService(0, 0, 'w')
+
+    sample = {
+        'payouts': [
+            {
+                'ts': 1700000000,
+                'on_chain_txid': 'abcd',
+                'lightning_txid': 'ln1',
+                'total_satoshis_net_paid': 100
+            }
+        ]
+    }
+
+    def fake_get(url, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = sample
+        return resp
+
+    monkeypatch.setattr(svc.session, 'get', fake_get)
+    monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
+
+    payments = svc.get_payment_history_api(days=1, btc_price=20000)
+
+    assert len(payments) == 1
+    p = payments[0]
+    assert p['txid'] == 'abcd'
+    assert p['lightning_txid'] == 'ln1'
+    assert p['amount_sats'] == 100
+    assert abs(p['amount_btc'] - 100 / svc.sats_per_btc) < 1e-9
+    assert p['fiat_value'] == (100 / svc.sats_per_btc) * 20000
+    expected_dt = datetime.fromtimestamp(1700000000, tz=ZoneInfo('UTC'))
+    assert p['date_iso'] == expected_dt.isoformat()
+    assert p['date'] == expected_dt.strftime('%Y-%m-%d %H:%M')
+
+
 def test_get_earnings_data_with_nested_result(monkeypatch):
     svc = MiningDashboardService(0, 0, 'w')
 
