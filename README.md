@@ -77,7 +77,7 @@ informed with minimal fuss.
 - **Ambient Audio**: Soft ocean sounds play in the DeepSea theme while the Bitcoin theme cycles through
   `bitcoin.mp3`, `bitcoin1.mp3` and `bitcoin2.mp3`. Playback position persists between page loads. Place the files
   in `static/audio/`. The Docker configuration mounts this directory automatically. Hover the speaker icon to reveal
-  a volume slider.
+  a vertical volume slider.
 
 ### DeepSea Theme
 - **Underwater Effects**: Light rays and digital noise create an immersive experience.

@@ -1253,8 +1253,11 @@ html.deepsea-theme #congratsMessage {
 
 .volume-slider {
   display: none;
-  width: 100px;
+  width: 4px;
+  height: 100px;
   margin-top: 4px;
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
 }
 
 .audio-controls:hover .volume-slider {
