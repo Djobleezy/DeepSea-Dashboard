@@ -183,15 +183,10 @@ def register_main_routes(app, context: dict) -> None:
 
         scheduler = get_scheduler()
         scheduler_last_successful_run = get_scheduler_last_successful_run()
-        uptime_formatted = (
-            f"{int(uptime_seconds // 3600)}h "
-            f"{int((uptime_seconds % 3600) // 60)}m "
-            f"{int(uptime_seconds % 60)}s"
-        )
         status = {
             "status": health_status,
             "uptime": uptime_seconds,
-            "uptime_formatted": uptime_formatted,
+            "uptime_formatted": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m {int(uptime_seconds % 60)}s",
             "connections": get_active_connections(),
             "memory": {
                 "usage_mb": round(memory_usage_mb, 2),
@@ -222,20 +217,14 @@ def register_main_routes(app, context: dict) -> None:
         scheduler_last_successful_run = get_scheduler_last_successful_run()
         last_metrics_update_time = get_last_metrics_update_time()
         try:
-            next_run = None
-            if hasattr(scheduler, "get_jobs") and scheduler.get_jobs():
-                next_run = str(scheduler.get_jobs()[0].next_run_time)
-
             scheduler_status = {
                 "running": scheduler.running if hasattr(scheduler, "running") else False,
                 "job_count": len(scheduler.get_jobs()) if hasattr(scheduler, "get_jobs") else 0,
-                "next_run": next_run,
+                "next_run": str(scheduler.get_jobs()[0].next_run_time) if hasattr(scheduler, "get_jobs") and scheduler.get_jobs() else None,
                 "last_update": last_metrics_update_time,
                 "time_since_update": time.time() - last_metrics_update_time if last_metrics_update_time else None,
                 "last_successful_run": scheduler_last_successful_run,
-                "time_since_successful": (
-                    time.time() - scheduler_last_successful_run if scheduler_last_successful_run else None
-                ),
+                "time_since_successful": time.time() - scheduler_last_successful_run if scheduler_last_successful_run else None,
             }
             return jsonify(scheduler_status)
         except Exception as exc:  # pragma: no cover

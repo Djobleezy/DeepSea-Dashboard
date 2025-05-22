@@ -183,12 +183,7 @@ def stream():
                     
                     # Send regular pings about every 30 seconds to keep connection alive
                     if int(time.time()) % 30 == 0:
-                        ping_payload = {
-                            "type": "ping",
-                            "time": int(time.time()),
-                            "connections": active_sse_connections,
-                        }
-                        yield f"data: {json.dumps(ping_payload)}\n\n"
+                        yield f"data: {{\"type\": \"ping\", \"time\": {int(time.time())}, \"connections\": {active_sse_connections}}}\n\n"
                     
                     # Sleep to reduce CPU usage
                     time.sleep(1)
@@ -303,11 +298,7 @@ def update_config():
             # If currency changed, update notifications to use the new currency
             if currency_changed:
                 try:
-                    logging.info(
-                        "Currency changed from %s to %s",
-                        current_config.get("currency", "USD"),
-                        new_config["currency"],
-                    )
+                    logging.info(f"Currency changed from {current_config.get('currency', 'USD')} to {new_config['currency']}")
                     updated_count = notification_service.update_notification_currency(new_config["currency"])
                     logging.info(f"Updated {updated_count} notifications to use {new_config['currency']} currency")
                 except Exception as e:
@@ -357,13 +348,7 @@ def force_refresh():
             cached_metrics = metrics
             scheduler_last_successful_run = time.time()
             logging.info(f"Force refresh successful, new timestamp: {metrics['server_timestamp']}")
-            return jsonify(
-                {
-                    "status": "success",
-                    "message": "Metrics refreshed",
-                    "timestamp": metrics["server_timestamp"],
-                }
-            )
+            return jsonify({"status": "success", "message": "Metrics refreshed", "timestamp": metrics['server_timestamp']})
         else:
             return jsonify({"status": "error", "message": "Failed to fetch metrics"}), 500
     except Exception as e:
