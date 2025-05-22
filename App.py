@@ -49,6 +49,7 @@ app = Flask(__name__)
 
 @app.context_processor
 def inject_request():
+    """Inject the current request into the template context."""
     return dict(request=request)
 
 # Set up caching using a simple in-memory cache
@@ -385,6 +386,7 @@ def update_metrics_job(force=False):
         job_successful = False
         
         def timeout_handler():
+            """Log an error if the metrics update exceeds the timeout."""
             if not job_successful:
                 logging.error("Background job timed out after 45 seconds")
         
@@ -594,6 +596,7 @@ def stream():
     num_points = MAX_HISTORY_ENTRIES
 
     def event_stream(start_event_id, num_points):
+        """Yield Server-Sent Events for dashboard updates."""
         global active_sse_connections, cached_metrics
         client_id = None
         
@@ -776,6 +779,7 @@ def available_timezones():
 
 @app.route('/api/timezone', methods=['GET'])
 def get_timezone_config():
+    """Return the timezone configured for the application."""
     from flask import jsonify
     from config import get_timezone
     return jsonify({"timezone": get_timezone()})
@@ -1258,9 +1262,11 @@ def internal_server_error(e):
 class RobustMiddleware:
     """WSGI middleware for enhanced error handling."""
     def __init__(self, app):
+        """Store the wrapped WSGI application."""
         self.app = app
 
     def __call__(self, environ, start_response):
+        """Invoke the wrapped application and catch errors."""
         try:
             return self.app(environ, start_response)
         except Exception:

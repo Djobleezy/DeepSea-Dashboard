@@ -17,12 +17,14 @@ SIGNIFICANT_HASHRATE_CHANGE_PERCENT = 25
 NOTIFICATION_WINDOW_MINUTES = 5
 
 class NotificationLevel(Enum):
+    """Severity levels for dashboard notifications."""
     INFO = "info"
     SUCCESS = "success"
     WARNING = "warning"
     ERROR = "error"
 
 class NotificationCategory(Enum):
+    """Categories for grouping notifications."""
     HASHRATE = "hashrate"
     BLOCK = "block"
     WORKER = "worker"

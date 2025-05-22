@@ -70,6 +70,7 @@ def minify_html():
 
 
 def main():
+    """Command-line entry point for asset minification."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Minify static assets")
