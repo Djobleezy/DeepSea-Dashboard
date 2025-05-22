@@ -5,6 +5,7 @@
         const audio = document.getElementById('backgroundAudio');
         const control = document.getElementById('audioControl');
         const icon = document.getElementById('audioIcon');
+        const volumeSlider = document.getElementById('volumeSlider');
         if (!audio) { return; }
 
         const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
@@ -24,7 +25,18 @@
         loadTrack(trackIndex);
         audio.loop = playlist.length === 1;
 
-        audio.volume = 1.00;
+        const storedVolume = parseFloat(localStorage.getItem('audioVolume'));
+        if (!Number.isNaN(storedVolume)) {
+            audio.volume = storedVolume;
+            if (volumeSlider) {
+                volumeSlider.value = Math.round(storedVolume * 100);
+            }
+        } else {
+            audio.volume = 1.00;
+            if (volumeSlider) {
+                volumeSlider.value = 100;
+            }
+        }
 
         const setPosition = () => {
             const storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
@@ -69,6 +81,14 @@
         audio.addEventListener('timeupdate', () => {
             localStorage.setItem('audioPlaybackTime', audio.currentTime);
         });
+
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', function () {
+                const volume = parseInt(this.value, 10) / 100;
+                audio.volume = volume;
+                localStorage.setItem('audioVolume', volume.toString());
+            });
+        }
 
         window.addEventListener('beforeunload', () => {
             localStorage.setItem('audioPlaybackTime', audio.currentTime);

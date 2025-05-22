@@ -244,9 +244,12 @@
             <source src="{{ url_for('static', filename='audio/ocean.mp3') }}" type="audio/mpeg">
         </audio>
 
-        <!-- Mute/unmute control -->
-        <div id="audioControl" class="audio-control">
-            <i id="audioIcon" class="fas fa-volume-up"></i>
+        <!-- Audio controls -->
+        <div id="audioControls" class="audio-controls">
+            <div id="audioControl" class="audio-control">
+                <i id="audioIcon" class="fas fa-volume-up"></i>
+            </div>
+            <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" value="100">
         </div>
     </div>
 
