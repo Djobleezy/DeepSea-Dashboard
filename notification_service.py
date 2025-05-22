@@ -526,12 +526,15 @@ class NotificationService:
             return float(value_str)
 
         if isinstance(value_str, str):
-            # Extract the first token and remove common thousands separators
-            numeric_part = value_str.split()[0].replace(",", "")
-            try:
-                return float(numeric_part)
-            except (ValueError, IndexError):
-                pass
+            # Remove commas and extract leading numeric portion to handle
+            # values like "1,234.5TH/s" without a space before the unit.
+            cleaned = value_str.replace(",", "").strip()
+            match = re.match(r"[-+]?\d*\.?\d+", cleaned)
+            if match:
+                try:
+                    return float(match.group(0))
+                except ValueError:
+                    pass
 
         return 0.0
     
