@@ -2848,16 +2848,27 @@ function updateUI() {
                 numberWithCommas(Math.round(varianceValue)) + ' SATS';
         }
 
+        // Determine color class similar to pool luck styling
+        let colorClass = 'normal-luck';
+        if (!needsData) {
+            if (varianceValue > 0) {
+                colorClass = 'lucky';
+            } else if (varianceValue < 0) {
+                colorClass = 'unlucky';
+            }
+        }
+
         const existing = document.getElementById(varianceId);
         if (existing) {
             existing.textContent = formatted;
+            existing.className = 'metric-value metric-divider-value ' + colorClass;
             if (needsData) {
                 existing.setAttribute('title', 'Variance requires about 3 hours of data');
             } else {
                 existing.removeAttribute('title');
             }
         } else {
-            const div = createDivider(varianceId, formatted, '[3hr \u0394]');
+            const div = createDivider(varianceId, formatted, '[3hr \u0394]', colorClass);
             container.appendChild(div);
             const valueSpan = div.querySelector('#' + varianceId);
             if (needsData) {
