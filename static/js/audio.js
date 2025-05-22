@@ -7,6 +7,23 @@
         const icon = document.getElementById('audioIcon');
         if (!audio) { return; }
 
+        const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+        const playlist = isDeepSea
+            ? ['/static/audio/ocean.mp3']
+            : ['/static/audio/bitcoin.mp3', '/static/audio/bitcoin1.mp3', '/static/audio/bitcoin2.mp3'];
+
+        let trackIndex = parseInt(localStorage.getItem('audioTrackIndex')) || 0;
+        if (trackIndex >= playlist.length) {
+            trackIndex = 0;
+        }
+
+        const loadTrack = (index) => {
+            audio.src = playlist[index];
+            audio.load();
+        };
+        loadTrack(trackIndex);
+        audio.loop = playlist.length === 1;
+
         audio.volume = 1.00;
 
         const setPosition = () => {
@@ -37,6 +54,14 @@
             }
         };
 
+        if (playlist.length > 1) {
+            audio.addEventListener('ended', () => {
+                trackIndex = (trackIndex + 1) % playlist.length;
+                loadTrack(trackIndex);
+                play();
+            });
+        }
+
         if (!wasPaused && !storedMuted) {
             play();
         }
@@ -49,6 +74,7 @@
             localStorage.setItem('audioPlaybackTime', audio.currentTime);
             localStorage.setItem('audioMuted', audio.muted.toString());
             localStorage.setItem('audioPaused', audio.paused.toString());
+            localStorage.setItem('audioTrackIndex', trackIndex.toString());
         });
 
         if (control) {
