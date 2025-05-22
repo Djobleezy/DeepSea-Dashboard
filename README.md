@@ -148,6 +148,31 @@ The application is designed for efficient resource utilization:
 - **Database**: Optional Redis for persistent state
 - **Compatible with**: Windows, macOS, and Linux
 
+## Development
+
+To set up a development environment:
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Prepare directories and assets:
+   ```bash
+   make setup
+   ```
+   Run `make minify` whenever static files or templates change.
+3. Check code style with ruff:
+   ```bash
+   ruff check .
+   ```
+4. Execute tests:
+   ```bash
+   pytest
+   ```
+
+See the [Testing guide](docs/TESTING.md) for more details.
+
+
 ## Technical Architecture
 
 Built with a modern stack for reliability and performance:
