@@ -1229,3 +1229,18 @@ html.deepsea-theme #congratsMessage {
     border-right: 3px solid var(--primary-color);
   }
 }
+
+/* Background audio control */
+.audio-control {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  z-index: 1010;
+  cursor: pointer;
+}
+
+.audio-control:hover {
+  text-shadow: 0 0 5px rgba(var(--primary-color-rgb), 0.7);
+}

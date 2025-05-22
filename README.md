@@ -74,6 +74,7 @@ informed with minimal fuss.
 - **Boot Sequence Animation**: Engaging initialization sequence on startup
 - **System Monitor**: Floating status display with uptime and refresh information
 - **Responsive Interface**: Adapts to desktop and mobile devices
+- **Ambient Ocean Audio**: Soft ocean sounds play in the background with a mute control. Place your 10 minute MP3 at `static/audio/ocean.mp3`.
 
 ### DeepSea Theme
 - **Underwater Effects**: Light rays and digital noise create an immersive experience.

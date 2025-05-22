@@ -238,6 +238,16 @@
             <p>Not affiliated with <a href="https://www.Ocean.xyz">Ocean.xyz</a></p>
             <p>v0.9.8d - Public Beta</p>
         </footer>
+
+        <!-- Background audio element -->
+        <audio id="backgroundAudio" loop>
+            <source src="{{ url_for('static', filename='audio/ocean.mp3') }}" type="audio/mpeg">
+        </audio>
+
+        <!-- Mute/unmute control -->
+        <div id="audioControl" class="audio-control">
+            <i id="audioIcon" class="fas fa-volume-up"></i>
+        </div>
     </div>
 
     <!-- External JavaScript libraries -->
@@ -371,6 +381,7 @@
         });
     });
     </script>
+    <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
     <script src="/static/js/easterEgg.js"></script>
 </body>
 </html>
