@@ -20,3 +20,8 @@ def test_unexpected_unit_returns_original_and_logs_warning(caplog):
         result = convert_to_ths(7.5, "unknown")
     assert result == 7.5
     assert any("Unexpected hashrate unit" in rec.message for rec in caplog.records)
+
+
+def test_negative_or_none_returns_zero():
+    assert convert_to_ths(-5, "TH/s") == 0
+    assert convert_to_ths(None, "TH/s") == 0

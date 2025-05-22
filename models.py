@@ -154,7 +154,7 @@ def convert_to_ths(value, unit):
     Returns:
         float: The hashrate value in TH/s
     """
-    if value is None or value == 0:
+    if value is None or value <= 0:
         return 0
         
     try:
