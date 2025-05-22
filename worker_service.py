@@ -275,8 +275,15 @@ class WorkerService:
             # Remove workers from the end of the list to preserve earlier ones
             current_workers = current_workers[:target_count]
 
-        # Update the worker data
+        # Update the worker data and counts
         worker_data["workers"] = current_workers
+        worker_data["workers_total"] = len(current_workers)
+        worker_data["workers_online"] = sum(
+            1 for w in current_workers if w.get("status") == "online"
+        )
+        worker_data["workers_offline"] = worker_data["workers_total"] - worker_data[
+            "workers_online"
+        ]
 
     def create_default_worker(self, name, status):
         """

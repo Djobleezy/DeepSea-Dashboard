@@ -151,3 +151,15 @@ def test_adjust_worker_instances_removes_excess(monkeypatch):
 
     svc.adjust_worker_instances(worker_data, 3)
     assert len(worker_data['workers']) == 3
+
+
+def test_adjust_worker_instances_updates_counts(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    svc = WorkerService()
+    worker_data = svc.generate_default_workers_data()
+
+    svc.adjust_worker_instances(worker_data, 4)
+
+    assert worker_data['workers_total'] == 4
+    assert worker_data['workers_online'] + worker_data['workers_offline'] == 4
+    assert len(worker_data['workers']) == 4
