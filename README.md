@@ -81,6 +81,7 @@ Comprehensive guides have been moved to the `docs` directory:
 - [Deployment guide](docs/DEPLOYMENT.md)
 - [Configuration options](docs/CONFIGURATION.md)
 - [Worker naming guide](docs/WORKER-NAMING.md)
+- [Testing guide](docs/TESTING.md)
 
 ### Customization
 
