@@ -1,5 +1,6 @@
 import types
 import sys
+import random
 
 # Provide lightweight stubs for external deps if missing
 if 'pytz' not in sys.modules:
@@ -98,3 +99,41 @@ def test_sync_worker_counts_with_dashboard(monkeypatch):
     assert worker_data['hashrate_unit'] == 'TH/s'
     assert worker_data['daily_sats'] == 150
     assert worker_data['total_earnings'] == 0.2
+
+
+def test_generate_sequential_workers_deterministic(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    random.seed(0)
+    svc = WorkerService()
+    workers = svc.generate_sequential_workers(5, 100, 'TH/s', total_unpaid_earnings=0.5)
+
+    assert len(workers) == 5
+    online = [w for w in workers if w['status'] == 'online']
+    offline = [w for w in workers if w['status'] == 'offline']
+    assert len(online) == 4
+    assert len(offline) == 1
+
+    total_hashrate = round(sum(w['hashrate_3hr'] for w in workers), 2)
+    assert total_hashrate == 116.73
+
+    total_earnings = round(sum(w['earnings'] for w in workers), 8)
+    assert total_earnings == 0.5
+
+
+def test_generate_simulated_workers_deterministic(monkeypatch):
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    random.seed(0)
+    svc = WorkerService()
+    workers = svc.generate_simulated_workers(5, 100, 'TH/s', total_unpaid_earnings=0.5)
+
+    assert len(workers) == 5
+    online = [w for w in workers if w['status'] == 'online']
+    offline = [w for w in workers if w['status'] == 'offline']
+    assert len(online) == 4
+    assert len(offline) == 1
+
+    online_hashrate = round(sum(w['hashrate_3hr'] for w in online), 2)
+    assert online_hashrate == 100.0
+
+    total_earnings = round(sum(w['earnings'] for w in workers), 8)
+    assert total_earnings == 0.5
