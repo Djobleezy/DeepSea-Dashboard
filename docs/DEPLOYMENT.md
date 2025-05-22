@@ -98,13 +98,14 @@ For better performance and reliability in production environments:
 
 2. Run the container:
    ```bash
-   docker run -d -p 5000:5000 \
-     -e WALLET=your-wallet-address \
-     -e POWER_COST=0.12 \
-     -e POWER_USAGE=3450 \
-     -v $(pwd)/logs:/app/logs \
-     --name mining-dashboard \
-     bitcoin-mining-dashboard
+    docker run -d -p 5000:5000 \
+      -e WALLET=your-wallet-address \
+      -e POWER_COST=0.12 \
+      -e POWER_USAGE=3450 \
+      -v $(pwd)/logs:/app/logs \
+      -v $(pwd)/static/audio:/app/static/audio \
+      --name mining-dashboard \
+      bitcoin-mining-dashboard
    ```
 
 3. Access the dashboard at `http://localhost:5000`
@@ -132,10 +133,11 @@ For better performance and reliability in production environments:
          - WALLET=your-wallet-address
          - POWER_COST=0.12
          - POWER_USAGE=3450
-       volumes:
-         - ./logs:/app/logs
-       depends_on:
-         - redis
+        volumes:
+          - ./logs:/app/logs
+          - ./static/audio:/app/static/audio
+        depends_on:
+          - redis
    
    volumes:
      redis_data:

@@ -17,8 +17,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=INFO
-    volumes:
-      - ./logs:/app/logs
+      volumes:
+        - ./logs:/app/logs
+        - ./static/audio:/app/static/audio
 
 volumes:
   redis_data:
