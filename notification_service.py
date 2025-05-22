@@ -521,18 +521,18 @@ class NotificationService:
             return None
     
     def _parse_numeric_value(self, value_str: Any) -> float:
-        """Parse numeric values from strings that may include units."""
+        """Parse numeric values from strings that may include units or commas."""
         if isinstance(value_str, (int, float)):
             return float(value_str)
-            
+
         if isinstance(value_str, str):
-            # Extract just the numeric part
-            parts = value_str.split()
+            # Extract the first token and remove common thousands separators
+            numeric_part = value_str.split()[0].replace(",", "")
             try:
-                return float(parts[0])
+                return float(numeric_part)
             except (ValueError, IndexError):
                 pass
-        
+
         return 0.0
     
     def _check_hashrate_change(self, current: Dict[str, Any], previous: Dict[str, Any]) -> Optional[Dict[str, Any]]:
