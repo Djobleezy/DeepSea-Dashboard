@@ -1,10 +1,12 @@
 """Routes for dashboard pages and APIs."""
 from __future__ import annotations
+import os
 import psutil
 from datetime import datetime, timedelta
 
 import logging
 import time
+import requests
 from zoneinfo import ZoneInfo
 
 from notification_service import NotificationCategory, NotificationLevel

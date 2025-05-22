@@ -5,17 +5,15 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 import time
-import psutil
 import signal
 import sys
 import threading
 import json
-import requests
 from flask import Flask, render_template, jsonify, Response, request, stream_with_context
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask_caching import Cache
-from notification_service import NotificationService, NotificationLevel, NotificationCategory
+from notification_service import NotificationService
 
 # Import custom modules
 from config import load_config, save_config
