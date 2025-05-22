@@ -15,13 +15,15 @@ if 'redis' not in sys.modules:
     sys.modules['redis'] = redis_mod
 
 from collections import deque
-from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES
+from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES, MAX_HISTORY_ENTRIES
 from datetime import timedelta
 
 class DummyRedis:
     def __init__(self):
         self.storage = {}
     def set(self, key, value):
+        if isinstance(value, str):
+            value = value.encode('utf-8')
         self.storage[key] = value
     def get(self, key):
         return self.storage.get(key)
@@ -80,3 +82,46 @@ def test_variance_history_calculation(monkeypatch):
     assert second["estimated_earnings_per_day_sats_variance_3hr"] == 20
     assert second["estimated_earnings_next_block_sats_variance_3hr"] == 10
     assert second["estimated_rewards_in_window_sats_variance_3hr"] == 10
+
+
+def test_persist_critical_state_and_load():
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+
+    cached = {"server_timestamp": 100}
+    mgr.persist_critical_state(cached, 200, 300)
+
+    raw = mgr.redis_client.get("critical_state")
+    stored = json.loads(raw.decode("utf-8"))
+    assert stored["cached_metrics_timestamp"] == 100
+    assert stored["last_successful_run"] == 200
+    assert stored["last_update_time"] == 300
+
+    # Loading should return the stored values
+    last_run, last_update = mgr.load_critical_state()
+    assert last_run == 200
+    assert last_update == 300
+
+
+def test_prune_old_data():
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+    mgr.last_prune_time = 0
+
+    # Create history longer than MAX_HISTORY_ENTRIES
+    entries = [{"time": str(i), "value": i, "arrow": ""} for i in range(MAX_HISTORY_ENTRIES + 50)]
+    mgr.arrow_history["hashrate_60sec"] = deque(entries, maxlen=MAX_HISTORY_ENTRIES + 50)
+
+    m_entries = [
+        {"timestamp": str(i), "metrics": {"hashrate_60sec": i}}
+        for i in range(MAX_HISTORY_ENTRIES + 50)
+    ]
+    mgr.metrics_log = deque(m_entries, maxlen=MAX_HISTORY_ENTRIES + 50)
+
+    assert len(mgr.arrow_history["hashrate_60sec"]) > MAX_HISTORY_ENTRIES
+    assert len(mgr.metrics_log) > MAX_HISTORY_ENTRIES
+
+    mgr.prune_old_data()
+
+    assert len(mgr.arrow_history["hashrate_60sec"]) <= MAX_HISTORY_ENTRIES
+    assert len(mgr.metrics_log) <= MAX_HISTORY_ENTRIES
