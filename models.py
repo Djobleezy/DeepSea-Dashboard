@@ -2,7 +2,7 @@
 Data models for the Bitcoin Mining Dashboard.
 """
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Union, Any
+from typing import Dict, Any
 import logging
 
 @dataclass

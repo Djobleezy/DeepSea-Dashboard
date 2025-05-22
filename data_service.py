@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from bs4 import BeautifulSoup
 
-from models import OceanData, WorkerData, convert_to_ths
+from models import OceanData, convert_to_ths
 from config import get_timezone
 from miner_specs import parse_worker_name
 

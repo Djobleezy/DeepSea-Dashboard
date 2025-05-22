@@ -271,8 +271,7 @@ class WorkerService:
                     
         elif current_count > target_count:
             # Need to remove some workers
-            workers_to_remove = current_count - target_count
-            
+
             # Remove workers from the end of the list to preserve earlier ones
             worker_data["workers"] = current_workers[:target_count]
             

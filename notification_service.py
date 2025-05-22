@@ -1,14 +1,11 @@
 # notification_service.py
 import logging
-import json
-import time
 import uuid
 import pytz
 import re
 from datetime import datetime, timedelta
 from enum import Enum
-from collections import deque
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from config import get_timezone, load_config
 
 from data_service import MiningDashboardService
@@ -664,7 +661,7 @@ class NotificationService:
                     days = int(est_time)
                     if 0 < days <= 1:
                         if self._should_send_payout_notification():
-                            message = f"Payout approaching! Estimated within 1 day"
+                            message = "Payout approaching! Estimated within 1 day"
                             self.last_payout_notification_time = self._get_current_time()
                             return self.add_notification(
                                 message,
@@ -675,7 +672,7 @@ class NotificationService:
                 # If it says "next block"
                 elif "next block" in est_time.lower():
                     if self._should_send_payout_notification():
-                        message = f"Payout expected with next block!"
+                        message = "Payout expected with next block!"
                         self.last_payout_notification_time = self._get_current_time()
                         return self.add_notification(
                             message,

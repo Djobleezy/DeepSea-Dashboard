@@ -22,3 +22,4 @@ six==1.16.0
 jsmin==3.0.1
 cssmin==0.2.0
 pytest==8.2.1
+ruff==0.4.3

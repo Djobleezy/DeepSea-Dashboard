@@ -16,7 +16,6 @@ if 'redis' not in sys.modules:
 
 from collections import deque
 from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES, MAX_HISTORY_ENTRIES
-from datetime import timedelta
 
 class DummyRedis:
     def __init__(self):

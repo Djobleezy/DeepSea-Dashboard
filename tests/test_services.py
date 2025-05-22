@@ -228,7 +228,8 @@ def test_get_payment_history_scrape(monkeypatch):
 
     monkeypatch.setattr(svc.session, 'get', fake_get)
     monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
-    import importlib, sys
+    import importlib
+    import sys
     sys.modules.pop('bs4', None)
     real_bs4 = importlib.import_module('bs4')
     monkeypatch.setattr(data_service, 'BeautifulSoup', real_bs4.BeautifulSoup)
@@ -267,7 +268,8 @@ def test_get_payment_history_scrape_lightning(monkeypatch):
 
     monkeypatch.setattr(svc.session, 'get', fake_get)
     monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
-    import importlib, sys
+    import importlib
+    import sys
     sys.modules.pop('bs4', None)
     real_bs4 = importlib.import_module('bs4')
     monkeypatch.setattr(data_service, 'BeautifulSoup', real_bs4.BeautifulSoup)
@@ -317,7 +319,8 @@ def test_get_payment_history_scrape_pagination(monkeypatch):
 
     monkeypatch.setattr(svc.session, 'get', fake_get)
     monkeypatch.setattr('data_service.get_timezone', lambda: 'UTC')
-    import importlib, sys
+    import importlib
+    import sys
     sys.modules.pop('bs4', None)
     real_bs4 = importlib.import_module('bs4')
     monkeypatch.setattr(data_service, 'BeautifulSoup', real_bs4.BeautifulSoup)

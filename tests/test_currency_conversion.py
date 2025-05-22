@@ -1,4 +1,5 @@
-import sys, types
+import sys
+import types
 
 if "pytz" not in sys.modules:
     tz_module = types.ModuleType("pytz")
@@ -18,7 +19,8 @@ if "requests" not in sys.modules:
     sys.modules["requests"] = req_module
 if "bs4" not in sys.modules:
     bs4_module = types.ModuleType("bs4")
-    class DummySoup: pass
+    class DummySoup:
+        pass
     bs4_module.BeautifulSoup = DummySoup
     sys.modules["bs4"] = bs4_module
 

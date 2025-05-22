@@ -13,7 +13,6 @@ import argparse
 import subprocess
 import json
 import re
-from pathlib import Path
 
 # Configure logging with color support
 try:
@@ -451,7 +450,7 @@ def perform_system_checks():
         with open(test_file, 'w') as f:
             f.write('test')
         os.remove(test_file)
-        logger.info(f"✓ Write permissions for logs directory")
+        logger.info("✓ Write permissions for logs directory")
     except Exception as e:
         logger.warning(f"⚠ Cannot write to logs directory: {str(e)}")
     

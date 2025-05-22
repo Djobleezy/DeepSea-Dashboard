@@ -12,6 +12,7 @@ import signal
 import sys
 import threading
 import json
+import requests
 from flask import Flask, render_template, jsonify, Response, request, stream_with_context
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -601,7 +602,7 @@ def stream():
             with sse_connections_lock:
                 if active_sse_connections >= MAX_SSE_CONNECTIONS:
                     logging.warning(f"Connection limit reached ({MAX_SSE_CONNECTIONS}), refusing new SSE connection")
-                    yield f"data: {{\"error\": \"Too many connections, please try again later\", \"retry\": 5000}}\n\n"
+                    yield "data: {\"error\": \"Too many connections, please try again later\", \"retry\": 5000}\n\n"
                     return
                 
                 active_sse_connections += 1
@@ -611,15 +612,6 @@ def stream():
             # Set a maximum connection time - increased to 15 minutes for better user experience
             end_time = time.time() + MAX_SSE_CONNECTION_TIME
             last_timestamp = None
-
-            # Initialize connection event id
-            connection_event_id = start_event_id
-
-            # Determine starting event id from Last-Event-ID header
-            try:
-                connection_event_id = int(request.headers.get("Last-Event-ID", 0))
-            except ValueError:
-                connection_event_id = 0
 
             logging.info(f"SSE {client_id}: Streaming {num_points} history points")
 
@@ -670,7 +662,7 @@ def stream():
             
             # Connection timeout reached - send a reconnect instruction to client
             logging.info(f"SSE {client_id}: Connection timeout reached ({MAX_SSE_CONNECTION_TIME}s)")
-            yield f"data: {{\"type\": \"timeout\", \"message\": \"Connection timeout reached\", \"reconnect\": true}}\n\n"
+            yield "data: {\"type\": \"timeout\", \"message\": \"Connection timeout reached\", \"reconnect\": true}\n\n"
             
         except GeneratorExit:
             # This is how we detect client disconnection
@@ -896,7 +888,7 @@ def update_config():
             if hasattr(dashboard_service, 'set_worker_service'):
                 dashboard_service.set_worker_service(worker_service)
             notification_service.dashboard_service = dashboard_service
-            logging.info(f"Worker service updated with the new dashboard service")
+            logging.info("Worker service updated with the new dashboard service")
             
             # If currency changed, update notifications to use the new currency
             if currency_changed:
@@ -1271,7 +1263,7 @@ class RobustMiddleware:
     def __call__(self, environ, start_response):
         try:
             return self.app(environ, start_response)
-        except Exception as e:
+        except Exception:
             logging.exception("Unhandled exception in WSGI app")
             start_response("500 Internal Server Error", [("Content-Type", "text/html")])
             return [b"<h1>Internal Server Error</h1>"]

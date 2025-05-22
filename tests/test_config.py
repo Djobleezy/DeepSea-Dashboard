@@ -1,7 +1,6 @@
 import json
 import importlib
 import os
-from pathlib import Path
 import config as config_module
 
 def test_load_config_defaults(tmp_path, monkeypatch):
