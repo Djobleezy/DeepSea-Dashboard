@@ -1,4 +1,4 @@
-﻿# notification_service.py
+# notification_service.py
 import logging
 import json
 import time

@@ -1,4 +1,4 @@
-﻿# Ocean.xyz API Integration
+# Ocean.xyz API Integration
 
 This application integrates with the [Ocean.xyz](https://ocean.xyz) mining pool API to retrieve user hashrates, payout data, and other mining stats.
 

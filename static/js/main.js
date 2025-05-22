@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 /**
  * ArrowIndicator - A clean implementation for managing metric value change indicators

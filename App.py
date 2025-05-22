@@ -1,4 +1,4 @@
-﻿"""
+"""
 Main application module for the Bitcoin Mining Dashboard.
 """
 import os

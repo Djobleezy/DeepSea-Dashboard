@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 // Constants for configuration
 const REFRESH_INTERVAL = 60000; // 60 seconds

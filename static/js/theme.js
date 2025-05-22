@@ -1,4 +1,4 @@
-﻿// Add this flag at the top of your file, outside the function
+// Add this flag at the top of your file, outside the function
 let isApplyingTheme = false;
 
 // Bitcoin Orange theme (default)

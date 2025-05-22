@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 // Global variables for workers dashboard
 let workerData = null;

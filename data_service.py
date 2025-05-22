@@ -1,4 +1,4 @@
-﻿"""
+"""
 Data service module for fetching and processing mining data.
 """
 import logging
