@@ -406,6 +406,10 @@ window.applyDeepSeaTheme = applyDeepSeaTheme;
 function toggleTheme() {
     const useDeepSea = localStorage.getItem('useDeepSeaTheme') !== 'true';
 
+    if (typeof window.applyAudioTheme === 'function') {
+        window.applyAudioTheme(useDeepSea);
+    }
+
     // Update the data-text attribute based on the new theme
     updateDashboardDataText(useDeepSea);
 
