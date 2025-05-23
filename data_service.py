@@ -1262,22 +1262,46 @@ class MiningDashboardService:
                 logging.warning("API method found workers but with invalid names")
                 
         # If both methods failed or found workers with invalid names, use fallback data
-        logging.warning("Both worker data fetch methods failed to get valid names, using fallback data")
-        
+        logging.warning(
+            "Both worker data fetch methods failed to get valid names, using fallback data"
+        )
+
         # Try to get worker count from cached metrics
         workers_count = 0
         if hasattr(self, 'cached_metrics') and self.cached_metrics:
             workers_count = self.cached_metrics.get('workers_hashing', 0)
-        
+
         # If no cached metrics, try to get from somewhere else
         if workers_count <= 0 and result and result.get('workers_total'):
             workers_count = result.get('workers_total')
-        
+
         # Ensure we have at least 1 worker
         workers_count = max(1, workers_count)
-        
+
         logging.info(f"Using fallback data generation with {workers_count} workers")
-        return None
+
+        if self.worker_service:
+            metrics = getattr(self, 'cached_metrics', {}) or {
+                'workers_hashing': workers_count,
+                'hashrate_3hr': 0,
+                'hashrate_3hr_unit': 'TH/s'
+            }
+            return self.worker_service.generate_fallback_data(metrics)
+
+        # Minimal fallback if no worker_service is available
+        return {
+            'workers': [],
+            'workers_total': workers_count,
+            'workers_online': 0,
+            'workers_offline': workers_count,
+            'total_hashrate': 0.0,
+            'hashrate_unit': 'TH/s',
+            'total_earnings': 0.0,
+            'daily_sats': 0,
+            'total_power': 0,
+            'hashrate_history': [],
+            'timestamp': datetime.now(ZoneInfo(get_timezone())).isoformat()
+        }
 
     # Rename the original method to get_worker_data_original
     def get_worker_data_original(self):

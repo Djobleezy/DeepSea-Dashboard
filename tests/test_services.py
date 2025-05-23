@@ -381,6 +381,39 @@ def test_get_worker_data_api(monkeypatch):
     assert 'rig1' in names and 'rig2' in names
 
 
+def test_get_worker_data_fallback(monkeypatch):
+    """Ensure fallback data is returned when all fetch methods fail."""
+    ws = WorkerService()
+    svc = MiningDashboardService(0, 0, 'w', worker_service=ws)
+
+    monkeypatch.setattr('worker_service.get_timezone', lambda: 'UTC')
+    monkeypatch.setattr(svc, 'get_worker_data_alternative', lambda: None)
+    monkeypatch.setattr(svc, 'get_worker_data_original', lambda: None)
+    monkeypatch.setattr(svc, 'get_worker_data_api', lambda: None)
+
+    def fake_generate(metrics):
+        return {
+            'workers': [{'name': 'w1', 'status': 'online'}],
+            'workers_total': 1,
+            'workers_online': 1,
+            'workers_offline': 0,
+            'total_hashrate': 0,
+            'hashrate_unit': 'TH/s',
+            'total_earnings': 0,
+            'daily_sats': 0,
+            'total_power': 0,
+            'hashrate_history': []
+        }
+
+    monkeypatch.setattr(ws, 'generate_fallback_data', fake_generate)
+    svc.cached_metrics = {'workers_hashing': 1, 'hashrate_3hr': 0, 'hashrate_3hr_unit': 'TH/s'}
+
+    data = svc.get_worker_data()
+
+    assert data['workers_total'] == 1
+    assert data['workers'][0]['name'] == 'w1'
+
+
 def test_get_pool_stat_api(monkeypatch):
     svc = MiningDashboardService(0, 0, 'w')
 
