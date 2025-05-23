@@ -24,6 +24,7 @@ def reload_config(monkeypatch, path):
 
 # ----- get_timezone -----
 
+
 def test_get_timezone_env(monkeypatch, tmp_path):
     path = create_config(tmp_path, timezone="America/New_York")
     mod = reload_config(monkeypatch, path)
@@ -39,6 +40,7 @@ def test_get_timezone_config(monkeypatch, tmp_path):
 
 
 # ----- get_currency -----
+
 
 def test_get_currency_env(monkeypatch, tmp_path):
     path = create_config(tmp_path, currency="GBP")
@@ -56,6 +58,7 @@ def test_get_currency_config(monkeypatch, tmp_path):
 
 # ----- get_exchange_rate_api_key -----
 
+
 def test_get_exchange_rate_api_key_env(monkeypatch, tmp_path):
     path = create_config(tmp_path, EXCHANGE_RATE_API_KEY="CFGKEY")
     mod = reload_config(monkeypatch, path)
@@ -68,4 +71,3 @@ def test_get_exchange_rate_api_key_config(monkeypatch, tmp_path):
     mod = reload_config(monkeypatch, path)
     monkeypatch.delenv("EXCHANGE_RATE_API_KEY", raising=False)
     assert mod.get_exchange_rate_api_key() == "CFGONLY"
-

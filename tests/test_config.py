@@ -3,6 +3,7 @@ import importlib
 import os
 import config as config_module
 
+
 def test_load_config_defaults(tmp_path, monkeypatch):
     temp_file = tmp_path / "cfg.json"
     monkeypatch.setattr(config_module, "CONFIG_FILE", str(temp_file))

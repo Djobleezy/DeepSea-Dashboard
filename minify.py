@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Minimal asset minification helper."""
+
 import subprocess
 import shutil
 import logging
@@ -65,7 +66,9 @@ def minify_html():
         if src.name.endswith(".min.html"):
             continue
         out = out_dir / src.name.replace(".html", ".min.html")
-        out.write_text(htmlmin.minify(src.read_text(), remove_comments=True, reduce_empty_attributes=True), encoding="utf-8")
+        out.write_text(
+            htmlmin.minify(src.read_text(), remove_comments=True, reduce_empty_attributes=True), encoding="utf-8"
+        )
         logger.info("Minified %s", src.name)
 
 

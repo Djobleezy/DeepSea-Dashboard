@@ -2,21 +2,25 @@ import importlib
 import sys
 import types
 
-if 'pytest' not in sys.modules:
-    pytest = types.ModuleType('pytest')
+if "pytest" not in sys.modules:
+    pytest = types.ModuleType("pytest")
+
     def fixture(func=None, **kwargs):
         if func is None:
             return lambda f: f
         return func
+
     pytest.fixture = fixture
-    sys.modules['pytest'] = pytest
+    sys.modules["pytest"] = pytest
 else:
     import pytest
+
 
 @pytest.fixture
 def client(monkeypatch):
     # Prevent scheduler from starting
     import apscheduler.schedulers.background as bg
+
     monkeypatch.setattr(bg.BackgroundScheduler, "start", lambda self: None)
 
     App = importlib.reload(importlib.import_module("App"))
@@ -31,6 +35,7 @@ def client(monkeypatch):
     monkeypatch.setattr(App, "save_config", lambda cfg: True)
 
     return App.app.test_client()
+
 
 def test_health_endpoint(client):
     resp = client.get("/api/health")
@@ -206,4 +211,3 @@ def test_clear_notifications_endpoint(client):
     assert data["unread_count"] == 1
     assert len(App.notification_service.notifications) == 1
     assert App.notification_service.notifications[0]["id"] == "2"
-

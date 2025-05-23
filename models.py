@@ -1,14 +1,17 @@
 """
 Data models for the Bitcoin Mining Dashboard.
 """
+
 from dataclasses import dataclass
 from typing import Dict, Any
 import logging
 import re
 
+
 @dataclass
 class OceanData:
     """Data structure for Ocean.xyz pool mining data."""
+
     # Keep original definitions with None default to maintain backward compatibility
     pool_total_hashrate: float = None
     pool_total_hashrate_unit: str = None
@@ -35,14 +38,14 @@ class OceanData:
     total_last_share: str = "N/A"
     last_block_earnings: str = None
     pool_fees_percentage: float = None  # Added missing attribute
-    
+
     def get_normalized_hashrate(self, timeframe: str = "3hr") -> float:
         """
         Get a normalized hashrate value in TH/s regardless of original units.
-        
+
         Args:
             timeframe: The timeframe to get ("24hr", "3hr", "10min", "5min", "60sec")
-            
+
         Returns:
             float: Normalized hashrate in TH/s
         """
@@ -57,13 +60,13 @@ class OceanData:
         elif timeframe == "60sec" and self.hashrate_60sec is not None:
             return convert_to_ths(self.hashrate_60sec, self.hashrate_60sec_unit)
         return 0.0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the OceanData object to a dictionary."""
         return {k: v for k, v in self.__dict__.items()}
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'OceanData':
+    def from_dict(cls, data: Dict[str, Any]) -> "OceanData":
         """Create an OceanData instance from a dictionary."""
         filtered_data = {}
         for k, v in data.items():
@@ -71,9 +74,11 @@ class OceanData:
                 filtered_data[k] = v
         return cls(**filtered_data)
 
+
 @dataclass
 class WorkerData:
     """Data structure for individual worker information."""
+
     name: str = None
     status: str = "offline"
     type: str = "ASIC"  # ASIC or Bitaxe
@@ -97,27 +102,27 @@ class WorkerData:
         # Ensure hashrates are non-negative
         if self.hashrate_60sec is not None and self.hashrate_60sec < 0:
             self.hashrate_60sec = 0
-            
+
         if self.hashrate_3hr is not None and self.hashrate_3hr < 0:
             self.hashrate_3hr = 0
-            
+
         # Ensure status is valid, but don't raise exceptions for backward compatibility
         if self.status not in ["online", "offline"]:
             logging.warning(f"Worker {self.name}: Invalid status '{self.status}', using 'offline'")
             self.status = "offline"
-            
+
         # Ensure type is valid, but don't raise exceptions for backward compatibility
         if self.type not in ["ASIC", "Bitaxe"]:
             logging.warning(f"Worker {self.name}: Invalid type '{self.type}', using 'ASIC'")
             self.type = "ASIC"
-    
+
     def get_normalized_hashrate(self, timeframe: str = "3hr") -> float:
         """
         Get normalized hashrate in TH/s.
-        
+
         Args:
             timeframe: The timeframe to get ("3hr" or "60sec")
-            
+
         Returns:
             float: Normalized hashrate in TH/s
         """
@@ -126,13 +131,13 @@ class WorkerData:
         elif timeframe == "60sec":
             return convert_to_ths(self.hashrate_60sec, self.hashrate_60sec_unit)
         return 0.0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert the WorkerData object to a dictionary."""
         return {k: v for k, v in self.__dict__.items()}
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'WorkerData':
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkerData":
         """Create a WorkerData instance from a dictionary."""
         filtered_data = {}
         for k, v in data.items():
@@ -140,18 +145,21 @@ class WorkerData:
                 filtered_data[k] = v
         return cls(**filtered_data)
 
+
 class HashRateConversionError(Exception):
     """Exception raised for errors in hashrate unit conversion."""
+
     pass
+
 
 def convert_to_ths(value, unit):
     """
     Convert any hashrate unit to TH/s equivalent.
-    
+
     Args:
         value (float): The numerical value of the hashrate
         unit (str): The unit of measurement (e.g., 'PH/s', 'EH/s', etc.)
-    
+
     Returns:
         float: The hashrate value in TH/s
     """
@@ -160,28 +168,28 @@ def convert_to_ths(value, unit):
 
     try:
         if isinstance(value, str):
-            cleaned = value.replace(',', '').strip()
+            cleaned = value.replace(",", "").strip()
             match = re.match(r"[-+]?\d*\.?\d+", cleaned)
             value = float(match.group(0)) if match else 0
         value = float(value)
         if value <= 0:
             return 0
 
-        unit = unit.lower() if unit else 'th/s'
-        
-        if 'ph/s' in unit:
+        unit = unit.lower() if unit else "th/s"
+
+        if "ph/s" in unit:
             return value * 1000  # 1 PH/s = 1000 TH/s
-        elif 'eh/s' in unit:
+        elif "eh/s" in unit:
             return value * 1000000  # 1 EH/s = 1,000,000 TH/s
-        elif 'gh/s' in unit:
+        elif "gh/s" in unit:
             return value / 1000  # 1 TH/s = 1000 GH/s
-        elif 'mh/s' in unit:
+        elif "mh/s" in unit:
             return value / 1000000  # 1 TH/s = 1,000,000 MH/s
-        elif 'kh/s' in unit:
+        elif "kh/s" in unit:
             return value / 1000000000  # 1 TH/s = 1,000,000,000 KH/s
-        elif 'h/s' in unit and not any(prefix in unit for prefix in ['th/s', 'ph/s', 'eh/s', 'gh/s', 'mh/s', 'kh/s']):
+        elif "h/s" in unit and not any(prefix in unit for prefix in ["th/s", "ph/s", "eh/s", "gh/s", "mh/s", "kh/s"]):
             return value / 1000000000000  # 1 TH/s = 1,000,000,000,000 H/s
-        elif 'th/s' in unit:
+        elif "th/s" in unit:
             return value
         else:
             # Log unexpected unit

@@ -4,11 +4,16 @@ from models import OceanData, WorkerData
 
 def test_ocean_data_get_normalized_hashrate():
     data = OceanData(
-        hashrate_24hr=2, hashrate_24hr_unit="EH/s",
-        hashrate_3hr=1.5, hashrate_3hr_unit="PH/s",
-        hashrate_10min=500, hashrate_10min_unit="GH/s",
-        hashrate_5min=2_000_000, hashrate_5min_unit="MH/s",
-        hashrate_60sec=3_000_000_000, hashrate_60sec_unit="KH/s",
+        hashrate_24hr=2,
+        hashrate_24hr_unit="EH/s",
+        hashrate_3hr=1.5,
+        hashrate_3hr_unit="PH/s",
+        hashrate_10min=500,
+        hashrate_10min_unit="GH/s",
+        hashrate_5min=2_000_000,
+        hashrate_5min_unit="MH/s",
+        hashrate_60sec=3_000_000_000,
+        hashrate_60sec_unit="KH/s",
     )
     assert data.get_normalized_hashrate("24hr") == pytest.approx(2_000_000)
     assert data.get_normalized_hashrate("3hr") == pytest.approx(1500)

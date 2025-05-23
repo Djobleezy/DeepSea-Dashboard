@@ -3,38 +3,50 @@ import gzip
 import sys
 import types
 
-if 'redis' not in sys.modules:
-    redis_mod = types.ModuleType('redis')
+if "redis" not in sys.modules:
+    redis_mod = types.ModuleType("redis")
+
     class DummyRedisModule:
         @classmethod
         def from_url(cls, url):
             return cls()
+
         def ping(self):
             pass
+
     redis_mod.Redis = DummyRedisModule
-    sys.modules['redis'] = redis_mod
+    sys.modules["redis"] = redis_mod
 
 from collections import deque
 from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES, MAX_HISTORY_ENTRIES
 
+
 class DummyRedis:
     def __init__(self):
         self.storage = {}
+
     def set(self, key, value):
         if isinstance(value, str):
-            value = value.encode('utf-8')
+            value = value.encode("utf-8")
         self.storage[key] = value
+
     def get(self, key):
         return self.storage.get(key)
+
     def ping(self):
         pass
+
 
 def test_save_and_load_graph_state_gzip():
     mgr = StateManager()
     mgr.redis_client = DummyRedis()
-    mgr.arrow_history = {"hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)}
+    mgr.arrow_history = {
+        "hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)
+    }
     mgr.hashrate_history = [1]
-    mgr.metrics_log = deque([{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}], maxlen=180)
+    mgr.metrics_log = deque(
+        [{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}], maxlen=180
+    )
 
     mgr.save_graph_state()
     raw = mgr.redis_client.get(mgr.STATE_KEY)
@@ -69,7 +81,7 @@ def test_load_graph_state_plain_json():
 
 def test_variance_history_calculation(monkeypatch):
     mgr = StateManager()
-    monkeypatch.setattr('state_manager.get_timezone', lambda: 'UTC')
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
 
     first = {
         "estimated_earnings_per_day_sats": 100,
@@ -104,15 +116,19 @@ def test_variance_history_calculation(monkeypatch):
 def test_variance_history_persistence(monkeypatch):
     mgr = StateManager()
     mgr.redis_client = DummyRedis()
-    monkeypatch.setattr('state_manager.get_timezone', lambda: 'UTC')
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
 
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
-    now = datetime(2024, 1, 1, tzinfo=ZoneInfo('UTC'))
-    mgr.arrow_history = {"hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)}
+    now = datetime(2024, 1, 1, tzinfo=ZoneInfo("UTC"))
+    mgr.arrow_history = {
+        "hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)
+    }
     mgr.hashrate_history = [1]
-    mgr.metrics_log = deque([{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}], maxlen=180)
+    mgr.metrics_log = deque(
+        [{"timestamp": "t", "metrics": {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}}], maxlen=180
+    )
     mgr.variance_history = {
         "estimated_earnings_per_day_sats": deque([{"time": now, "value": 100}], maxlen=MAX_VARIANCE_HISTORY_ENTRIES)
     }
@@ -156,10 +172,7 @@ def test_prune_old_data():
     entries = [{"time": str(i), "value": i, "arrow": ""} for i in range(MAX_HISTORY_ENTRIES + 50)]
     mgr.arrow_history["hashrate_60sec"] = deque(entries, maxlen=MAX_HISTORY_ENTRIES + 50)
 
-    m_entries = [
-        {"timestamp": str(i), "metrics": {"hashrate_60sec": i}}
-        for i in range(MAX_HISTORY_ENTRIES + 50)
-    ]
+    m_entries = [{"timestamp": str(i), "metrics": {"hashrate_60sec": i}} for i in range(MAX_HISTORY_ENTRIES + 50)]
     mgr.metrics_log = deque(m_entries, maxlen=MAX_HISTORY_ENTRIES + 50)
 
     assert len(mgr.arrow_history["hashrate_60sec"]) > MAX_HISTORY_ENTRIES

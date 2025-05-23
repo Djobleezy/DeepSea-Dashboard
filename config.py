@@ -2,6 +2,7 @@
 Configuration management module for the Bitcoin Mining Dashboard.
 Responsible for loading and managing application settings.
 """
+
 import os
 import json
 import logging
@@ -15,6 +16,7 @@ CONFIG_FILE = globals().get("CONFIG_FILE", "config.json")
 # Cached configuration and its modification time
 _cached_config = None
 _config_mtime = None
+
 
 def load_config():
     """Load configuration with caching and modification time checks."""
@@ -71,35 +73,38 @@ def load_config():
     _config_mtime = os.path.getmtime(CONFIG_FILE) if file_exists else None
     return default_config
 
+
 def get_timezone():
     """
     Get the configured timezone with fallback to default.
-    
+
     Returns:
         str: Timezone identifier
     """
     # First check environment variable (for Docker)
     import os
+
     env_timezone = os.environ.get("TIMEZONE")
     if env_timezone:
         return env_timezone
-    
+
     # Then check config file
     config = load_config()
     timezone = config.get("timezone")
     if timezone:
         return timezone
-    
+
     # Default to Los Angeles
     return "America/Los_Angeles"
+
 
 def save_config(config):
     """
     Save configuration to file.
-    
+
     Args:
         config (dict): Configuration dictionary to save
-    
+
     Returns:
         bool: True if save was successful, False otherwise
     """
@@ -112,41 +117,45 @@ def save_config(config):
         logging.error(f"Error saving config: {e}")
         return False
 
+
 def get_value(key, default=None):
     """
     Get a configuration value by key with fallback to default.
-    
+
     Args:
         key (str): Configuration key to look up
         default: Default value if key is not found
-    
+
     Returns:
         Value for the key or default if not found
     """
     config = load_config()
     return config.get(key, default)
 
+
 def get_currency():
     """
     Get the configured currency with fallback to default.
-    
+
     Returns:
         str: Currency code (e.g., 'USD', 'EUR', etc.)
     """
     # First check environment variable (for Docker)
     import os
+
     env_currency = os.environ.get("CURRENCY")
     if env_currency:
         return env_currency
-    
+
     # Then check config file
     config = load_config()
     currency = config.get("currency")
     if currency:
         return currency
-    
+
     # Default to USD
     return "USD"
+
 
 def get_exchange_rate_api_key():
     """Get the ExchangeRate API key from env or config."""

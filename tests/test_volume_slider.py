@@ -1,5 +1,6 @@
 from pathlib import Path
 
+
 def test_volume_slider_vertical():
     css_path = Path("static/css/common.css")
     assert css_path.exists()

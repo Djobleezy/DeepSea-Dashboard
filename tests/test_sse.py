@@ -2,14 +2,16 @@ import importlib
 import sys
 import types
 
-if 'pytest' not in sys.modules:
-    pytest = types.ModuleType('pytest')
+if "pytest" not in sys.modules:
+    pytest = types.ModuleType("pytest")
+
     def fixture(func=None, **kwargs):
         if func is None:
             return lambda f: f
         return func
+
     pytest.fixture = fixture
-    sys.modules['pytest'] = pytest
+    sys.modules["pytest"] = pytest
 else:
     import pytest
 
@@ -17,6 +19,7 @@ else:
 @pytest.fixture
 def sse_client(monkeypatch):
     import apscheduler.schedulers.background as bg
+
     monkeypatch.setattr(bg.BackgroundScheduler, "start", lambda self: None)
 
     App = importlib.reload(importlib.import_module("App"))
@@ -39,6 +42,7 @@ def parse_events(data):
 
 def test_stream_returns_data_when_cached(sse_client, monkeypatch):
     import App
+
     monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
     monkeypatch.setattr(App.time, "sleep", lambda x: None)
     App.cached_metrics = {"server_timestamp": 1, "val": 42}
@@ -47,11 +51,12 @@ def test_stream_returns_data_when_cached(sse_client, monkeypatch):
     assert resp.status_code == 200
     events = parse_events(resp.data)
     assert len(events) >= 2
-    assert "\"val\": 42" in events[0]
+    assert '"val": 42' in events[0]
 
 
 def test_stream_connection_limit(sse_client, monkeypatch):
     import App
+
     monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
     App.active_sse_connections = App.MAX_SSE_CONNECTIONS
     resp = sse_client.get("/stream")
