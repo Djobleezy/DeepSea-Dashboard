@@ -121,7 +121,8 @@ class WorkerService:
                         return real_worker_data
                     else:
                         logging.warning(
-                            "Real worker data had invalid names (like 'online'/'offline'), falling back to simulated data"
+                            "Real worker data had invalid names (like 'online'/'offline'), "
+                            "falling back to simulated data"
                         )
                 else:
                     logging.warning("Real worker data fetch returned no workers, falling back to simulated data")
@@ -203,9 +204,11 @@ class WorkerService:
                 worker_data["workers_online"] = new_online_count
                 worker_data["workers_offline"] = new_offline_count
 
-                logging.info(
-                    f"Updated worker counts - Total: {dashboard_worker_count}, Online: {new_online_count}, Offline: {new_offline_count}"
+                msg = (
+                    f"Updated worker counts - Total: {dashboard_worker_count}, "
+                    f"Online: {new_online_count}, Offline: {new_offline_count}"
                 )
+                logging.info(msg)
 
                 # If we have worker instances, try to adjust them as well
                 if "workers" in worker_data and isinstance(worker_data["workers"], list):

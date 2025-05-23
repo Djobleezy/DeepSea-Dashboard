@@ -503,7 +503,10 @@ class NotificationService:
             formatted_profit = format_currency_value(daily_profit_usd, user_currency, exchange_rates)
 
             # Build message
-            message = f"Daily Mining Summary: {hashrate_24hr} {hashrate_unit} average hashrate, {daily_mined_sats} SATS mined ({formatted_profit})"
+            message = (
+                f"Daily Mining Summary: {hashrate_24hr} {hashrate_unit} average hashrate, "
+                f"{daily_mined_sats} SATS mined ({formatted_profit})"
+            )
 
             # Add notification
             logging.info(f"[NotificationService] Generating daily stats notification: {message}")
@@ -530,9 +533,11 @@ class NotificationService:
             last_block_height = metrics.get("last_block_height", "Unknown")
             last_block_earnings = metrics.get("last_block_earnings", "0")
 
-            logging.info(
-                f"[NotificationService] Generating block notification: height={last_block_height}, earnings={last_block_earnings}"
+            log_msg = (
+                "[NotificationService] Generating block notification: "
+                f"height={last_block_height}, earnings={last_block_earnings}"
             )
+            logging.info(log_msg)
 
             message = f"New block found by the pool! Block #{last_block_height}, earnings: {last_block_earnings} SATS"
 
@@ -605,9 +610,11 @@ class NotificationService:
             previous_hashrate = previous.get(previous_hashrate_key, 0)
 
             # Log what we're comparing
-            logging.debug(
-                f"[NotificationService] Comparing {timeframe} hashrates - current: {current_hashrate}, previous: {previous_hashrate}"
+            log_msg = (
+                f"[NotificationService] Comparing {timeframe} hashrates - "
+                f"current: {current_hashrate}, previous: {previous_hashrate}"
             )
+            logging.debug(log_msg)
 
             # Skip if values are missing
             if not current_hashrate or not previous_hashrate:
@@ -618,9 +625,11 @@ class NotificationService:
             current_value = self._parse_numeric_value(current_hashrate)
             previous_value = self._parse_numeric_value(previous_hashrate)
 
-            logging.debug(
-                f"[NotificationService] Converted {timeframe} hashrates - current: {current_value}, previous: {previous_value}"
+            conv_msg = (
+                f"[NotificationService] Converted {timeframe} hashrates - "
+                f"current: {current_value}, previous: {previous_value}"
             )
+            logging.debug(conv_msg)
 
             # Skip if previous was zero (prevents division by zero)
             if previous_value == 0:
@@ -678,7 +687,8 @@ class NotificationService:
             current_wallet = str(current.get("wallet", ""))
             if current_wallet == "yourwallethere":
                 logging.info(
-                    "[NotificationService] Detected wallet reset to default (likely Alt+W) - skipping payout notification"
+                    "[NotificationService] Detected wallet reset to default "
+                    "(likely Alt+W) - skipping payout notification"
                 )
                 return None
 

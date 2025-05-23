@@ -1198,11 +1198,15 @@ class MiningDashboardService:
             page_num += 1
 
         if page_num >= max_pages:
-            logging.info(f"Reached maximum page limit ({max_pages}). Collected {len(all_rows)} worker rows total.")
-        else:
             logging.info(
-                f"Completed fetching all available worker data. Collected {len(all_rows)} worker rows from {page_num} pages."
+                f"Reached maximum page limit ({max_pages}). Collected {len(all_rows)} worker rows total."
             )
+        else:
+            msg = (
+                "Completed fetching all available worker data. Collected "
+                f"{len(all_rows)} worker rows from {page_num} pages."
+            )
+            logging.info(msg)
 
         return all_rows
 
