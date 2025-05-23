@@ -346,6 +346,11 @@ let lastPayoutTracking = {
 let serverTimeOffset = 0;
 let serverStartTime = null;
 
+// Track block timing for network block intervals
+let lastBlockNumber = null;
+let lastBlockTime = null;
+let blockTimerInterval = null;
+
 // Register local annotation plugin if available
 if (window.simpleAnnotationPlugin) {
     Chart.register(window.simpleAnnotationPlugin);
@@ -449,6 +454,36 @@ function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
             }
         })
         .catch(err => console.error('Error fetching block events', err));
+}
+
+// --- Block timer helpers ---
+function formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
+function getBlockTimerClass(seconds) {
+    if (seconds < 8 * 60) {
+        return 'very-lucky';
+    } else if (seconds < 10 * 60) {
+        return 'lucky';
+    } else if (seconds <= 12 * 60) {
+        return 'normal-luck';
+    }
+    return 'unlucky';
+}
+
+function updateBlockTimerValue() {
+    if (!lastBlockTime) {
+        return;
+    }
+    const elapsed = Math.floor((Date.now() - lastBlockTime) / 1000);
+    const timerEl = document.getElementById('block_timer');
+    if (timerEl) {
+        timerEl.textContent = formatDuration(elapsed);
+        timerEl.className = 'metric-value metric-divider-value ' + getBlockTimerClass(elapsed);
+    }
 }
 
 function saveBlockAnnotations(minutes = 180, maxEntries = 100) {
@@ -3241,6 +3276,58 @@ function updateUI() {
         // Update other non-hashrate metrics
         updateElementText("block_number", numberWithCommas(data.block_number));
 
+        if (lastBlockNumber === null || data.block_number !== lastBlockNumber) {
+            lastBlockNumber = data.block_number;
+            lastBlockTime = Date.now();
+        }
+
+        (function updateBlockTimerUI() {
+            const para = document.getElementById('block_number').parentNode;
+            ensureElementStyles();
+
+            if (!para.querySelector('.main-metric')) {
+                const metricEl = document.getElementById('block_number');
+                const indicatorEl = document.getElementById('indicator_block_number');
+                const mainMetric = document.createElement('span');
+                mainMetric.className = 'main-metric';
+                if (metricEl && indicatorEl) {
+                    let node = metricEl.nextSibling;
+                    while (node && node !== indicatorEl) {
+                        const nextNode = node.nextSibling;
+                        if (node.nodeType === 3) {
+                            para.removeChild(node);
+                        }
+                        node = nextNode;
+                    }
+                    metricEl.parentNode.insertBefore(mainMetric, metricEl);
+                    mainMetric.appendChild(metricEl);
+                    mainMetric.appendChild(indicatorEl);
+                }
+                const dividerContainer = document.createElement('span');
+                dividerContainer.className = 'metric-divider-container';
+                para.appendChild(dividerContainer);
+            }
+
+            let container = para.querySelector('.metric-divider-container');
+            if (!container) {
+                container = document.createElement('span');
+                container.className = 'metric-divider-container';
+                para.appendChild(container);
+            }
+
+            const elapsed = lastBlockTime ? Math.floor((Date.now() - lastBlockTime) / 1000) : 0;
+            const formatted = formatDuration(elapsed);
+            const colorClass = getBlockTimerClass(elapsed);
+            const existing = document.getElementById('block_timer');
+            if (existing) {
+                existing.textContent = formatted;
+                existing.className = 'metric-value metric-divider-value ' + colorClass;
+            } else {
+                const div = createDivider('block_timer', formatted, '[Block \u0394]', colorClass);
+                container.appendChild(div);
+            }
+        })();
+
         // Update BTC price with currency conversion and symbol
         if (data.btc_price != null) {
             const btcPriceValue = data.btc_price;
@@ -4429,6 +4516,9 @@ $(document).ready(function () {
     // Start server time polling
     updateServerTime();
     setInterval(updateServerTime, 30000);
+
+    // Live block timer update every second
+    blockTimerInterval = setInterval(updateBlockTimerValue, 1000);
 
     // Update the manual refresh button color
     $("body").append('<button id="refreshButton" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #0088cc; color: white; border: none; padding: 8px 16px; display: none; cursor: pointer;">Refresh Data</button>');
