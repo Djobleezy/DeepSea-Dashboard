@@ -8,3 +8,10 @@ def test_crossfade_constant():
     content = js_path.read_text()
     assert "crossfadeDuration" in content
     assert re.search(r"crossfadeDuration\s*=\s*2", content)
+
+
+def test_crossfade_to_theme_function():
+    js_path = Path("static/js/audio.js")
+    content = js_path.read_text()
+    assert "crossfadeToTheme" in content
+    assert "window.crossfadeToTheme" in content

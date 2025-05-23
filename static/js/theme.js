@@ -412,6 +412,11 @@ function toggleTheme() {
     // Save the new theme preference
     saveThemePreference(useDeepSea);
 
+    // Crossfade background audio to the new theme
+    if (window.crossfadeToTheme) {
+        window.crossfadeToTheme(useDeepSea);
+    }
+
     // Show a themed loading message
     const loadingMessage = document.createElement('div');
     loadingMessage.id = 'theme-loader';
@@ -453,10 +458,11 @@ function toggleTheme() {
     }
 
     // Short delay before refreshing
+    const reloadDelay = (window.audioCrossfadeDuration || 2) * 1000 + 500;
     setTimeout(() => {
         // Hard reload the page
         window.location.reload();
-    }, 500);
+    }, reloadDelay);
 }
 
 // Set theme preference to localStorage

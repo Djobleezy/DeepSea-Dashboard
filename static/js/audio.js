@@ -12,9 +12,9 @@
         let isCrossfading = false;
 
         const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
-        const playlist = isDeepSea
-            ? ['/static/audio/ocean.mp3']
-            : ['/static/audio/bitcoin.mp3', '/static/audio/bitcoin1.mp3', '/static/audio/bitcoin2.mp3'];
+        const deepSeaTracks = ['/static/audio/ocean.mp3'];
+        const bitcoinTracks = ['/static/audio/bitcoin.mp3', '/static/audio/bitcoin1.mp3', '/static/audio/bitcoin2.mp3'];
+        let playlist = isDeepSea ? deepSeaTracks : bitcoinTracks;
 
         let trackIndex = parseInt(localStorage.getItem('audioTrackIndex')) || 0;
         if (trackIndex >= playlist.length) {
@@ -106,6 +106,45 @@
                 }
             }, interval);
         };
+
+        const crossfadeToTheme = (useDeepSea) => {
+            if (isCrossfading) { return; }
+            const newPlaylist = useDeepSea ? deepSeaTracks : bitcoinTracks;
+            if (playlist === newPlaylist) { return; }
+            playlist = newPlaylist;
+            trackIndex = 0;
+            audio.loop = playlist.length === 1;
+            isCrossfading = true;
+            loadTrack(nextAudio, trackIndex);
+            nextAudio.volume = 0;
+            nextAudio.muted = audio.muted;
+            nextAudio.play().catch(() => { });
+            const steps = 20;
+            const interval = (crossfadeDuration * 1000) / steps;
+            let step = 0;
+            const fade = setInterval(() => {
+                step += 1;
+                const ratio = step / steps;
+                audio.volume = baseVolume * (1 - ratio);
+                nextAudio.volume = baseVolume * ratio;
+                if (step >= steps) {
+                    clearInterval(fade);
+                    audio.pause();
+                    audio.volume = baseVolume;
+                    audio.removeEventListener('timeupdate', timeUpdateHandler);
+                    const old = audio;
+                    audio = nextAudio;
+                    nextAudio = old;
+                    loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
+                    audio.addEventListener('timeupdate', timeUpdateHandler);
+                    storedTime = 0;
+                    isCrossfading = false;
+                }
+            }, interval);
+        };
+
+        window.crossfadeToTheme = crossfadeToTheme;
+        window.audioCrossfadeDuration = crossfadeDuration;
 
         loadAndResume();
 
