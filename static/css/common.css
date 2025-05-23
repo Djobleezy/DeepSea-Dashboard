@@ -1256,8 +1256,10 @@ html.deepsea-theme #congratsMessage {
   width: 4px;
   height: 100px;
   margin-bottom: 4px;
-  writing-mode: bt-lr;
-  -webkit-appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: none;
+  -webkit-appearance: none;
   accent-color: var(--primary-color);
 }
 
