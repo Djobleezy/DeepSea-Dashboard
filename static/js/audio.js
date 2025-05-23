@@ -38,26 +38,9 @@
             }
         }
 
-        const setPosition = () => {
-            const storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
-            if (!Number.isNaN(storedTime)) {
-                audio.currentTime = storedTime;
-            }
-        };
-
-        if (audio.readyState > 0) {
-            setPosition();
-        } else {
-            audio.addEventListener('loadedmetadata', setPosition);
-        }
-
+        const storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
         const storedMuted = localStorage.getItem('audioMuted') === 'true';
         const wasPaused = localStorage.getItem('audioPaused') === 'true';
-        audio.muted = storedMuted;
-        if (icon) {
-            icon.classList.toggle('fa-volume-mute', storedMuted);
-            icon.classList.toggle('fa-volume-up', !storedMuted);
-        }
 
         const play = () => {
             const promise = audio.play();
@@ -66,16 +49,39 @@
             }
         };
 
+        const loadAndResume = () => {
+            const resume = () => {
+                if (!Number.isNaN(storedTime)) {
+                    audio.currentTime = storedTime;
+                }
+                if (!wasPaused && !storedMuted) {
+                    play();
+                }
+                audio.removeEventListener('loadedmetadata', resume);
+            };
+
+            if (audio.readyState > 0) {
+                resume();
+            } else {
+                audio.addEventListener('loadedmetadata', resume);
+            }
+        };
+
+        loadAndResume();
+
+        audio.muted = storedMuted;
+        if (icon) {
+            icon.classList.toggle('fa-volume-mute', storedMuted);
+            icon.classList.toggle('fa-volume-up', !storedMuted);
+        }
+        
         if (playlist.length > 1) {
             audio.addEventListener('ended', () => {
                 trackIndex = (trackIndex + 1) % playlist.length;
                 loadTrack(trackIndex);
-                play();
+                storedTime = 0;
+                loadAndResume();
             });
-        }
-
-        if (!wasPaused && !storedMuted) {
-            play();
         }
 
         audio.addEventListener('timeupdate', () => {
