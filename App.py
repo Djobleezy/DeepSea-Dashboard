@@ -27,6 +27,7 @@ from data_service import MiningDashboardService
 from worker_service import WorkerService
 from state_manager import StateManager, MAX_HISTORY_ENTRIES
 from config import get_timezone
+from error_handlers import register_error_handlers
 
 # Memory management configuration
 MEMORY_CONFIG = {
@@ -47,6 +48,7 @@ object_counts_history = {}
 
 # Initialize Flask app
 app = Flask(__name__)
+register_error_handlers(app)
 
 
 @app.context_processor
@@ -1295,17 +1297,6 @@ def notifications_page():
     return render_template("notifications.html", current_time=current_time)
 
 
-@app.errorhandler(404)
-def page_not_found(e):
-    """Error handler for 404 errors."""
-    return render_template("error.html", message="Page not found."), 404
-
-
-@app.errorhandler(500)
-def internal_server_error(e):
-    """Error handler for 500 errors."""
-    logging.error("Internal server error: %s", e)
-    return render_template("error.html", message="Internal server error."), 500
 
 
 class RobustMiddleware:

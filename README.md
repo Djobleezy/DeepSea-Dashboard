@@ -67,7 +67,7 @@ informed with minimal fuss.
 - **API Worker Fallback**: Uses the Ocean.xyz API for worker lists when HTML parsing fails
 - **Cross-Tab Synchronization**: Data consistency across multiple browser tabs
 - **Server Health Monitoring**: Built-in watchdog processes ensure reliability
-- **Error Handling**: Displays a user-friendly error page (`error.html`) for unexpected issues.
+- **Error Handling**: Centralized error handlers return a user-friendly page (`error.html`) for unexpected issues.
 
 ### Distinctive Design Elements
 - **Retro Terminal Aesthetic**: Nostalgic interface with modern functionality
