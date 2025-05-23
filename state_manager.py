@@ -525,6 +525,7 @@ class StateManager:
                 "estimated_earnings_per_day_sats",
                 "estimated_earnings_next_block_sats",
                 "estimated_rewards_in_window_sats",
+                "network_hashrate",
             ]
             now = datetime.now(ZoneInfo(get_timezone()))
             window_start = now - timedelta(hours=3)

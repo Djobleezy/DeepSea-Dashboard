@@ -2801,7 +2801,7 @@ function updateUI() {
     }
 
     // Helper to attach a 3hr variance divider to a metric row
-    function updateVarianceDivider(metricId, varianceId, varianceValue) {
+    function updateVarianceDivider(metricId, varianceId, varianceValue, formatFn) {
         const para = document.getElementById(metricId).parentNode;
         ensureElementStyles();
 
@@ -2843,6 +2843,8 @@ function updateUI() {
         const needsData = varianceValue === null || varianceValue === undefined;
         if (needsData) {
             formatted = 'Loading...';
+        } else if (typeof formatFn === 'function') {
+            formatted = formatFn(varianceValue);
         } else {
             formatted = (varianceValue >= 0 ? '+' : '') +
                 numberWithCommas(Math.round(varianceValue)) + ' SATS';
@@ -3266,6 +3268,22 @@ function updateUI() {
             // Use regular EH/s formatting
             updateElementText("network_hashrate",
                 numberWithCommas(Math.round(data.network_hashrate)) + " EH/s");
+        }
+
+        if (data.network_hashrate_variance_3hr !== undefined) {
+            updateVarianceDivider(
+                "network_hashrate",
+                "variance_network_hashrate",
+                data.network_hashrate_variance_3hr,
+                function(v) {
+                    const sign = v >= 0 ? '+' : '';
+                    const abs = Math.abs(v);
+                    if (abs >= 1000) {
+                        return sign + (abs / 1000).toFixed(2) + ' ZH/s';
+                    }
+                    return sign + numberWithCommas(Math.round(abs)) + ' EH/s';
+                }
+            );
         }
         updateElementText("difficulty", numberWithCommas(Math.round(data.difficulty)));
 

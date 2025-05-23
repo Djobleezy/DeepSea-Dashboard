@@ -113,6 +113,24 @@ def test_variance_history_calculation(monkeypatch):
     assert second["estimated_rewards_in_window_sats_variance_3hr"] == 10
 
 
+def test_network_hashrate_variance_calculation(monkeypatch):
+    mgr = StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    first = {"network_hashrate": 400}
+    mgr.update_metrics_history(first)
+    assert first["network_hashrate_variance_3hr"] is None
+
+    history = mgr.variance_history["network_hashrate"]
+    for _ in range(MAX_VARIANCE_HISTORY_ENTRIES - 1):
+        history.append({"time": history[0]["time"], "value": first["network_hashrate"]})
+
+    second = {"network_hashrate": 450}
+    mgr.update_metrics_history(second)
+
+    assert second["network_hashrate_variance_3hr"] == 50
+
+
 def test_variance_history_persistence(monkeypatch):
     mgr = StateManager()
     mgr.redis_client = DummyRedis()
