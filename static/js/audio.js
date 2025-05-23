@@ -3,7 +3,7 @@
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
         let audio = document.getElementById('backgroundAudio');
-        const nextAudio = new Audio();
+        let nextAudio = new Audio();
         const control = document.getElementById('audioControl');
         const icon = document.getElementById('audioIcon');
         const volumeSlider = document.getElementById('volumeSlider');
