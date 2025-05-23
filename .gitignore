@@ -1,8 +1,0 @@
-__pycache__/
-logs/
-static/css/min/
-static/js/min/
-templates/min/
-tests/__pycache__/
-.pytest_cache/
-*.pyc
