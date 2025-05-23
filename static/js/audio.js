@@ -77,6 +77,7 @@
         const startCrossfade = () => {
             if (isCrossfading) { return; }
             isCrossfading = true;
+            audio.removeEventListener('ended', onTrackEnded);
             const nextIndex = (trackIndex + 1) % playlist.length;
             loadTrack(nextAudio, nextIndex);
             nextAudio.volume = 0;
@@ -95,12 +96,14 @@
                     audio.pause();
                     audio.volume = baseVolume;
                     audio.removeEventListener('timeupdate', timeUpdateHandler);
+                    audio.removeEventListener('ended', onTrackEnded);
                     const old = audio;
                     audio = nextAudio;
                     nextAudio = old;
                     trackIndex = nextIndex;
                     loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
                     audio.addEventListener('timeupdate', timeUpdateHandler);
+                    audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
                     isCrossfading = false;
                 }
@@ -115,6 +118,7 @@
             trackIndex = 0;
             audio.loop = playlist.length === 1;
             isCrossfading = true;
+            audio.removeEventListener('ended', onTrackEnded);
             loadTrack(nextAudio, trackIndex);
             nextAudio.volume = 0;
             nextAudio.muted = audio.muted;
@@ -132,11 +136,13 @@
                     audio.pause();
                     audio.volume = baseVolume;
                     audio.removeEventListener('timeupdate', timeUpdateHandler);
+                    audio.removeEventListener('ended', onTrackEnded);
                     const old = audio;
                     audio = nextAudio;
                     nextAudio = old;
                     loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
                     audio.addEventListener('timeupdate', timeUpdateHandler);
+                    audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
                     isCrossfading = false;
                 }
@@ -168,14 +174,16 @@
 
         audio.addEventListener('timeupdate', timeUpdateHandler);
 
+        const onTrackEnded = () => {
+            trackIndex = (trackIndex + 1) % playlist.length;
+            loadTrack(audio, trackIndex);
+            loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
+            storedTime = 0;
+            loadAndResume();
+        };
+
         if (playlist.length > 1) {
-            audio.addEventListener('ended', () => {
-                trackIndex = (trackIndex + 1) % playlist.length;
-                loadTrack(audio, trackIndex);
-                loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
-                storedTime = 0;
-                loadAndResume();
-            });
+            audio.addEventListener('ended', onTrackEnded);
         }
 
         if (volumeSlider) {

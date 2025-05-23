@@ -15,3 +15,11 @@ def test_crossfade_to_theme_function():
     content = js_path.read_text()
     assert "crossfadeToTheme" in content
     assert "window.crossfadeToTheme" in content
+
+
+def test_on_track_ended_rebinding():
+    js_path = Path("static/js/audio.js")
+    content = js_path.read_text()
+    assert "onTrackEnded" in content
+    assert "removeEventListener('ended', onTrackEnded)" in content
+    assert "addEventListener('ended', onTrackEnded)" in content
