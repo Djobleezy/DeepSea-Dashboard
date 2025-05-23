@@ -1029,8 +1029,8 @@ function createWorkerCard(worker, maxHashrate) {
     const card = $('<div class="worker-card"></div>');
 
     card.addClass(worker.status === 'online' ? 'worker-card-online' : 'worker-card-offline');
-    card.append(`<div class="worker-type">${worker.type}</div>`);
-    card.append(`<div class="worker-name">${worker.name}</div>`);
+    card.append($('<div class="worker-type"></div>').text(worker.type));
+    card.append($('<div class="worker-name"></div>').text(worker.name));
     card.append(`<div class="status-badge ${worker.status === 'online' ? 'status-badge-online' : 'status-badge-offline'}">${worker.status.toUpperCase()}</div>`);
 
     // Use 3hr hashrate for display
@@ -1084,11 +1084,14 @@ function createWorkerCard(worker, maxHashrate) {
         valueDisplay = `${currencyData.symbol}${currencyData.value}`;
     }
 
-    // Add ASIC model info if available
-    const modelInfo = worker.model ? `<div class="worker-stats-row">
-        <div class="worker-stats-label">Model:</div>
-        <div class="white-glow">${worker.model}</div>
-    </div>` : '';
+    // Add ASIC model info if available with sanitized text
+    let modelInfo = '';
+    if (worker.model) {
+        const modelRow = $('<div class="worker-stats-row"></div>');
+        modelRow.append('<div class="worker-stats-label">Model:</div>');
+        modelRow.append($('<div class="white-glow"></div>').text(worker.model));
+        modelInfo = modelRow.prop('outerHTML');
+    }
 
     // Display power consumption info with different styling for offline workers
     const powerConsumptionClass = worker.status === 'online' ? 'yellow-glow' : 'dim-glow';

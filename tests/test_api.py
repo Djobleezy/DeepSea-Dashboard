@@ -230,3 +230,23 @@ def test_batch_endpoint(client):
     assert data["responses"][0]["body"]["wallet"] == "w"
     assert data["responses"][1]["status"] == 200
     assert "status" in data["responses"][1]["body"]
+
+
+def test_batch_invalid_path(client):
+    resp = client.post(
+        "/api/batch",
+        json={"requests": [{"method": "GET", "path": "/"}]},
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["responses"][0]["status"] == 400
+
+
+def test_batch_invalid_method(client):
+    resp = client.post(
+        "/api/batch",
+        json={"requests": [{"method": "PATCH", "path": "/api/config"}]},
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["responses"][0]["status"] == 400

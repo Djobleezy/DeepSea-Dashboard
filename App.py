@@ -802,6 +802,16 @@ def batch_requests():
                 method = item.get("method", "GET").upper()
                 params = item.get("params")
                 body = item.get("body")
+                allowed_methods = {"GET", "POST", "PUT", "DELETE"}
+                if (
+                    not path
+                    or not str(path).startswith("/api/")
+                    or str(path) == "/api/batch"
+                    or method not in allowed_methods
+                ):
+                    responses.append({"status": 400, "body": {"error": "invalid request"}})
+                    continue
+
                 resp = client.open(path, method=method, json=body, query_string=params)
                 try:
                     body_data = resp.get_json()
