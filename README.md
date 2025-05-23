@@ -51,7 +51,7 @@ informed with minimal fuss.
 ### Bitcoin Block Explorer
 - **Recent Blocks**: View the latest blocks added to the blockchain
 - **Block Details**: Examine transaction counts, fees, and mining pool information
-- **Visual Indicators**: Track network difficulty and block discovery times
+- **Visual Indicators**: Track network difficulty and block discovery times. The block timer now persists when navigating away from the dashboard
 - **Pagination Controls**: Seamlessly move between older and newer blocks with a quick link back to the latest view
 
 ### Earnings Page

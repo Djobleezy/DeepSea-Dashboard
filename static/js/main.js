@@ -351,6 +351,27 @@ let lastBlockNumber = null;
 let lastBlockTime = null;
 let blockTimerInterval = null;
 
+// Restore last block timer info from localStorage so the timer persists
+try {
+    const storedTime = localStorage.getItem('dashboardLastBlockTime');
+    if (storedTime) {
+        const parsedTime = parseInt(storedTime, 10);
+        if (!isNaN(parsedTime)) {
+            lastBlockTime = parsedTime;
+        }
+    }
+
+    const storedNumber = localStorage.getItem('dashboardLastBlockNumber');
+    if (storedNumber) {
+        const parsedNumber = parseInt(storedNumber, 10);
+        if (!isNaN(parsedNumber)) {
+            lastBlockNumber = parsedNumber;
+        }
+    }
+} catch (e) {
+    console.error('Error loading block timer from localStorage:', e);
+}
+
 // Register local annotation plugin if available
 if (window.simpleAnnotationPlugin) {
     Chart.register(window.simpleAnnotationPlugin);
@@ -3279,6 +3300,12 @@ function updateUI() {
         if (lastBlockNumber === null || data.block_number !== lastBlockNumber) {
             lastBlockNumber = data.block_number;
             lastBlockTime = Date.now();
+            try {
+                localStorage.setItem('dashboardLastBlockNumber', lastBlockNumber.toString());
+                localStorage.setItem('dashboardLastBlockTime', lastBlockTime.toString());
+            } catch (e) {
+                console.error('Error saving block timer to localStorage:', e);
+            }
         }
 
         (function updateBlockTimerUI() {
