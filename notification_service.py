@@ -795,6 +795,11 @@ class NotificationService:
             # zero-argument callable.  Call it without arguments to avoid
             # issues when such a patch is in place.
             exchange_rates = get_exchange_rates()
+            if new_currency not in exchange_rates:
+                logging.warning(
+                    f"[NotificationService] Missing exchange rate for {new_currency}, skipping update"
+                )
+                return 0
 
             updated = 0
             for notif in self.notifications:

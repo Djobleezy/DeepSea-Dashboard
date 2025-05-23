@@ -108,6 +108,16 @@ class NotificationCurrencyTest(unittest.TestCase):
         self.assertAlmostEqual(notif["data"]["daily_profit_usd"], 10.0)
         self.assertIn("$", notif["message"])
 
+    def test_update_notification_currency_missing_rate(self):
+        """Ensure notifications remain unchanged when a rate is missing."""
+        with patch("notification_service.get_exchange_rates", return_value={"EUR": 0.5}):
+            updated = self.service.update_notification_currency("JPY")
+
+        self.assertEqual(updated, 0)
+        notif = self.service.notifications[0]
+        self.assertEqual(notif["data"]["currency"], "USD")
+        self.assertAlmostEqual(notif["data"]["daily_profit"], 10.0)
+
     def test_parse_timestamp_with_z_suffix(self):
         with patch("notification_service.get_timezone", return_value="UTC"):
             svc = NotificationService(DummyStateManager())
