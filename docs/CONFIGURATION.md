@@ -17,6 +17,9 @@ The default configuration file contains the following keys:
 | `network_fee` | Additional fees beyond pool fees | `0.0` |
 | `currency` | Preferred fiat currency for earnings display | `"USD"` |
 
+Configuration files are validated when loaded. Missing keys or incorrect types
+cause the application to fall back to default values and log an error.
+
 ## Environment Variables
 
 | Variable | Description | Default |

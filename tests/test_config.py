@@ -54,3 +54,40 @@ def test_config_caching(monkeypatch, tmp_path):
     cfg3 = mod.load_config()
     assert call_count["count"] == 2
     assert cfg3["currency"] == "USD"
+
+
+def test_validate_config_valid():
+    cfg = {
+        "power_cost": 0.1,
+        "power_usage": 100,
+        "wallet": "abc",
+        "timezone": "UTC",
+        "network_fee": 0.0,
+        "currency": "USD",
+        "EXCHANGE_RATE_API_KEY": "KEY",
+    }
+    assert config_module.validate_config(cfg)
+
+
+def test_validate_config_missing_key():
+    cfg = {
+        "power_cost": 0.1,
+        "power_usage": 100,
+        "wallet": "abc",
+        "timezone": "UTC",
+        "network_fee": 0.0,
+        "currency": "USD",
+        "EXCHANGE_RATE_API_KEY": "KEY",
+    }
+    cfg.pop("wallet")
+    assert not config_module.validate_config(cfg)
+
+
+def test_load_config_invalid(monkeypatch, tmp_path):
+    temp_file = tmp_path / "cfg.json"
+    with open(temp_file, "w") as fh:
+        json.dump({"power_cost": "oops"}, fh)
+    monkeypatch.setattr(config_module, "CONFIG_FILE", str(temp_file))
+    mod = importlib.reload(config_module)
+    cfg = mod.load_config()
+    assert cfg == mod.DEFAULT_CONFIG

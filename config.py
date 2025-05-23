@@ -17,20 +17,43 @@ CONFIG_FILE = globals().get("CONFIG_FILE", "config.json")
 _cached_config = None
 _config_mtime = None
 
+# Default configuration values
+DEFAULT_CONFIG = {
+    "power_cost": 0.0,
+    "power_usage": 0.0,
+    "wallet": "yourwallethere",
+    "timezone": "America/Los_Angeles",
+    "network_fee": 0.0,
+    "currency": "USD",
+    "EXCHANGE_RATE_API_KEY": "179cbeb07c900f20dde92d3b",
+}
+
+
+def validate_config(config):
+    """Validate configuration values."""
+    required_types = {
+        "power_cost": (int, float),
+        "power_usage": (int, float),
+        "wallet": str,
+        "timezone": str,
+        "network_fee": (int, float),
+        "currency": str,
+        "EXCHANGE_RATE_API_KEY": str,
+    }
+
+    for key, expected in required_types.items():
+        if key not in config:
+            logging.error("Missing configuration key: %s", key)
+            return False
+        if not isinstance(config[key], expected):
+            logging.error("Invalid type for %s", key)
+            return False
+    return True
+
 
 def load_config():
     """Load configuration with caching and modification time checks."""
     global _cached_config, _config_mtime
-
-    default_config = {
-        "power_cost": 0.0,
-        "power_usage": 0.0,
-        "wallet": "yourwallethere",
-        "timezone": "America/Los_Angeles",
-        "network_fee": 0.0,
-        "currency": "USD",
-        "EXCHANGE_RATE_API_KEY": "179cbeb07c900f20dde92d3b",
-    }
 
     file_exists = os.path.exists(CONFIG_FILE)
 
@@ -46,16 +69,12 @@ def load_config():
 
         try:
             with open(CONFIG_FILE, "r") as f:
-                config = json.load(f)
+                loaded = json.load(f)
+            config = {**DEFAULT_CONFIG, **loaded}
             logging.info(f"Configuration loaded from {CONFIG_FILE}")
 
-            if "network_fee" not in config:
-                config["network_fee"] = default_config["network_fee"]
-                logging.info("Added missing network_fee to config with default value")
-
-            if "EXCHANGE_RATE_API_KEY" not in config:
-                config["EXCHANGE_RATE_API_KEY"] = default_config["EXCHANGE_RATE_API_KEY"]
-                logging.info("Added missing EXCHANGE_RATE_API_KEY to config with default value")
+            if not validate_config(config):
+                raise ValueError("Invalid configuration file")
 
             _cached_config = config
             _config_mtime = mtime
@@ -69,9 +88,9 @@ def load_config():
     if not file_exists:
         logging.warning(f"Config file {CONFIG_FILE} not found, using defaults")
 
-    _cached_config = default_config
+    _cached_config = DEFAULT_CONFIG
     _config_mtime = os.path.getmtime(CONFIG_FILE) if file_exists else None
-    return default_config
+    return DEFAULT_CONFIG
 
 
 def get_timezone():
