@@ -4,6 +4,7 @@ Data models for the Bitcoin Mining Dashboard.
 
 from dataclasses import dataclass
 from typing import Dict, Any
+from functools import lru_cache
 import logging
 import re
 
@@ -152,6 +153,7 @@ class HashRateConversionError(Exception):
     pass
 
 
+@lru_cache(maxsize=128)
 def convert_to_ths(value, unit):
     """
     Convert any hashrate unit to TH/s equivalent.

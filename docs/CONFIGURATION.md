@@ -33,3 +33,9 @@ The default configuration file contains the following keys:
 | `PORT` | Application port | `5000` |
 
 Refer to [INSTALL.md](INSTALL.md) and [DEPLOYMENT.md](DEPLOYMENT.md) for instructions on how these variables are used during setup and deployment.
+
+## Caching
+
+Expensive operations such as network requests, complex calculations and Redis queries are cached to reduce
+load on external services. Results are retained for up to 60 seconds before being refreshed. The built-in
+cache requires no configuration.
