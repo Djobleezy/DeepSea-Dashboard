@@ -2,11 +2,14 @@
 
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
-        const audio = document.getElementById('backgroundAudio');
+        let audio = document.getElementById('backgroundAudio');
+        const nextAudio = new Audio();
         const control = document.getElementById('audioControl');
         const icon = document.getElementById('audioIcon');
         const volumeSlider = document.getElementById('volumeSlider');
         if (!audio) { return; }
+        const crossfadeDuration = 2;
+        let isCrossfading = false;
 
         const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
         const playlist = isDeepSea
@@ -18,21 +21,25 @@
             trackIndex = 0;
         }
 
-        const loadTrack = (index) => {
-            audio.src = playlist[index];
-            audio.load();
+        const loadTrack = (element, index) => {
+            element.src = playlist[index];
+            element.load();
         };
-        loadTrack(trackIndex);
+        loadTrack(audio, trackIndex);
+        loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
         audio.loop = playlist.length === 1;
 
         const storedVolume = parseFloat(localStorage.getItem('audioVolume'));
+        let baseVolume;
         if (!Number.isNaN(storedVolume)) {
-            audio.volume = storedVolume;
+            baseVolume = storedVolume;
+            audio.volume = baseVolume;
             if (volumeSlider) {
                 volumeSlider.value = Math.round(storedVolume * 100);
             }
         } else {
-            audio.volume = 1.00;
+            baseVolume = 1.00;
+            audio.volume = baseVolume;
             if (volumeSlider) {
                 volumeSlider.value = 100;
             }
@@ -67,6 +74,39 @@
             }
         };
 
+        const startCrossfade = () => {
+            if (isCrossfading) { return; }
+            isCrossfading = true;
+            const nextIndex = (trackIndex + 1) % playlist.length;
+            loadTrack(nextAudio, nextIndex);
+            nextAudio.volume = 0;
+            nextAudio.muted = audio.muted;
+            nextAudio.play().catch(() => { });
+            const steps = 20;
+            const interval = (crossfadeDuration * 1000) / steps;
+            let step = 0;
+            const fade = setInterval(() => {
+                step += 1;
+                const ratio = step / steps;
+                audio.volume = baseVolume * (1 - ratio);
+                nextAudio.volume = baseVolume * ratio;
+                if (step >= steps) {
+                    clearInterval(fade);
+                    audio.pause();
+                    audio.volume = baseVolume;
+                    audio.removeEventListener('timeupdate', timeUpdateHandler);
+                    const old = audio;
+                    audio = nextAudio;
+                    nextAudio = old;
+                    trackIndex = nextIndex;
+                    loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
+                    audio.addEventListener('timeupdate', timeUpdateHandler);
+                    storedTime = 0;
+                    isCrossfading = false;
+                }
+            }, interval);
+        };
+
         loadAndResume();
 
         audio.muted = storedMuted;
@@ -75,23 +115,36 @@
             icon.classList.toggle('fa-volume-up', !storedMuted);
         }
         
+        const timeUpdateHandler = () => {
+            localStorage.setItem('audioPlaybackTime', audio.currentTime);
+            if (
+                playlist.length > 1 &&
+                audio.duration &&
+                !isCrossfading &&
+                audio.currentTime >= audio.duration - crossfadeDuration
+            ) {
+                startCrossfade();
+            }
+        };
+
+        audio.addEventListener('timeupdate', timeUpdateHandler);
+
         if (playlist.length > 1) {
             audio.addEventListener('ended', () => {
                 trackIndex = (trackIndex + 1) % playlist.length;
-                loadTrack(trackIndex);
+                loadTrack(audio, trackIndex);
+                loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
                 storedTime = 0;
                 loadAndResume();
             });
         }
 
-        audio.addEventListener('timeupdate', () => {
-            localStorage.setItem('audioPlaybackTime', audio.currentTime);
-        });
-
         if (volumeSlider) {
             volumeSlider.addEventListener('input', function () {
                 const volume = parseInt(this.value, 10) / 100;
+                baseVolume = volume;
                 audio.volume = volume;
+                nextAudio.volume = volume;
                 localStorage.setItem('audioVolume', volume.toString());
             });
         }
