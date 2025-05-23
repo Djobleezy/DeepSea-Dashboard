@@ -13,6 +13,7 @@ import gc
 import threading
 import gzip
 import redis
+from cache_utils import ttl_cache
 from collections import deque
 from datetime import datetime
 from config import get_timezone
@@ -92,6 +93,7 @@ class StateManager:
                     logging.error(f"Could not connect to Redis after {max_retries} attempts: {e}")
                     return None
 
+    @ttl_cache(ttl_seconds=60)
     def load_graph_state(self):
         """Load graph state from Redis with support for the optimized format."""
 
@@ -190,6 +192,7 @@ class StateManager:
         except Exception as e:
             logging.error(f"Error loading graph state from Redis: {e}")
 
+    @ttl_cache(ttl_seconds=60)
     def load_payout_history(self):
         """Load payout history list from Redis."""
         if not self.redis_client:
@@ -662,6 +665,7 @@ class StateManager:
     # ------------------------------------------------------------------
     # Last earnings caching
     # ------------------------------------------------------------------
+    @ttl_cache(ttl_seconds=60)
     def load_last_earnings(self):
         """Load last successful earnings data from Redis."""
         if not self.redis_client:

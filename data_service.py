@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from models import OceanData, convert_to_ths
 from config import get_timezone
+from cache_utils import ttl_cache
 from miner_specs import parse_worker_name
 
 
@@ -629,6 +630,7 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error dumping table structure: {e}")
 
+    @ttl_cache(ttl_seconds=30)
     def fetch_url(self, url: str, timeout: int = 5):
         """
         Fetch URL with error handling.
@@ -1162,6 +1164,7 @@ class MiningDashboardService:
 
         return difficulty, network_hashrate, btc_price, block_count
 
+    @ttl_cache(ttl_seconds=60)
     def get_all_worker_rows(self):
         """
         Iterate through wpage parameter values to collect all worker table rows.
