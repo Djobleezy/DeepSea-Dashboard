@@ -38,7 +38,7 @@
             }
         }
 
-        const storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
+        let storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
         const storedMuted = localStorage.getItem('audioMuted') === 'true';
         const wasPaused = localStorage.getItem('audioPaused') === 'true';
 
