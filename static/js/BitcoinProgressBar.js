@@ -52,6 +52,9 @@ const BitcoinMinuteRefresh = (function () {
         TERMINAL_DOT: '.terminal-dot'
     };
 
+    // Duration (ms) for collapse/expand animations
+    const STATE_TRANSITION_MS = 350;
+
     // Private variables
     let terminalElement = null;
     let uptimeElement = null;
@@ -1805,6 +1808,8 @@ const BitcoinMinuteRefresh = (function () {
                 if (snapPoints[currentSnapPoint]) {
                     terminalElement.style.left = snapPoints[currentSnapPoint].x + 'px';
                     terminalElement.style.top = snapPoints[currentSnapPoint].y + 'px';
+                    terminalElement.style.right = 'auto';
+                    terminalElement.style.bottom = 'auto';
 
                     // The snap point stays the same, but we need to update its position
                     terminalElement.setAttribute('data-snap-point', currentSnapPoint);
@@ -1813,8 +1818,8 @@ const BitcoinMinuteRefresh = (function () {
                 // Remove transition after animation completes
                 setTimeout(() => {
                     terminalElement.style.transition = '';
-                }, 300);
-            }, 50);
+                }, STATE_TRANSITION_MS);
+            }, STATE_TRANSITION_MS);
         }
     }
 
