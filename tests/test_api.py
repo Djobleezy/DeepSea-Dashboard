@@ -211,3 +211,22 @@ def test_clear_notifications_endpoint(client):
     assert data["unread_count"] == 1
     assert len(App.notification_service.notifications) == 1
     assert App.notification_service.notifications[0]["id"] == "2"
+
+
+def test_batch_endpoint(client):
+    resp = client.post(
+        "/api/batch",
+        json={
+            "requests": [
+                {"method": "GET", "path": "/api/config"},
+                {"method": "GET", "path": "/api/health"},
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["responses"]) == 2
+    assert data["responses"][0]["status"] == 200
+    assert data["responses"][0]["body"]["wallet"] == "w"
+    assert data["responses"][1]["status"] == 200
+    assert "status" in data["responses"][1]["body"]

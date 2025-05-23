@@ -787,6 +787,31 @@ def api_metrics():
     return jsonify(cached_metrics)
 
 
+@app.route("/api/batch", methods=["POST"])
+def batch_requests():
+    """Process a list of API requests in one call."""
+    try:
+        requests_json = request.get_json(silent=True) or {}
+        reqs = requests_json.get("requests", [])
+        responses = []
+        with app.test_client() as client:
+            for item in reqs:
+                path = item.get("path")
+                method = item.get("method", "GET").upper()
+                params = item.get("params")
+                body = item.get("body")
+                resp = client.open(path, method=method, json=body, query_string=params)
+                try:
+                    body_data = resp.get_json()
+                except Exception:
+                    body_data = resp.data.decode("utf-8")
+                responses.append({"status": resp.status_code, "body": body_data})
+        return jsonify({"responses": responses})
+    except Exception as e:
+        logging.error(f"Error in batch handler: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/available_timezones")
 def available_timezones():
     """Return a list of available timezones."""
