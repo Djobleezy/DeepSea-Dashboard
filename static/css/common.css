@@ -10,6 +10,7 @@
   --primary-color: #f7931a;
   --primary-color-rgb: 247, 147, 26;
   --accent-color: #00ffff;
+  --accent-color-rgb: 0, 255, 255;
   --text-color: #ffffff;
   --card-padding: 0.5rem;
   --text-size-base: 16px;
@@ -1256,15 +1257,17 @@ html.deepsea-theme #congratsMessage {
   width: 4px;
   height: 100px;
   margin-bottom: 4px;
-  writing-mode: bt-lr;
-  -webkit-appearance: slider-vertical;
-  accent-color: var(--primary-color);
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: none;
+  -webkit-appearance: none;
+  accent-color: var(--accent-color);
 }
 
 .volume-slider::-webkit-slider-thumb,
 .volume-slider::-moz-range-thumb {
-    background-color: var(--primary-color);
-    border: 1px solid var(--primary-color);
+    background-color: var(--accent-color);
+    border: 1px solid var(--accent-color);
     width: 12px;
     height: 12px;
     border-radius: 50%;
@@ -1273,7 +1276,7 @@ html.deepsea-theme #congratsMessage {
 
 .volume-slider::-webkit-slider-runnable-track,
 .volume-slider::-moz-range-track {
-    background-color: rgba(var(--primary-color-rgb), 0.5);
+    background-color: rgba(var(--accent-color-rgb), 0.5);
     border-radius: 2px;
 }
 

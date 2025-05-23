@@ -130,6 +130,7 @@ function applyDeepSeaTheme() {
                 --primary-color: #0088cc;
                 --primary-color-rgb: 0, 136, 204;
                 --accent-color: #00b3ff;
+                --accent-color-rgb: 0, 179, 255;
                 --bg-gradient: linear-gradient(135deg, #0a0a0a, #131b20);
             }
         
