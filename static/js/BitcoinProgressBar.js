@@ -963,26 +963,28 @@ const BitcoinMinuteRefresh = (function () {
 
             // Calculate terminal height now that it's in the DOM
             const termHeight = terminalElement.offsetHeight;
+            const termWidth = terminalElement.offsetWidth;
             const safeBottomY = window.innerHeight - termHeight - 20;
+            const safeRightX = window.innerWidth - termWidth - 20;
 
             if (savedSnapPoint) {
                 // If we have a saved snap point, use it to position with freshly calculated dimensions
                 const snapPoints = isCollapsed ? {
                     // Collapsed snap points
                     topLeft: { x: 20, y: 20 },
-                    topRight: { x: window.innerWidth - 250, y: 20 },
+                    topRight: { x: safeRightX, y: 20 },
                     bottomLeft: { x: 20, y: safeBottomY },
-                    bottomRight: { x: window.innerWidth - 250, y: safeBottomY },
-                    center: { x: (window.innerWidth - 230) / 2, y: 20 },
-                    centerBottom: { x: (window.innerWidth - 230) / 2, y: safeBottomY }
+                    bottomRight: { x: safeRightX, y: safeBottomY },
+                    center: { x: (window.innerWidth - termWidth) / 2, y: 20 },
+                    centerBottom: { x: (window.innerWidth - termWidth) / 2, y: safeBottomY }
                 } : {
                     // Expanded snap points
                     topLeft: { x: 20, y: 20 },
-                    topRight: { x: window.innerWidth - 250, y: 20 },
+                    topRight: { x: safeRightX, y: 20 },
                     bottomLeft: { x: 20, y: safeBottomY },
-                    bottomRight: { x: window.innerWidth - 250, y: safeBottomY },
-                    center: { x: (window.innerWidth - 230) / 2, y: 20 },
-                    centerBottom: { x: (window.innerWidth - 230) / 2, y: safeBottomY }
+                    bottomRight: { x: safeRightX, y: safeBottomY },
+                    center: { x: (window.innerWidth - termWidth) / 2, y: 20 },
+                    centerBottom: { x: (window.innerWidth - termWidth) / 2, y: safeBottomY }
                 };
 
                 if (snapPoints[savedSnapPoint]) {
@@ -1778,23 +1780,25 @@ const BitcoinMinuteRefresh = (function () {
 
                 // Calculate the height-adjusted position
                 const termHeight = terminalElement.offsetHeight;
+                const termWidth = terminalElement.offsetWidth;
                 const safeBottomY = window.innerHeight - termHeight - 20;
+                const safeRightX = window.innerWidth - termWidth - 20;
 
                 // Get snap point coordinates for new state
                 const snapPoints = isNowCollapsed ? {
                     topLeft: { x: 20, y: 20 },
-                    topRight: { x: window.innerWidth - 250, y: 20 },
+                    topRight: { x: safeRightX, y: 20 },
                     bottomLeft: { x: 20, y: safeBottomY },
-                    bottomRight: { x: window.innerWidth - 250, y: safeBottomY },
-                    center: { x: (window.innerWidth - 230) / 2, y: 20 },
-                    centerBottom: { x: (window.innerWidth - 230) / 2, y: safeBottomY }
+                    bottomRight: { x: safeRightX, y: safeBottomY },
+                    center: { x: (window.innerWidth - termWidth) / 2, y: 20 },
+                    centerBottom: { x: (window.innerWidth - termWidth) / 2, y: safeBottomY }
                 } : {
                     topLeft: { x: 20, y: 20 },
-                    topRight: { x: window.innerWidth - 250, y: 20 },
+                    topRight: { x: safeRightX, y: 20 },
                     bottomLeft: { x: 20, y: safeBottomY },
-                    bottomRight: { x: window.innerWidth - 250, y: safeBottomY },
-                    center: { x: (window.innerWidth - 230) / 2, y: 20 },
-                    centerBottom: { x: (window.innerWidth - 230) / 2, y: safeBottomY }
+                    bottomRight: { x: safeRightX, y: safeBottomY },
+                    center: { x: (window.innerWidth - termWidth) / 2, y: 20 },
+                    centerBottom: { x: (window.innerWidth - termWidth) / 2, y: safeBottomY }
                 };
 
                 // Move to newly sized position
