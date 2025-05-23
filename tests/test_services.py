@@ -1,50 +1,16 @@
 from unittest.mock import MagicMock
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import sys
-import types
 import os
 
+from tests.test_stubs import install_dummy_pytz, install_dummy_requests, install_dummy_bs4
+
+install_dummy_pytz()
+install_dummy_requests()
+install_dummy_bs4()
+
+import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-if "pytz" not in sys.modules:
-    tz_module = types.ModuleType("pytz")
-
-    class DummyTZInfo:
-        def utcoffset(self, dt):
-            return None
-
-        def dst(self, dt):
-            return None
-
-        def tzname(self, dt):
-            return "UTC"
-
-        def localize(self, dt_obj):
-            return dt_obj.replace(tzinfo=self)
-
-    tz_module.timezone = lambda name: DummyTZInfo()
-    sys.modules["pytz"] = tz_module
-
-if "requests" not in sys.modules:
-    req_module = types.ModuleType("requests")
-
-    class DummySession:
-        def get(self, *args, **kwargs):
-            raise NotImplementedError
-
-    req_module.Session = DummySession
-    req_module.exceptions = types.SimpleNamespace(Timeout=Exception, ConnectionError=Exception)
-    sys.modules["requests"] = req_module
-
-if "bs4" not in sys.modules:
-    bs4_module = types.ModuleType("bs4")
-
-    class DummySoup:
-        pass
-
-    bs4_module.BeautifulSoup = DummySoup
-    sys.modules["bs4"] = bs4_module
 
 from worker_service import WorkerService
 from data_service import MiningDashboardService
