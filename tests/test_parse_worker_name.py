@@ -18,3 +18,19 @@ def test_parse_worker_name_t21():
     assert specs["type"] == "ASIC"
     assert specs["efficiency"] == 20.2
     assert round(specs["power"]) == round(162 * 20.2)
+
+
+def test_parse_worker_name_no_false_positive():
+    """Ensure patterns don't match inside other words."""
+    assert miner_specs.parse_worker_name("foo1166bar") is None
+    assert miner_specs.parse_worker_name("mys9buddy") is None
+
+
+def test_parse_worker_name_generic_axe():
+    """Any worker name containing 'axe' should map to the Bitaxe family."""
+    specs = miner_specs.parse_worker_name("mycoolaxe123")
+    assert specs is not None
+    assert specs["model"] == "Generic Bitaxe"
+    assert specs["type"] == "Bitaxe"
+    assert specs["efficiency"] == 15
+    assert round(specs["power"]) == round(1.1 * 15)

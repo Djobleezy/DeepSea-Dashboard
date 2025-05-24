@@ -81,7 +81,8 @@ def parse_worker_name(name: str) -> Optional[Dict[str, float]]:
         return None
     name_lower = name.lower()
     for pattern, specs in MODEL_SPECS:
-        if re.search(pattern, name_lower):
+        boundary_pattern = rf"(?<![A-Za-z0-9]){pattern}(?![A-Za-z0-9])"
+        if re.search(boundary_pattern, name_lower):
             power = specs.get("hashrate", 0) * specs.get("efficiency", 0)
             return {
                 "model": specs["model"],
@@ -90,4 +91,14 @@ def parse_worker_name(name: str) -> Optional[Dict[str, float]]:
                 "default_hashrate": specs["hashrate"],
                 "power": power,
             }
+    if "axe" in name_lower:
+        hashrate = 1.1
+        efficiency = 15
+        return {
+            "model": "Generic Bitaxe",
+            "type": "Bitaxe",
+            "efficiency": efficiency,
+            "default_hashrate": hashrate,
+            "power": hashrate * efficiency,
+        }
     return None
