@@ -46,6 +46,8 @@ class MiningDashboardService:
         self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
         # Time-to-live (TTL) for exchange rate cache in seconds (~2 hours)
         self.exchange_rate_ttl = 7200
+        # Record the service start time to report consistent uptime
+        self.server_start_time = datetime.now(ZoneInfo(get_timezone()))
 
     def set_worker_service(self, worker_service):
         """Associate a WorkerService instance for power estimation."""
@@ -231,7 +233,9 @@ class MiningDashboardService:
 
             # --- Add server timestamps to the response in Los Angeles Time ---
             metrics["server_timestamp"] = datetime.now(ZoneInfo(get_timezone())).isoformat()
-            metrics["server_start_time"] = datetime.now(ZoneInfo(get_timezone())).isoformat()
+            metrics["server_start_time"] = self.server_start_time.astimezone(
+                ZoneInfo(get_timezone())
+            ).isoformat()
 
             # Get the configured currency
             from config import get_currency

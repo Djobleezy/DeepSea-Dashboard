@@ -517,3 +517,22 @@ def test_fetch_metrics_power_configured(monkeypatch):
 
     assert metrics["power_usage_estimated"] is False
     assert abs(metrics["break_even_electricity_price"] - 0.46875) < 1e-4
+
+
+def test_server_start_time_constant(monkeypatch):
+    """Ensure server_start_time remains constant across fetches."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr(
+        svc,
+        "get_ocean_data",
+        lambda: data_service.OceanData(hashrate_3hr=100, hashrate_3hr_unit="TH/s", pool_fees_percentage=0.0),
+    )
+    monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
+    monkeypatch.setattr(svc, "fetch_exchange_rates", lambda: {"USD": 1})
+
+    metrics1 = svc.fetch_metrics()
+    metrics2 = svc.fetch_metrics()
+
+    assert metrics1["server_start_time"] == metrics2["server_start_time"]
