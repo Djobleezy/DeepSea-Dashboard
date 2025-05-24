@@ -44,17 +44,18 @@ function debounce(func, wait) {
 
 // Helper function to fetch from mempool.guide with a fallback to mempool.space
 function fetchMempoolApi(endpoint) {
-    return $.ajax({
-        url: `${MEMPOOL_GUIDE_BASE_URL}${endpoint}`,
-        method: "GET",
-        dataType: "json",
-        timeout: 10000
-    }).catch(() => $.ajax({
-        url: `${MEMPOOL_SPACE_BASE_URL}${endpoint}`,
-        method: "GET",
-        dataType: "json",
-        timeout: 10000
-    }));
+    function fetchJson(baseUrl) {
+        return fetch(`${baseUrl}${endpoint}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            });
+    }
+
+    return fetchJson(MEMPOOL_GUIDE_BASE_URL)
+        .catch(() => fetchJson(MEMPOOL_SPACE_BASE_URL));
 }
 
 // Helper function to validate block height
