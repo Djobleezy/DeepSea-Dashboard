@@ -1,0 +1,8 @@
+{
+  "name": "deepsea-dashboard",
+  "private": true,
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss-cli": "^10.1.0"
+  }
+}

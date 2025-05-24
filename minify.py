@@ -17,6 +17,37 @@ def _has_uglify():
     return shutil.which("uglifyjs") is not None
 
 
+def run_postcss() -> Path:
+    """Run PostCSS with Autoprefixer on CSS files if available.
+
+    Returns the directory containing processed files. If PostCSS is not
+    installed, the original CSS directory is returned unchanged.
+    """
+
+    css_dir = Path("static/css")
+    out_dir = css_dir / "prefixed"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    postcss_cmd = None
+    if shutil.which("postcss"):
+        postcss_cmd = ["postcss"]
+    elif shutil.which("npx"):
+        postcss_cmd = ["npx", "postcss"]
+
+    if not postcss_cmd:
+        logger.warning("PostCSS not available; skipping prefixing")
+        return css_dir
+
+    for src in css_dir.glob("*.css"):
+        if src.name.endswith(".min.css"):
+            continue
+        out = out_dir / src.name
+        subprocess.run(postcss_cmd + [str(src), "-o", str(out)], check=True)
+        logger.info("PostCSS processed %s", src.name)
+
+    return out_dir
+
+
 def minify_js():
     """Minify JS files using uglify-js if available or jsmin fallback."""
     js_dir = Path("static/js")
@@ -43,12 +74,13 @@ def minify_js():
 
 
 def minify_css():
-    """Minify CSS files using cssmin."""
+    """Run PostCSS then minify CSS files using cssmin."""
     css_dir = Path("static/css")
+    prefixed_dir = run_postcss()
     out_dir = css_dir / "min"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for src in css_dir.glob("*.css"):
+    for src in prefixed_dir.glob("*.css"):
         if src.name.endswith(".min.css"):
             continue
         out = out_dir / src.name.replace(".css", ".min.css")

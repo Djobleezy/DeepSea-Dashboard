@@ -167,20 +167,25 @@ The application is designed for efficient resource utilization:
 
 To set up a development environment:
 
-1. Install dependencies:
+1. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-2. Prepare directories and assets:
+2. Install Node dependencies for PostCSS:
+   ```bash
+   npm ci
+   ```
+3. Prepare directories and assets:
    ```bash
    make setup
    ```
-   Run `make minify` whenever static files or templates change.
-3. Check code style with ruff:
+   Run `make minify` whenever static files or templates change. The
+   command runs PostCSS with Autoprefixer before minifying assets.
+4. Check code style with ruff:
    ```bash
    ruff check .
    ```
-4. Execute tests:
+5. Execute tests:
    ```bash
    pytest
    ```
