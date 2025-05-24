@@ -70,27 +70,39 @@ const ASIC_EFFICIENCY_DATA = {
     "Bitmain Antminer S19": { efficiency: 0.03, defaultWatts: 3250 },
     "Bitmain Antminer S19 Pro": { efficiency: 0.034, defaultWatts: 3250 },
     "Bitmain Antminer S19j Pro": { efficiency: 0.033, defaultWatts: 3150 },
+    "Bitmain Antminer S19j Pro+": { efficiency: 0.036, defaultWatts: 3350 },
+    "Bitmain Antminer S19 Pro++": { efficiency: 0.038, defaultWatts: 3540 },
     "Bitmain Antminer S19k Pro": { efficiency: 0.034, defaultWatts: 3050 },
     "Bitmain Antminer S19 XP": { efficiency: 0.039, defaultWatts: 3010 },
     "Bitmain Antminer S19j": { efficiency: 0.029, defaultWatts: 3050 },
+    "Bitmain Antminer T19": { efficiency: 0.027, defaultWatts: 3150 },
 
     // S21 Series 
+    "Bitmain Antminer S21+ Hydro": { efficiency: 0.067, defaultWatts: 5250 },
+    "Bitmain Antminer S21+": { efficiency: 0.061, defaultWatts: 4125 },
+    "Bitmain Antminer S21 Hydro": { efficiency: 0.063, defaultWatts: 5360 },
     "Bitmain Antminer S21": { efficiency: 0.049, defaultWatts: 3500 },
     "Bitmain Antminer S21 Pro": { efficiency: 0.053, defaultWatts: 3450 },
-    "Bitmain Antminer T21": { efficiency: 0.039, defaultWatts: 3276 },
+    "Bitmain Antminer T21": { efficiency: 0.053, defaultWatts: 3080 },
 
     // M Series (MicroBT Whatsminer)
     "MicroBT Whatsminer M30S": { efficiency: 0.031, defaultWatts: 3400 },
     "MicroBT Whatsminer M30S+": { efficiency: 0.034, defaultWatts: 3400 },
     "MicroBT Whatsminer M30S++": { efficiency: 0.035, defaultWatts: 3472 },
-    "MicroBT Whatsminer M31S": { efficiency: 0.030, defaultWatts: 3220 },
-    "MicroBT Whatsminer M31S+": { efficiency: 0.032, defaultWatts: 3312 },
+    "MicroBT Whatsminer M31S+": { efficiency: 0.024, defaultWatts: 3312 },
+    "MicroBT Whatsminer M31S": { efficiency: 0.023, defaultWatts: 3220 },
     "MicroBT Whatsminer M50": { efficiency: 0.046, defaultWatts: 3500 },
+    "MicroBT Whatsminer M50S++": { efficiency: 0.046, defaultWatts: 2990 },
+    "MicroBT Whatsminer M50S": { efficiency: 0.0385, defaultWatts: 3500 },
+    "MicroBT Whatsminer M53": { efficiency: 0.0345, defaultWatts: 6550 },
+    "MicroBT Whatsminer M56": { efficiency: 0.035, defaultWatts: 6060 },
 
     // Avalon Series
     "Canaan Avalon A1246": { efficiency: 0.029, defaultWatts: 3010 },
     "Canaan Avalon A1166": { efficiency: 0.027, defaultWatts: 3196 },
     "Canaan Avalon A1346": { efficiency: 0.035, defaultWatts: 3276 },
+    "Canaan Avalon A1466I": { efficiency: 0.051, defaultWatts: 3315 },
+    "Canaan Avalon A1466": { efficiency: 0.047, defaultWatts: 3225 },
 
     // BitAxe and DIY Mining Devices (much smaller scale)
     "BitAxe": { efficiency: 0.005, defaultWatts: 35 },

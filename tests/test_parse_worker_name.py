@@ -16,8 +16,17 @@ def test_parse_worker_name_t21():
     assert specs is not None
     assert specs["model"] == "Bitmain Antminer T21"
     assert specs["type"] == "ASIC"
-    assert specs["efficiency"] == 20.2
-    assert round(specs["power"]) == round(162 * 20.2)
+    assert specs["efficiency"] == 19.0
+    assert round(specs["power"]) == round(162 * 19.0)
+
+
+def test_parse_worker_name_s19j_pro_plus():
+    specs = miner_specs.parse_worker_name("home-s19jpro+")
+    assert specs is not None
+    assert specs["model"] == "Bitmain Antminer S19j Pro+"
+    assert specs["type"] == "ASIC"
+    assert specs["efficiency"] == 27.5
+    assert round(specs["power"]) == round(122 * 27.5)
 
 
 def test_parse_worker_name_no_false_positive():
