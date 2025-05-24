@@ -41,6 +41,8 @@
   font-family: var(--terminal-font);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .filter-button:hover {
@@ -359,6 +361,16 @@
   }
 }
 
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  .controls-bar {
+    flex-wrap: nowrap;
+  }
+  .worker-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* ----- PAGINATION STYLES ----- */
 .pagination-container {
   display: flex;
@@ -383,7 +395,8 @@
   font-family: var(--terminal-font);
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 35px;
+  min-width: 48px;
+  min-height: 48px;
   text-align: center;
 }
 

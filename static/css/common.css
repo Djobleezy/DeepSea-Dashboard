@@ -604,6 +604,11 @@ html.deepsea-theme h1::after {
   overflow: hidden;
   letter-spacing: 1px;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .nav-link::after {
@@ -1158,6 +1163,8 @@ html.deepsea-theme #congratsMessage {
   color: var(--primary-color);
   font-size: 1.25rem;
   padding: 0.3rem 0.65rem;
+  min-width: 48px;
+  min-height: 48px;
   cursor: pointer;
   position: relative;
   z-index: 1010;
@@ -1245,6 +1252,8 @@ html.deepsea-theme #congratsMessage {
 
 .audio-control {
   cursor: pointer;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .audio-control:hover {
@@ -1286,5 +1295,15 @@ html.deepsea-theme #congratsMessage {
 @media (max-width: 599px) {
   .audio-controls:hover .volume-slider {
     display: none;
+  }
+}
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  .navigation-links {
+    flex-direction: row;
+  }
+  .audio-controls {
+    flex-direction: row;
   }
 }

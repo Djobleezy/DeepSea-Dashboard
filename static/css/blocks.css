@@ -42,6 +42,8 @@
   font-family: var(--terminal-font);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .block-button:hover {
@@ -471,5 +473,15 @@ svg {
 @media (max-width: 576px) {
   #minerChart {
     max-width: 100%;
+  }
+}
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  #svg-container {
+    height: 200px;
+  }
+  .block-controls {
+    flex-wrap: nowrap;
   }
 }

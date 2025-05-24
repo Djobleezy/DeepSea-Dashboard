@@ -385,3 +385,13 @@ html.deepsea-theme .underwater-rays {
     padding: 0.5rem 1rem;
   }
 }
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  .error-container {
+    margin-top: 5px;
+  }
+  body {
+    padding-top: 20px;
+  }
+}

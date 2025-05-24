@@ -549,3 +549,10 @@ html.deepsea-theme {
     font-size: 0.75rem;
   }
 }
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

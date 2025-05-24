@@ -27,6 +27,8 @@
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 .filter-button:hover {
@@ -57,6 +59,7 @@
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 80px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -352,5 +355,15 @@
 @media (max-width: 375px) {
   .filter-buttons {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  .notification-controls {
+    flex-direction: row;
+  }
+  .filter-buttons {
+    grid-template-columns: repeat(4, 1fr);
   }
 }

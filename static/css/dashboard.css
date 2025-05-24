@@ -92,7 +92,8 @@
   font-family: var(--terminal-font);
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 40px;
+  min-width: 48px;
+  min-height: 48px;
   position: relative;
   z-index: 2;
 }
@@ -512,6 +513,16 @@ html.deepsea-theme .toggle-btn.active {
   .datum-label {
     font-size: 0.85em;
     letter-spacing: 1px;
+  }
+}
+
+/* Landscape orientation adjustments for short screens */
+@media (orientation: landscape) and (max-height: 500px) {
+  #graphContainer {
+    height: 200px;
+  }
+  .chart-controls {
+    flex-wrap: wrap;
   }
 }
 
