@@ -205,9 +205,11 @@ $(document).ready(function () {
         }
     });
 
-    // Initialize BitcoinMinuteRefresh if available
+    // Register refresh function for the system monitor and initialize it
+    // This ensures the monitor can trigger manual data reloads
+    window.manualRefresh = loadLatestBlocks;
     if (typeof BitcoinMinuteRefresh !== 'undefined' && BitcoinMinuteRefresh.initialize) {
-        BitcoinMinuteRefresh.initialize(loadLatestBlocks);
+        BitcoinMinuteRefresh.initialize(window.manualRefresh);
         console.log("BitcoinMinuteRefresh initialized with refresh function");
     }
 
