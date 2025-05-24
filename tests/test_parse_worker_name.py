@@ -49,3 +49,19 @@ def test_parse_worker_name_allows_trailing_digits():
     """Keywords should match even if the worker name ends with numbers."""
     assert miner_specs.parse_worker_name("urlacher1")["model"] == "The Urlacher"
     assert miner_specs.parse_worker_name("bitchimney1")["model"] == "BitChimney Heater"
+
+
+def test_parse_worker_name_separator_variations():
+    """Patterns should match with hyphens or underscores between keywords."""
+    assert (
+        miner_specs.parse_worker_name("rig-s19pro+-hydro")["model"]
+        == "Bitmain Antminer S19 Pro+ Hydro"
+    )
+    assert (
+        miner_specs.parse_worker_name("farm_s21xp-hydro")["model"]
+        == "Bitmain Antminer S21 XP Hydro"
+    )
+    assert (
+        miner_specs.parse_worker_name("apollo-btc_ii")["model"]
+        == "FutureBit Apollo BTC II"
+    )
