@@ -250,3 +250,14 @@ def test_batch_invalid_method(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["responses"][0]["status"] == 400
+
+
+def test_batch_too_many_requests(client, monkeypatch):
+    import App
+
+    monkeypatch.setattr(App, "MAX_BATCH_REQUESTS", 5)
+    reqs = [{"method": "GET", "path": "/api/health"} for _ in range(6)]
+    resp = client.post("/api/batch", json={"requests": reqs})
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data["error"] == "too many requests"

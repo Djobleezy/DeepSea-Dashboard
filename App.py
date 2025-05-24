@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 from flask_caching import Cache
 from apscheduler.schedulers.background import BackgroundScheduler
 from notification_service import NotificationService, NotificationLevel, NotificationCategory
+from urllib.parse import urlparse
 
 # Import custom modules
 from config import load_config, save_config
@@ -65,6 +66,28 @@ MAX_SSE_CONNECTIONS = 50  # Maximum concurrent SSE connections
 MAX_SSE_CONNECTION_TIME = 900  # 15 minutes maximum SSE connection time
 active_sse_connections = 0
 sse_connections_lock = threading.Lock()
+
+# Allowed paths and limits for the batch API
+MAX_BATCH_REQUESTS = 10
+ALLOWED_BATCH_PATHS = {
+    "/api/health",
+    "/api/metrics",
+    "/api/time",
+    "/api/timezone",
+    "/api/available_timezones",
+    "/api/workers",
+    "/api/block-events",
+    "/api/config",
+    "/api/payout-history",
+    "/api/earnings",
+    "/api/notifications",
+    "/api/notifications/unread_count",
+    "/api/notifications/mark_read",
+    "/api/notifications/delete",
+    "/api/notifications/clear",
+    "/api/reset-chart-data",
+    "/api/force-refresh",
+}
 
 # Global variables for metrics and scheduling
 cached_metrics = None
@@ -795,6 +818,11 @@ def batch_requests():
     try:
         requests_json = request.get_json(silent=True) or {}
         reqs = requests_json.get("requests", [])
+        if not isinstance(reqs, list):
+            return jsonify({"error": "invalid format"}), 400
+        if len(reqs) > MAX_BATCH_REQUESTS:
+            return jsonify({"error": "too many requests"}), 400
+
         responses = []
         with app.test_client() as client:
             for item in reqs:
@@ -802,17 +830,30 @@ def batch_requests():
                 method = item.get("method", "GET").upper()
                 params = item.get("params")
                 body = item.get("body")
-                allowed_methods = {"GET", "POST", "PUT", "DELETE"}
+                allowed_methods = {"GET", "POST", "DELETE"}
+
+                if not path or method not in allowed_methods:
+                    responses.append({"status": 400, "body": {"error": "invalid request"}})
+                    continue
+
+                parsed = urlparse(str(path))
+                clean_path = parsed.path
+                query = parsed.query
+
                 if (
-                    not path
-                    or not str(path).startswith("/api/")
-                    or str(path) == "/api/batch"
-                    or method not in allowed_methods
+                    not clean_path.startswith("/api/")
+                    or clean_path == "/api/batch"
+                    or clean_path not in ALLOWED_BATCH_PATHS
                 ):
                     responses.append({"status": 400, "body": {"error": "invalid request"}})
                     continue
 
-                resp = client.open(path, method=method, json=body, query_string=params)
+                resp = client.open(
+                    clean_path,
+                    method=method,
+                    json=body,
+                    query_string=params or query,
+                )
                 try:
                     body_data = resp.get_json()
                 except Exception:

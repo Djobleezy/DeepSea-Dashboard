@@ -226,6 +226,8 @@ variance values remain visible after restarts.
 - `api/notifications/delete`: Deletes a specific notification.
 - `api/notifications/mark_read`: Marks a notification as read.
 - `api/notifications/unread_count`: Returns the count of unread notifications.
+- `/api/batch`: Batches multiple API calls. Only specific endpoints are allowed
+  and a single request may include at most 10 subrequests.
 
 ## Project Structure
 
