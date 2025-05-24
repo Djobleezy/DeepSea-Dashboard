@@ -767,6 +767,9 @@ function loadLatestBlocks() {
 
             // Show error toast
             showToast("Failed to load latest blocks. Please try again later.");
+
+            // Return empty array so downstream handlers receive a consistent value
+            return [];
         })
         .finally(function () {
             isLoading = false;
