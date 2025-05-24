@@ -760,6 +760,9 @@ function loadLatestBlocks() {
             displayBlocks(data.slice(0, BLOCKS_PER_PAGE));
             // Update miner distribution chart
             prepareChartData(data);
+
+            // Propagate the fetched data to the next promise chain
+            return data;
         })
         .catch(function (error) {
             console.error("Error fetching latest blocks:", error);
