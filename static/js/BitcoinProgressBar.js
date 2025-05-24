@@ -537,6 +537,23 @@ const BitcoinMinuteRefresh = (function () {
                     terminal.style.right = 'auto';
                     terminal.style.transform = 'translateX(-50%)';
                 } else {
+                    const snapName = terminal.getAttribute('data-snap-point');
+                    if (snapName) {
+                        const isCollapsed = terminal.classList.contains('collapsed');
+                        const snapper = addSnappingBehavior();
+                        const snapPoints = snapper.getSnapPoints(isCollapsed);
+                        const target = snapPoints.find(p => p.name === snapName);
+                        if (target) {
+                            terminal.style.left = target.x + 'px';
+                            terminal.style.top = target.y + 'px';
+                            terminal.style.right = 'auto';
+                            terminal.style.bottom = 'auto';
+                            localStorage.setItem(STORAGE_KEYS.POSITION_LEFT, target.x);
+                            localStorage.setItem(STORAGE_KEYS.POSITION_TOP, target.y);
+                            return;
+                        }
+                    }
+
                     // Ensure terminal stays visible in desktop view
                     const maxLeft = window.innerWidth - terminal.offsetWidth;
                     const maxTop = window.innerHeight - terminal.offsetHeight;
