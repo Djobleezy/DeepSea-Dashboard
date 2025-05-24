@@ -1373,6 +1373,13 @@ def notifications_page():
     return render_template("notifications.html", current_time=current_time)
 
 
+# Service worker route
+@app.route('/service-worker.js')
+def service_worker_file():
+    """Serve the service worker JavaScript file."""
+    return app.send_static_file('js/service-worker.js')
+
+
 
 
 class RobustMiddleware:

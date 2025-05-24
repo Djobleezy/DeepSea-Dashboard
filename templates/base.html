@@ -387,5 +387,12 @@
     </script>
     <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
     <script src="/static/js/easterEgg.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js');
+            }
+        });
+    </script>
 </body>
 </html>
