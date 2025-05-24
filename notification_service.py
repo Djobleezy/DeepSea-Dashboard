@@ -128,11 +128,10 @@ class NotificationService:
         """Get current datetime with the configured timezone."""
         try:
             tz = pytz.timezone(get_timezone())
-            return datetime.now(tz)
         except Exception as e:
             logging.error(f"[NotificationService] Error getting timezone: {e}")
-            # Fallback to naive datetime if timezone fails
-            return datetime.now()
+            tz = pytz.utc
+        return datetime.now(tz)
 
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
         """Parse an ISO timestamp string into a timezone-aware datetime."""

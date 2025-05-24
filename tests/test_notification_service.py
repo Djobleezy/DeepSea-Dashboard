@@ -126,6 +126,12 @@ class NotificationCurrencyTest(unittest.TestCase):
         self.assertEqual(dt.year, 2024)
         self.assertEqual(dt.minute, 4)
 
+    def test_get_current_time_fallback_tz(self):
+        svc = NotificationService(DummyStateManager())
+        with patch("notification_service.pytz.timezone", side_effect=Exception("bad")):
+            dt = svc._get_current_time()
+        self.assertIsNotNone(dt.tzinfo)
+
 
 if __name__ == "__main__":
     unittest.main()
