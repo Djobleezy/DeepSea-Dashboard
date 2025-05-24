@@ -43,3 +43,9 @@ def test_parse_worker_name_generic_axe():
     assert specs["type"] == "Bitaxe"
     assert specs["efficiency"] == 15
     assert round(specs["power"]) == round(1.1 * 15)
+
+
+def test_parse_worker_name_allows_trailing_digits():
+    """Keywords should match even if the worker name ends with numbers."""
+    assert miner_specs.parse_worker_name("urlacher1")["model"] == "The Urlacher"
+    assert miner_specs.parse_worker_name("bitchimney1")["model"] == "BitChimney Heater"

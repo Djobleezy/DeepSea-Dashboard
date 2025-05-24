@@ -93,8 +93,9 @@ def parse_worker_name(name: str) -> Optional[Dict[str, float]]:
         return None
     name_lower = name.lower()
     for pattern, specs in MODEL_SPECS:
-        boundary_pattern = rf"(?<![A-Za-z0-9]){pattern}(?![A-Za-z0-9])"
-        if re.search(boundary_pattern, name_lower):
+        strict_pattern = rf"(?<![A-Za-z0-9]){pattern}(?![A-Za-z0-9])"
+        relaxed_pattern = rf"(?<![A-Za-z]){pattern}(?![A-Za-z])"
+        if re.search(strict_pattern, name_lower) or re.search(relaxed_pattern, name_lower):
             power = specs.get("hashrate", 0) * specs.get("efficiency", 0)
             return {
                 "model": specs["model"],
