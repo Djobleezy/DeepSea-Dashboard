@@ -309,7 +309,8 @@ For optimal performance:
 8. Verify timezone settings for accurate time displays
 9. Alt + W on Dashboard resets wallet configuration and redirects to Boot sequence
 10. If block event lines persist, run `window.clearBlockAnnotations()` in your
-    browser console to remove them. Older annotations are pruned automatically.
+    browser console to remove them. Events now store full timestamps, so
+    annotations should disappear once they fall outside the 3‑hour window.
 
 ## Easter Egg
 

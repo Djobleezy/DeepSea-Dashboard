@@ -327,6 +327,7 @@ let initialLoad = true;
 let trendData = [];
 let trendLabels = [];
 let trendChart = null;
+// Stored block annotations as ISO timestamp strings
 let blockAnnotations = [];
 let connectionRetryCount = 0;
 let maxRetryCount = 10;
@@ -377,28 +378,41 @@ if (window.simpleAnnotationPlugin) {
     Chart.register(window.simpleAnnotationPlugin);
 }
 
-function pruneBlockAnnotations(minutes = 180, maxEntries = 100) {
-    const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
+function parseOldLabel(label, tz) {
     const now = Date.now();
-    const cutoff = now - minutes * 60 * 1000;
     const dayMs = 24 * 60 * 60 * 1000;
     const offset = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).getTime() - now;
+    const parts = label.split(':');
+    if (parts.length < 2) return null;
+    const hour = parseInt(parts[0], 10);
+    const minute = parseInt(parts[1], 10);
+    if (isNaN(hour) || isNaN(minute)) return null;
+    const base = new Date();
+    base.setHours(hour, minute, 0, 0);
+    let ts = base.getTime() - offset;
+    const diff = ts - now;
+    if (diff > 12 * 60 * 60 * 1000) ts -= dayMs;
+    else if (diff < -12 * 60 * 60 * 1000) ts += dayMs;
+    return new Date(ts).toISOString();
+}
+
+function pruneBlockAnnotations(minutes = 180, maxEntries = 100) {
+    const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
+    const cutoff = Date.now() - minutes * 60 * 1000;
 
     try {
-        blockAnnotations = blockAnnotations.filter(label => {
-            const parts = label.split(':');
-            if (parts.length < 2) return false;
-            const hour = parseInt(parts[0], 10);
-            const minute = parseInt(parts[1], 10);
-            if (isNaN(hour) || isNaN(minute)) return false;
-            const base = new Date();
-            base.setHours(hour, minute, 0, 0);
-            let ts = base.getTime() - offset;
-            const diff = ts - now;
-            if (diff > 12 * 60 * 60 * 1000) ts -= dayMs;
-            else if (diff < -12 * 60 * 60 * 1000) ts += dayMs;
-            return ts >= cutoff;
-        });
+        blockAnnotations = blockAnnotations
+            .map(ts => {
+                if (typeof ts === 'string' && ts.match(/^\d{1,2}:\d{2}$/)) {
+                    return parseOldLabel(ts, tz);
+                }
+                return ts;
+            })
+            .filter(ts => {
+                const time = new Date(ts).getTime();
+                return !isNaN(time) && time >= cutoff;
+            });
+
         if (maxEntries && blockAnnotations.length > maxEntries) {
             blockAnnotations.splice(0, blockAnnotations.length - maxEntries);
         }
@@ -437,12 +451,17 @@ function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
 
     try {
         const stored = localStorage.getItem('blockAnnotations');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-                blockAnnotations = parsed;
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    blockAnnotations = parsed.map(item => {
+                        if (typeof item === 'string' && item.match(/^\d{1,2}:\d{2}$/)) {
+                            return parseOldLabel(item, tz);
+                        }
+                        return item;
+                    });
+                }
             }
-        }
     } catch (e) {
         console.error('Error loading block annotations', e);
         blockAnnotations = [];
@@ -459,9 +478,9 @@ function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
                     try {
                         const d = new Date(ev.timestamp);
                         if (d.getTime() < cutoff) return;
-                        const label = formatter.format(d).replace(/\s[AP]M$/i, '');
-                        if (!blockAnnotations.includes(label)) {
-                            blockAnnotations.push(label);
+                        const iso = d.toISOString();
+                        if (!blockAnnotations.includes(iso)) {
+                            blockAnnotations.push(iso);
                         }
                     } catch (err) {
                         console.error('Error processing block event', err);
@@ -532,11 +551,20 @@ function updateBlockAnnotations(chart) {
     });
 
     const theme = getCurrentTheme();
+    const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
     const validLabels = chart.data && Array.isArray(chart.data.labels)
         ? new Set(chart.data.labels)
         : new Set();
     let idx = 0;
-    blockAnnotations.forEach(label => {
+    blockAnnotations.forEach(ts => {
+        const label = formatter.format(new Date(ts)).replace(/\s[AP]M$/i, '');
         if (!validLabels.has(label)) return;
         anns['blockEvent' + idx] = {
             type: 'line',
@@ -1996,8 +2024,8 @@ function checkForBlockUpdates(data) {
         showCongrats("Congrats! New Block Found: " + data.last_block_height);
         playBlockSound();
         if (trendChart && trendChart.data && trendChart.data.labels.length > 0) {
-            const label = trendChart.data.labels[trendChart.data.labels.length - 1];
-            blockAnnotations.push(label);
+            const ts = new Date().toISOString();
+            blockAnnotations.push(ts);
             saveBlockAnnotations();
             updateBlockAnnotations(trendChart);
         }
