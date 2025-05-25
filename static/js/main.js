@@ -2081,7 +2081,7 @@ function showCongrats(message) {
     // Set auto-hide timer
     setTimeout(function () {
         $congrats.fadeOut(800);
-    }, 15000); // 15 seconds display time
+    }, 30000); // 30 seconds display time
 
     // Add click to dismiss
     $congrats.off('click').on('click', function () {
