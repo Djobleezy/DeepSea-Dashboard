@@ -556,6 +556,9 @@ class StateManager:
                 else:
                     metrics[f"{key}_variance_3hr"] = None
 
+                progress = min(len(history), MAX_VARIANCE_HISTORY_ENTRIES) / MAX_VARIANCE_HISTORY_ENTRIES * 100
+                metrics[f"{key}_variance_progress"] = round(progress)
+
             # --- Aggregate arrow_history by minute for the graph ---
             aggregated_history = {}
             for key, entries in self.arrow_history.items():

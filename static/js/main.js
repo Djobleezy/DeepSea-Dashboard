@@ -2910,7 +2910,7 @@ function updateUI() {
     }
 
     // Helper to attach a 3hr variance divider to a metric row
-    function updateVarianceDivider(metricId, varianceId, varianceValue, formatFn) {
+    function updateVarianceDivider(metricId, varianceId, varianceValue, formatFn, progress) {
         const para = document.getElementById(metricId).parentNode;
         ensureElementStyles();
 
@@ -2951,7 +2951,11 @@ function updateUI() {
         let formatted;
         const needsData = varianceValue === null || varianceValue === undefined;
         if (needsData) {
-            formatted = 'Loading...';
+            if (progress !== undefined && progress !== null) {
+                formatted = `Loading ${progress}%...`;
+            } else {
+                formatted = 'Loading...';
+            }
         } else if (typeof formatFn === 'function') {
             formatted = formatFn(varianceValue);
         } else {
@@ -3449,7 +3453,8 @@ function updateUI() {
                         return sign + (abs / 1000).toFixed(2) + ' ZH/s';
                     }
                     return sign + numberWithCommas(Math.round(abs)) + ' EH/s';
-                }
+                },
+                data.network_hashrate_variance_progress
             );
         }
         updateElementText("difficulty", numberWithCommas(Math.round(data.difficulty)));
@@ -3613,21 +3618,27 @@ function updateUI() {
             updateVarianceDivider(
                 "estimated_earnings_per_day_sats",
                 "variance_earnings_day",
-                data.estimated_earnings_per_day_sats_variance_3hr
+                data.estimated_earnings_per_day_sats_variance_3hr,
+                null,
+                data.estimated_earnings_per_day_sats_variance_progress
             );
         }
         if (data.estimated_earnings_next_block_sats_variance_3hr !== undefined) {
             updateVarianceDivider(
                 "estimated_earnings_next_block_sats",
                 "variance_earnings_block",
-                data.estimated_earnings_next_block_sats_variance_3hr
+                data.estimated_earnings_next_block_sats_variance_3hr,
+                null,
+                data.estimated_earnings_next_block_sats_variance_progress
             );
         }
         if (data.estimated_rewards_in_window_sats_variance_3hr !== undefined) {
             updateVarianceDivider(
                 "estimated_rewards_in_window_sats",
                 "variance_rewards_window",
-                data.estimated_rewards_in_window_sats_variance_3hr
+                data.estimated_rewards_in_window_sats_variance_3hr,
+                null,
+                data.estimated_rewards_in_window_sats_variance_progress
             );
         }
 

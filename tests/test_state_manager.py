@@ -90,6 +90,7 @@ def test_variance_history_calculation(monkeypatch):
     }
     mgr.update_metrics_history(first)
     assert first["estimated_earnings_per_day_sats_variance_3hr"] is None
+    assert first["estimated_earnings_per_day_sats_variance_progress"] < 100
 
     # Pre-fill variance history to simulate 3 hours of data
     for key in [
@@ -111,6 +112,7 @@ def test_variance_history_calculation(monkeypatch):
     assert second["estimated_earnings_per_day_sats_variance_3hr"] == 20
     assert second["estimated_earnings_next_block_sats_variance_3hr"] == 10
     assert second["estimated_rewards_in_window_sats_variance_3hr"] == 10
+    assert second["estimated_earnings_per_day_sats_variance_progress"] == 100
 
 
 def test_network_hashrate_variance_calculation(monkeypatch):
@@ -129,6 +131,7 @@ def test_network_hashrate_variance_calculation(monkeypatch):
     mgr.update_metrics_history(second)
 
     assert second["network_hashrate_variance_3hr"] == 50
+    assert second["network_hashrate_variance_progress"] == 100
 
 
 def test_variance_history_persistence(monkeypatch):
