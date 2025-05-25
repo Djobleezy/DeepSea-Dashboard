@@ -3,7 +3,7 @@ import logging
 import uuid
 import pytz
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, tzinfo
 from enum import Enum
 from typing import List, Dict, Any, Optional
 from config import get_timezone, load_config
@@ -128,9 +128,11 @@ class NotificationService:
         """Get current datetime with the configured timezone."""
         try:
             tz = pytz.timezone(get_timezone())
+            if not isinstance(tz, tzinfo):
+                raise TypeError("Timezone object must derive from tzinfo")
         except Exception as e:
             logging.error(f"[NotificationService] Error getting timezone: {e}")
-            tz = pytz.utc
+            tz = getattr(pytz, "utc", timezone.utc)
         return datetime.now(tz)
 
     def _parse_timestamp(self, timestamp_str: str) -> datetime:
