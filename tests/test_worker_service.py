@@ -1,6 +1,7 @@
 import types
 import sys
 import random
+import pytest
 
 # Provide lightweight stubs for external deps if missing
 if "pytz" not in sys.modules:
@@ -60,6 +61,21 @@ def test_generate_fallback_data_counts(monkeypatch):
     assert data["workers_online"] == 1
     assert data["workers_offline"] == 1
     assert data["daily_sats"] == 500
+
+
+def test_generate_fallback_data_earnings_distribution(monkeypatch):
+    monkeypatch.setattr("worker_service.get_timezone", lambda: "UTC")
+    svc = WorkerService()
+    metrics = {
+        "workers_hashing": 2,
+        "hashrate_3hr": 60,
+        "hashrate_3hr_unit": "TH/s",
+        "unpaid_earnings": 0.2,
+        "daily_mined_sats": 500,
+    }
+    data = svc.generate_fallback_data(metrics)
+    earnings_sum = sum(w["earnings"] for w in data["workers"])
+    assert pytest.approx(earnings_sum) == 0.2
 
 
 def test_generate_fallback_data_zero_workers(monkeypatch):

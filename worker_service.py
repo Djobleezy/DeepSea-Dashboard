@@ -393,24 +393,6 @@ class WorkerService:
                 if name and name.lower() not in ["online", "offline", "total"]:
                     real_worker_names.append(name)
 
-        # Generate worker data
-        workers_data = []
-
-        # If we have real worker names, use them
-        if real_worker_names:
-            logging.info(f"Using {len(real_worker_names)} real worker names from cache")
-            workers_data = self.generate_simulated_workers(
-                workers_count, original_hashrate_3hr, hashrate_unit, real_worker_names=real_worker_names
-            )
-        else:
-            # Otherwise use sequential names
-            logging.info("No real worker names available, using sequential names")
-            workers_data = self.generate_sequential_workers(workers_count, original_hashrate_3hr, hashrate_unit)
-
-        # Calculate basic statistics
-        workers_online = len([w for w in workers_data if w["status"] == "online"])
-        workers_offline = len(workers_data) - workers_online
-
         # Use unpaid_earnings from main dashboard
         unpaid_earnings = cached_metrics.get("unpaid_earnings", 0)
         # Handle case where unpaid_earnings might be a string
@@ -425,6 +407,29 @@ class WorkerService:
         if unpaid_earnings is None or unpaid_earnings <= 0:
             unpaid_earnings = 0.001
 
+        # Generate worker data
+        workers_data = []
+
+        # If we have real worker names, use them
+        if real_worker_names:
+            logging.info(f"Using {len(real_worker_names)} real worker names from cache")
+            workers_data = self.generate_simulated_workers(
+                workers_count,
+                original_hashrate_3hr,
+                hashrate_unit,
+                total_unpaid_earnings=unpaid_earnings,
+                real_worker_names=real_worker_names,
+            )
+        else:
+            # Otherwise use sequential names
+            logging.info("No real worker names available, using sequential names")
+            workers_data = self.generate_sequential_workers(
+                workers_count, original_hashrate_3hr, hashrate_unit, total_unpaid_earnings=unpaid_earnings
+            )
+
+        # Calculate basic statistics
+        workers_online = len([w for w in workers_data if w["status"] == "online"])
+        workers_offline = len(workers_data) - workers_online
         # Use unpaid_earnings as total_earnings
         total_earnings = unpaid_earnings
 
