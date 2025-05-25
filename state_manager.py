@@ -559,17 +559,22 @@ class StateManager:
 
                 history.append({"time": now, "value": metrics[key]})
 
+                if history:
+                    earliest_time = history[0]["time"]
+                    elapsed_minutes = int((now - earliest_time).total_seconds() // 60) + 1
+                    progress = max(len(history), elapsed_minutes) / MAX_VARIANCE_HISTORY_ENTRIES * 100
+                else:
+                    progress = 0
+                metrics[f"{key}_variance_progress"] = round(progress)
+
                 # Find the earliest non-zero value to use as baseline
                 baseline_entry = next((h for h in history if h["value"] != 0), None)
 
-                if baseline_entry and len(history) >= MAX_VARIANCE_HISTORY_ENTRIES:
+                if baseline_entry and progress >= 100:
                     baseline = baseline_entry["value"]
                     metrics[f"{key}_variance_3hr"] = metrics[key] - baseline
                 else:
                     metrics[f"{key}_variance_3hr"] = None
-
-                progress = min(len(history), MAX_VARIANCE_HISTORY_ENTRIES) / MAX_VARIANCE_HISTORY_ENTRIES * 100
-                metrics[f"{key}_variance_progress"] = round(progress)
 
             # --- Aggregate arrow_history by minute for the graph ---
             aggregated_history = {}
