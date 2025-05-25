@@ -39,6 +39,13 @@ def test_get_timezone_config(monkeypatch, tmp_path):
     assert mod.get_timezone() == "Europe/Berlin"
 
 
+def test_get_timezone_invalid(monkeypatch, tmp_path):
+    path = create_config(tmp_path, timezone="Bad/Zone")
+    mod = reload_config(monkeypatch, path)
+    monkeypatch.delenv("TIMEZONE", raising=False)
+    assert mod.get_timezone() == "UTC"
+
+
 # ----- get_currency -----
 
 

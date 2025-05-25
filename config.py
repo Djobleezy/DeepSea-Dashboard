@@ -94,27 +94,25 @@ def load_config():
 
 
 def get_timezone():
-    """
-    Get the configured timezone with fallback to default.
-
-    Returns:
-        str: Timezone identifier
-    """
-    # First check environment variable (for Docker)
+    """Return the configured timezone or a safe default."""
     import os
+    from zoneinfo import ZoneInfo
 
-    env_timezone = os.environ.get("TIMEZONE")
-    if env_timezone:
-        return env_timezone
+    tz = os.environ.get("TIMEZONE")
+    if not tz:
+        cfg = load_config()
+        tz = cfg.get("timezone")
 
-    # Then check config file
-    config = load_config()
-    timezone = config.get("timezone")
-    if timezone:
-        return timezone
+    if not tz:
+        tz = "America/Los_Angeles"
 
-    # Default to Los Angeles
-    return "America/Los_Angeles"
+    try:
+        ZoneInfo(tz)
+    except Exception:
+        logging.warning("Invalid timezone '%s', falling back to UTC", tz)
+        tz = "UTC"
+
+    return tz
 
 
 def save_config(config):
