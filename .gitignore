@@ -1,0 +1,23 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Logs
+logs/
+
+# Test cache
+tests/__pycache__/
+
+# IDE settings
+*.swp
+*.swo
+*.idea/
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Static asset build outputs
+static/js/min/
+static/css/min/
+templates/min/
