@@ -25,6 +25,8 @@ from config import get_timezone
 MAX_HISTORY_ENTRIES = 180  # 3 hours worth at 1 min intervals
 # Separate history for short-term variance calculations (3 hours)
 MAX_VARIANCE_HISTORY_ENTRIES = 180  # 3 hours at 1 min intervals
+# Maximum number of minutes to autofill when variance data is missing
+MAX_FILL_GAP_MINUTES = 3
 
 # Lock for thread safety
 state_lock = threading.Lock()
@@ -544,6 +546,16 @@ class StateManager:
                 # Remove entries older than 3 hours
                 while history and history[0]["time"] < window_start:
                     history.popleft()
+
+                # Autofill small gaps with the last known value
+                if history:
+                    last_time = history[-1]["time"]
+                    gap_minutes = int((now - last_time).total_seconds() // 60) - 1
+                    if 0 < gap_minutes <= MAX_FILL_GAP_MINUTES:
+                        last_value = history[-1]["value"]
+                        for _ in range(gap_minutes):
+                            last_time += timedelta(minutes=1)
+                            history.append({"time": last_time, "value": last_value})
 
                 history.append({"time": now, "value": metrics[key]})
 

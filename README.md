@@ -205,7 +205,9 @@ dataset (arrow history, metrics log and hashrate history) is capped at 180
 entries, equating to roughly three hours of data. Older points are pruned by the
 `StateManager` before saving to Redis, ensuring memory usage remains stable.
 Short-term variance history for earnings metrics is also persisted so 3-hour
-variance values remain visible after restarts.
+variance values remain visible after restarts. Minor gaps of a few minutes are
+filled automatically using the last known metric so the variance progress can
+reach 100% even with occasional missing samples.
 
 ## API Endpoints
 - `/api/metrics`: Provides real-time mining metrics.

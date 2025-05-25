@@ -134,6 +134,28 @@ def test_network_hashrate_variance_calculation(monkeypatch):
     assert second["network_hashrate_variance_progress"] == 100
 
 
+def test_autofill_variance_gaps(monkeypatch):
+    mgr = StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    first = {"network_hashrate": 400}
+    mgr.update_metrics_history(first)
+
+    history = mgr.variance_history["network_hashrate"]
+    for _ in range(MAX_VARIANCE_HISTORY_ENTRIES - 2):
+        history.append({"time": history[-1]["time"], "value": first["network_hashrate"]})
+
+    history[-1]["time"] = datetime.now(ZoneInfo("UTC")) - timedelta(minutes=2)
+
+    second = {"network_hashrate": 450}
+    mgr.update_metrics_history(second)
+
+    assert second["network_hashrate_variance_progress"] == 100
+
+
 def test_variance_history_persistence(monkeypatch):
     mgr = StateManager()
     mgr.redis_client = DummyRedis()
