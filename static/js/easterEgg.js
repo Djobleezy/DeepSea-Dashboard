@@ -17,7 +17,15 @@
   function spawnWhales(x, y) {
     const count = 8;
     const useDeepSea = document.documentElement.classList.contains('deepsea-theme');
-    const symbol = useDeepSea ? '🐳' : '₿';
+    const useMatrix = document.documentElement.classList.contains('matrix-theme');
+    let symbol;
+    if (useMatrix) {
+      symbol = '💻';
+    } else if (useDeepSea) {
+      symbol = '🐳';
+    } else {
+      symbol = '₿';
+    }
     for (let i = 0; i < count; i++) {
       const emoji = document.createElement('span');
       emoji.className = 'cursor-whale';
@@ -30,7 +38,9 @@
       emoji.style.top = y + 'px';
       emoji.style.setProperty('--x', xMove + 'px');
       emoji.style.setProperty('--y', yMove + 'px');
-      if (!useDeepSea) {
+      if (useMatrix) {
+        emoji.style.color = '#39ff14';
+      } else if (!useDeepSea) {
         emoji.style.color = '#f7931a';
       }
       document.body.appendChild(emoji);
@@ -124,11 +134,16 @@
       ? 10
       : Math.max(20, Math.floor(window.innerHeight / 30));
 
+    const useMatrix = document.documentElement.classList.contains('matrix-theme');
     const seaIcons = ['🐳', '🐠', '🦀', '💰'];
+    const matrixIcons = ['💻', '🖥️', '⌨️'];
 
     for (let i = 0; i < iconCount; i++) {
       const icon = document.createElement('div');
-      if (useDeepSea) {
+      if (useMatrix) {
+        icon.className = 'matrix-icon';
+        icon.textContent = matrixIcons[Math.floor(Math.random() * matrixIcons.length)];
+      } else if (useDeepSea) {
         icon.className = 'sea-icon';
         icon.textContent = seaIcons[Math.floor(Math.random() * seaIcons.length)];
       } else {
@@ -139,7 +154,10 @@
       icon.style.left = '-150px';
       icon.style.animationDuration = 8 + Math.random() * 4 + 's';
       icon.style.animationDelay = Math.random() * 6 + 's';
-      if (useDeepSea) {
+      if (useMatrix) {
+        icon.style.fontSize = 3 + Math.random() * 1.5 + 'rem';
+        icon.style.color = '#39ff14';
+      } else if (useDeepSea) {
         icon.style.fontSize = 2 + Math.random() * 2 + 'rem';
       } else {
         icon.style.fontSize = 4 + Math.random() * 2 + 'rem';

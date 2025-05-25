@@ -124,6 +124,28 @@ function updateDashboardDataText(useDeepSea) {
     }
 }
 
+// Update header when applying Matrix theme
+function updateMatrixHeaderText() {
+    try {
+        const headerElement = document.querySelector('h1.text-center');
+        if (!headerElement) return;
+        const anchorElement = headerElement.querySelector('a');
+        if (!anchorElement) return;
+        let headerText = anchorElement.textContent.trim();
+        const newHeaderText = headerText.replace(/BTC-OS|DeepSea|DEEPSEA|BITCOIN/gi, 'Matrix');
+        anchorElement.textContent = newHeaderText;
+        if (headerElement.hasAttribute('data-text')) {
+            headerElement.setAttribute('data-text', newHeaderText);
+        }
+        if (document.title.includes('Dashboard')) {
+            document.title = document.title.replace(/BTC-OS|DeepSea|Bitcoin/gi, 'Matrix');
+        }
+        console.log(`Header updated to: ${newHeaderText}`);
+    } catch (e) {
+        console.error('Error updating matrix header:', e);
+    }
+}
+
 // Fixed applyDeepSeaTheme function with recursion protection
 function applyDeepSeaTheme() {
     // Check if we're already applying the theme to prevent recursion
@@ -460,6 +482,9 @@ function applyMatrixTheme() {
         document.documentElement.classList.remove('bitcoin-theme', 'deepsea-theme');
         document.documentElement.classList.add('matrix-theme');
 
+        updateMatrixHeaderText();
+        updateChartControlsLabel(true);
+
         console.log('Matrix theme applied');
     } finally {
         setTimeout(() => { isApplyingTheme = false; }, 100);
@@ -577,6 +602,7 @@ function loadThemePreference() {
         const matrixPref = localStorage.getItem('useMatrixTheme') === 'true';
         if (matrixPref) {
             applyMatrixTheme();
+            updateMatrixHeaderText();
             updateChartControlsLabel(true);
             return;
         }

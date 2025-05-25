@@ -46,6 +46,14 @@
   color: #f7931a;
 }
 
+#easterEggOverlay .matrix-icon {
+  position: absolute;
+  font-size: 3rem;
+  animation: spin-move 12s linear infinite;
+  pointer-events: none;
+  color: #39ff14;
+}
+
 #easterEggOverlay .fact {
   margin-top: 0.5rem;
   font-size: 1rem;
