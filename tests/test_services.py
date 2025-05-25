@@ -99,7 +99,10 @@ def test_notification_update_currency(monkeypatch):
             "data": {"daily_profit": 10.0, "currency": "USD"},
         }
     ]
-    monkeypatch.setattr("notification_service.get_exchange_rates", lambda: {"EUR": 0.5, "USD": 1})
+    monkeypatch.setattr(
+        "notification_service.get_exchange_rates",
+        lambda svc=None: {"EUR": 0.5, "USD": 1},
+    )
     updated = svc.update_notification_currency("EUR")
     assert updated == 1
     notif = svc.notifications[0]

@@ -492,11 +492,9 @@ class NotificationService:
             config = load_config()
             user_currency = config.get("currency", "USD")
 
-            # Get exchange rates
-            # ``get_exchange_rates`` can be patched by tests with a simple
-            # zero-argument callable.  Avoid passing ``dashboard_service`` so
-            # such patches don't receive unexpected arguments.
-            exchange_rates = get_exchange_rates()
+            # Get exchange rates using the shared dashboard service when
+            # available. Test patches typically ignore the argument.
+            exchange_rates = get_exchange_rates(self.dashboard_service)
 
             # Format with the user's currency
             formatted_profit = format_currency_value(daily_profit_usd, user_currency, exchange_rates)
@@ -790,10 +788,9 @@ class NotificationService:
                 config = load_config()
                 new_currency = config.get("currency", "USD")
 
-            # ``get_exchange_rates`` may be patched by tests with a simple
-            # zero-argument callable.  Call it without arguments to avoid
-            # issues when such a patch is in place.
-            exchange_rates = get_exchange_rates()
+            # Use the shared dashboard service for exchange rates when
+            # available. Test patches commonly ignore the argument.
+            exchange_rates = get_exchange_rates(self.dashboard_service)
             if new_currency not in exchange_rates:
                 logging.warning(
                     f"[NotificationService] Missing exchange rate for {new_currency}, skipping update"
