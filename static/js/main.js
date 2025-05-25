@@ -1994,6 +1994,7 @@ function checkForBlockUpdates(data) {
     if (previousMetrics.last_block_height !== undefined &&
         data.last_block_height !== previousMetrics.last_block_height) {
         showCongrats("Congrats! New Block Found: " + data.last_block_height);
+        playBlockSound();
         if (trendChart && trendChart.data && trendChart.data.labels.length > 0) {
             const label = trendChart.data.labels[trendChart.data.labels.length - 1];
             blockAnnotations.push(label);
@@ -2086,6 +2087,30 @@ function showCongrats(message) {
     $congrats.off('click').on('click', function () {
         $(this).fadeOut(500);
     });
+}
+
+// Play celebratory audio when a new block is found
+function playBlockSound() {
+    const audioSrc = '/static/audio/block.mp3';
+    const blockAudio = new Audio(audioSrc);
+    const bgAudio = document.getElementById('backgroundAudio');
+    let originalVolume = null;
+
+    if (bgAudio && !bgAudio.muted && !bgAudio.paused) {
+        originalVolume = bgAudio.volume;
+        bgAudio.volume = Math.max(0, originalVolume * 0.3);
+    }
+
+    const restoreVolume = () => {
+        if (originalVolume !== null && bgAudio) {
+            bgAudio.volume = originalVolume;
+        }
+    };
+
+    blockAudio.addEventListener('ended', restoreVolume);
+    blockAudio.addEventListener('error', restoreVolume);
+
+    blockAudio.play().catch(restoreVolume);
 }
 
 // Enhanced Chart Update Function to handle temporary hashrate spikes

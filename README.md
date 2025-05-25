@@ -78,6 +78,7 @@ informed with minimal fuss.
   `bitcoin.mp3`, `bitcoin1.mp3` and `bitcoin2.mp3`. Playback position persists between page loads. Place the files
   in `static/audio/`. The Docker configuration mounts this directory automatically. Hover the speaker icon to reveal
   a vertical volume slider. Tracks now crossfade seamlessly with a 2 second overlap and when switching themes.
+  Add an optional `block.mp3` file in the same directory to play a short sound whenever a new block is found.
 
 ### DeepSea Theme
 - **Underwater Effects**: Light rays and digital noise create an immersive experience.

@@ -108,6 +108,9 @@ For better performance and reliability in production environments:
       bitcoin-mining-dashboard
    ```
 
+   The `static/audio` directory should contain the background tracks and an optional
+   `block.mp3` file that plays when a new block is found.
+
 3. Access the dashboard at `http://localhost:5000`
 
 ### Option 4: Docker Compose with Redis Persistence
@@ -132,12 +135,12 @@ For better performance and reliability in production environments:
          - REDIS_URL=redis://redis:6379
          - WALLET=your-wallet-address
          - POWER_COST=0.12
-         - POWER_USAGE=3450
-        volumes:
-          - ./logs:/app/logs
-          - ./static/audio:/app/static/audio
-        depends_on:
-          - redis
+        - POWER_USAGE=3450
+       volumes:
+         - ./logs:/app/logs
+         - ./static/audio:/app/static/audio  # include block.mp3 here if desired
+       depends_on:
+         - redis
    
    volumes:
      redis_data:
