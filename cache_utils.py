@@ -1,5 +1,6 @@
 """Utility helpers for caching expensive operations."""
 
+import json
 import time
 from functools import wraps
 
@@ -10,6 +11,16 @@ def ttl_cache(ttl_seconds=60):
     def decorator(func):
         cache = {}
 
+        def _serialize(value):
+            try:
+                hash(value)
+                return value
+            except TypeError:
+                try:
+                    return json.dumps(value, sort_keys=True)
+                except Exception:
+                    return str(value)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             if args and hasattr(args[0], "__dict__"):
@@ -18,7 +29,10 @@ def ttl_cache(ttl_seconds=60):
             else:
                 key_prefix = None
                 key_args = args
-            key = (key_prefix, key_args, tuple(sorted(kwargs.items())))
+
+            serialized_args = tuple(_serialize(a) for a in key_args)
+            serialized_kwargs = tuple(sorted((k, _serialize(v)) for k, v in kwargs.items()))
+            key = (key_prefix, serialized_args, serialized_kwargs)
             now = time.time()
             cached = cache.get(key)
             if cached and now - cached[1] < ttl_seconds:

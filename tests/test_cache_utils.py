@@ -24,3 +24,29 @@ def test_ttl_cache(monkeypatch):
     fake_time[0] += 5
     assert add(1, 2) == 3
     assert call_count["count"] == 2
+
+
+def test_ttl_cache_unhashable(monkeypatch):
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    call_count = {"count": 0}
+
+    @ttl_cache(ttl_seconds=5)
+    def add_dict(d):
+        call_count["count"] += 1
+        return d["a"] + d["b"]
+
+    data = {"a": 1, "b": 2}
+    assert add_dict(data) == 3
+    assert call_count["count"] == 1
+
+    fake_time[0] += 1
+    # Different dict object with same contents should hit cache
+    data2 = {"b": 2, "a": 1}
+    assert add_dict(data2) == 3
+    assert call_count["count"] == 1
+
+    fake_time[0] += 6
+    assert add_dict(data) == 3
+    assert call_count["count"] == 2
