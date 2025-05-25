@@ -1,6 +1,8 @@
 (function() {
   const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+  const matrix = ['i','d','d','q','d'];
   let index = 0;
+  let matrixIndex = 0;
   let cursorClicks = [];
   const funFacts = [
     'Did you know dolphins sleep with one eye open?',
@@ -72,6 +74,19 @@
   }
 
   function handleKey(e) {
+    if (document.body.classList.contains('easterEggActive')) {
+      if (e.key.toLowerCase() === matrix[matrixIndex]) {
+        matrixIndex++;
+        if (matrixIndex === matrix.length) {
+          matrixIndex = 0;
+          activateMatrixTheme();
+          return;
+        }
+      } else {
+        matrixIndex = 0;
+      }
+    }
+
     if (e.key === konami[index]) {
       index++;
       if (index === konami.length) {
@@ -143,6 +158,21 @@
 
     document.body.appendChild(overlay);
     setTimeout(() => overlay.remove(), 15000);
+  }
+
+  function activateMatrixTheme() {
+    if (window.applyMatrixTheme) {
+      localStorage.setItem('useMatrixTheme', 'true');
+      localStorage.setItem('useDeepSeaTheme', 'true');
+      window.applyMatrixTheme();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'matrixOverlay';
+      overlay.classList.add('matrix');
+      overlay.textContent = 'Welcome to the Matrix!';
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), 5000);
+    }
   }
 
   window.addEventListener('keydown', handleKey);

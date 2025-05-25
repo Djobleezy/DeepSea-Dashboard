@@ -85,6 +85,9 @@ informed with minimal fuss.
 - **Retro Glitch Effects**: Subtle animations for a nostalgic feel.
 - **Theme Toggle**: Switch between Bitcoin and DeepSea themes with a single click.
 
+### Secret Matrix Theme
+- **Activation**: Enable the easter egg with the Konami code and then enter `IDDQD` to reveal a green Matrix-style look.
+
 ## Documentation
 
 Comprehensive guides have been moved to the `docs` directory:

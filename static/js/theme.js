@@ -35,15 +35,37 @@ const DEEPSEA_THEME = {
     }
 };
 
+// Matrix Green theme (secret)
+const MATRIX_THEME = {
+    PRIMARY: '#39ff14',
+    PRIMARY_RGB: '57, 255, 20',
+    SHARED: {
+        GREEN: '#32CD32',
+        RED: '#ff5555',
+        YELLOW: '#ffd700'
+    },
+    CHART: {
+        GRADIENT_START: '#39ff14',
+        GRADIENT_END: 'rgba(57, 255, 20, 0.2)',
+        ANNOTATION: '#39ff14',
+        BLOCK_EVENT: '#00ff00'
+    }
+};
+
 // Global theme constants
 const THEME = {
     BITCOIN: BITCOIN_THEME,
     DEEPSEA: DEEPSEA_THEME,
+    MATRIX: MATRIX_THEME,
     SHARED: BITCOIN_THEME.SHARED
 };
 
 // Function to get the current theme based on localStorage setting
 function getCurrentTheme() {
+    const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+    if (useMatrix) {
+        return MATRIX_THEME;
+    }
     const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
     return useDeepSea ? DEEPSEA_THEME : BITCOIN_THEME;
 }
@@ -402,9 +424,56 @@ function applyDeepSeaTheme() {
 // Make the function accessible globally
 window.applyDeepSeaTheme = applyDeepSeaTheme;
 
+function applyMatrixTheme() {
+    if (window.themeProcessing) {
+        console.log('Theme application already in progress, avoiding recursion');
+        return;
+    }
+    isApplyingTheme = true;
+    try {
+        const styleElement = document.createElement('style');
+        styleElement.id = 'matrixThemeStyles';
+        styleElement.textContent = `
+            :root {
+                --primary-color: #39ff14;
+                --primary-color-rgb: 57, 255, 20;
+                --accent-color: #00ff00;
+                --bg-gradient: linear-gradient(135deg, #000000, #003300);
+            }
+        `;
+        const existing = document.getElementById('matrixThemeStyles');
+        if (existing) {
+            existing.parentNode.removeChild(existing);
+        }
+        const deepSeaStyle = document.getElementById('deepSeaThemeStyles');
+        if (deepSeaStyle) {
+            deepSeaStyle.parentNode.removeChild(deepSeaStyle);
+        }
+        document.head.appendChild(styleElement);
+
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.style.borderColor = '#39ff14';
+            themeToggle.style.color = '#39ff14';
+        }
+
+        document.documentElement.classList.remove('bitcoin-theme', 'deepsea-theme');
+        document.documentElement.classList.add('matrix-theme');
+
+        console.log('Matrix theme applied');
+    } finally {
+        setTimeout(() => { isApplyingTheme = false; }, 100);
+    }
+}
+
+window.applyMatrixTheme = applyMatrixTheme;
+
 // Toggle theme with hard page refresh
 function toggleTheme() {
     const useDeepSea = localStorage.getItem('useDeepSeaTheme') !== 'true';
+
+    // Disable secret Matrix theme when toggling
+    localStorage.setItem('useMatrixTheme', 'false');
 
     // Update the data-text attribute based on the new theme
     updateDashboardDataText(useDeepSea);
@@ -504,6 +573,13 @@ function loadThemePreference() {
     try {
         // Check if it's first startup - if so, set DeepSea as default
         const isFirstTime = initializeDefaultTheme();
+
+        const matrixPref = localStorage.getItem('useMatrixTheme') === 'true';
+        if (matrixPref) {
+            applyMatrixTheme();
+            updateChartControlsLabel(true);
+            return;
+        }
 
         // Get theme preference from localStorage
         const themePreference = localStorage.getItem('useDeepSeaTheme');

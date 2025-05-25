@@ -1,4 +1,5 @@
-#easterEggOverlay {
+#easterEggOverlay,
+#matrixOverlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -23,6 +24,10 @@
 
 #easterEggOverlay.bitcoin {
   color: #f7931a;
+}
+
+#matrixOverlay.matrix {
+  color: #39ff14;
 }
 
 #easterEggOverlay .whale,

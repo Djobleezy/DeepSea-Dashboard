@@ -30,6 +30,7 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/theme-toggle.css">
     <link rel="stylesheet" href="/static/css/easter-egg.css">
+    <link rel="stylesheet" href="/static/css/matrix.css">
 
     <!-- Theme JS (added to ensure consistent application of theme) -->
     <script src="/static/js/theme.js"></script>
@@ -44,8 +45,9 @@
     <script>
         // Execute this immediately to preload theme
         (function () {
-            const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
-            const themeClass = useDeepSea ? 'deepsea-theme' : 'bitcoin-theme';
+            const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+            const useDeepSea = !useMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+            const themeClass = useMatrix ? 'matrix-theme' : (useDeepSea ? 'deepsea-theme' : 'bitcoin-theme');
 
             // Apply theme class to html element
             document.documentElement.classList.add(themeClass);
@@ -58,11 +60,12 @@
 
                 const icon = document.createElement('div');
                 icon.id = 'loader-icon';
-                icon.innerHTML = useDeepSea ? '🌊' : '₿';
+                icon.innerHTML = useMatrix ? '💻' : (useDeepSea ? '🌊' : '₿');
 
                 const text = document.createElement('div');
                 text.id = 'loader-text';
-                text.textContent = 'Loading ' + (useDeepSea ? 'DeepSea' : 'Bitcoin') + ' Theme';
+                const loaderName = useMatrix ? 'Matrix' : (useDeepSea ? 'DeepSea' : 'Bitcoin');
+                text.textContent = 'Loading ' + loaderName + ' Theme';
 
                 loader.appendChild(icon);
                 loader.appendChild(text);
@@ -267,10 +270,14 @@
             const themeToggle = document.getElementById('themeToggle');
             if (themeToggle) {
                 // Check current theme
-                const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+                const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+                const isDeepSea = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
 
                 // Update button style based on theme
-                if (isDeepSea) {
+                if (isMatrix) {
+                    themeToggle.style.borderColor = '#39ff14';
+                    themeToggle.style.color = '#39ff14';
+                } else if (isDeepSea) {
                     themeToggle.style.borderColor = '#0088cc';
                     themeToggle.style.color = '#0088cc';
                 } else {
@@ -303,8 +310,12 @@
         // Only set up mobile navigation if elements exist
         if (navToggle && navLinks) {
             // Apply theme colors to the toggle button
-            const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
-            if (isDeepSea) {
+            const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+            const isDeepSea = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+            if (isMatrix) {
+                navToggle.style.borderColor = '#39ff14';
+                navToggle.style.color = '#39ff14';
+            } else if (isDeepSea) {
                 navToggle.style.borderColor = '#0088cc';
                 navToggle.style.color = '#0088cc';
             } else {
@@ -372,11 +383,27 @@
 
         // Update colors on theme change
         window.addEventListener('storage', function(e) {
-            if (e.key === 'useDeepSeaTheme' && navToggle) {
+            if (!navToggle) return;
+            if (e.key === 'useMatrixTheme') {
+                if (e.newValue === 'true') {
+                    navToggle.style.borderColor = '#39ff14';
+                    navToggle.style.color = '#39ff14';
+                } else if (localStorage.getItem('useDeepSeaTheme') === 'true') {
+                    navToggle.style.borderColor = '#0088cc';
+                    navToggle.style.color = '#0088cc';
+                } else {
+                    navToggle.style.borderColor = '#f2a900';
+                    navToggle.style.color = '#f2a900';
+                }
+            }
+            if (e.key === 'useDeepSeaTheme') {
                 const useDeepSea = e.newValue === 'true';
                 if (useDeepSea) {
                     navToggle.style.borderColor = '#0088cc';
                     navToggle.style.color = '#0088cc';
+                } else if (localStorage.getItem('useMatrixTheme') === 'true') {
+                    navToggle.style.borderColor = '#39ff14';
+                    navToggle.style.color = '#39ff14';
                 } else {
                     navToggle.style.borderColor = '#f2a900';
                     navToggle.style.color = '#f2a900';
