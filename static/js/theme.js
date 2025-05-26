@@ -482,6 +482,10 @@ function applyMatrixTheme() {
         document.documentElement.classList.remove('bitcoin-theme', 'deepsea-theme');
         document.documentElement.classList.add('matrix-theme');
 
+        if (window.initMatrixRain) {
+            window.initMatrixRain();
+        }
+
         updateMatrixHeaderText();
         updateChartControlsLabel(true);
 

@@ -63,6 +63,11 @@ html.deepsea-theme #theme-loader {
   color: #0088cc;
 }
 
+html.matrix-theme #theme-loader {
+  background-color: #000000;
+  color: #39ff14;
+}
+
 #loader-icon {
   font-size: 48px;
   margin-bottom: 20px;

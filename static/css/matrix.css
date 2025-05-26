@@ -21,3 +21,18 @@ body.matrix-theme #themeToggle:focus,
 body.matrix-theme .theme-toggle-btn:focus {
   box-shadow: 0 0 0 3px rgba(57, 255, 20, 0.3);
 }
+
+html.matrix-theme body {
+  background: linear-gradient(135deg, #000000 0%, #003300 100%);
+  overflow: hidden;
+}
+
+.matrix-rain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
