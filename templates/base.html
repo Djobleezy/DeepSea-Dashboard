@@ -46,6 +46,11 @@
     <script>
         // Execute this immediately to preload theme
         (function () {
+            if (localStorage.getItem('hasStartedBefore') !== 'true') {
+                localStorage.setItem('useDeepSeaTheme', 'true');
+                localStorage.setItem('hasStartedBefore', 'true');
+            }
+
             const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
             const useDeepSea = !useMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
             const themeClass = useMatrix ? 'matrix-theme' : (useDeepSea ? 'deepsea-theme' : 'bitcoin-theme');

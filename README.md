@@ -74,6 +74,7 @@ informed with minimal fuss.
 - **Boot Sequence Animation**: Engaging initialization sequence on startup
 - **System Monitor**: Floating status display with uptime and refresh information
 - **Responsive Interface**: Adapts to desktop and mobile devices
+- **Default DeepSea Experience**: The dashboard launches in DeepSea mode on first run
 - **Ambient Audio**: Soft ocean sounds play in the DeepSea theme while the Bitcoin theme cycles through
   `bitcoin.mp3`, `bitcoin1.mp3` and `bitcoin2.mp3`. Playback position persists between page loads. Place the files
   in `static/audio/`. The Docker configuration mounts this directory automatically. Hover the speaker icon to reveal

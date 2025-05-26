@@ -16,8 +16,23 @@
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/boot.css">
     <link rel="stylesheet" href="/static/css/theme-toggle.css">
+    <link rel="stylesheet" href="/static/css/matrix.css">
     <!-- Add Theme JS -->
     <script src="/static/js/theme.js"></script>
+    <script src="/static/js/matrixRain.js"></script>
+    <script>
+        (function () {
+            if (localStorage.getItem('hasStartedBefore') !== 'true') {
+                localStorage.setItem('useDeepSeaTheme', 'true');
+                localStorage.setItem('hasStartedBefore', 'true');
+            }
+
+            const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+            const useDeepSea = !useMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+            const themeClass = useMatrix ? 'matrix-theme' : (useDeepSea ? 'deepsea-theme' : 'bitcoin-theme');
+            document.documentElement.classList.add(themeClass);
+        })();
+    </script>
 
     <!-- Water Beading and Dripping Effects CSS -->
     <style>
@@ -746,14 +761,22 @@
             // Initialize theme toggle button based on current theme
             const themeToggle = document.getElementById('themeToggle');
             if (themeToggle) {
-                // Check current theme
-                const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+                const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+                const isDeepSea = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
 
-                // Update button style based on theme
-                if (isDeepSea) {
+                if (isMatrix) {
+                    themeToggle.style.borderColor = '#39ff14';
+                    themeToggle.style.color = '#39ff14';
+                    if (window.applyMatrixTheme) {
+                        applyMatrixTheme();
+                    }
+                } else if (isDeepSea) {
                     document.body.classList.add('deepsea-theme');
                     themeToggle.style.borderColor = '#0088cc';
                     themeToggle.style.color = '#0088cc';
+                    if (window.applyDeepSeaTheme) {
+                        applyDeepSeaTheme();
+                    }
                 } else {
                     document.body.classList.remove('deepsea-theme');
                     themeToggle.style.borderColor = '#f2a900';
@@ -768,11 +791,11 @@
 
             // Update terminal colors based on theme (boot.html specific)
             function updateTerminalColors() {
-                const isDeepSeaTheme = localStorage.getItem('useDeepSeaTheme') === 'true';
-                if (isDeepSeaTheme) {
-                    document.body.classList.add('deepsea-theme');
-                } else {
-                    document.body.classList.remove('deepsea-theme');
+                const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+                const isDeepSeaTheme = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+                document.body.classList.toggle('deepsea-theme', isDeepSeaTheme);
+                if (isMatrix && window.applyMatrixTheme) {
+                    applyMatrixTheme();
                 }
             }
 
