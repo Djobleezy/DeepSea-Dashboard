@@ -126,6 +126,32 @@ def test_sync_worker_counts_with_dashboard(monkeypatch):
     assert worker_data["total_earnings"] == 0.2
 
 
+def test_sync_worker_counts_with_dashboard_keeps_max(monkeypatch):
+    monkeypatch.setattr("worker_service.get_timezone", lambda: "UTC")
+    svc = WorkerService()
+    worker_data = {
+        "workers_total": 5,
+        "workers_online": 3,
+        "workers_offline": 2,
+        "total_hashrate": 60,
+        "hashrate_unit": "TH/s",
+    }
+    metrics = {
+        "workers_hashing": 3,
+        "hashrate_3hr": 50,
+        "hashrate_3hr_unit": "TH/s",
+        "daily_mined_sats": 10,
+        "unpaid_earnings": 0.1,
+    }
+    svc.sync_worker_counts_with_dashboard(worker_data, metrics)
+    assert worker_data["workers_total"] == 5
+    assert worker_data["workers_online"] == 3
+    assert worker_data["workers_offline"] == 2
+    assert worker_data["total_hashrate"] == 50
+    assert worker_data["daily_sats"] == 10
+    assert worker_data["total_earnings"] == 0.1
+
+
 def test_generate_sequential_workers_deterministic(monkeypatch):
     monkeypatch.setattr("worker_service.get_timezone", lambda: "UTC")
     random.seed(0)

@@ -180,14 +180,18 @@ class WorkerService:
         if dashboard_worker_count is not None:
             current_worker_count = worker_data.get("workers_total", 0)
 
-            # If counts already match, no need to sync workers count
-            if current_worker_count != dashboard_worker_count:
+            # Determine the target count as the maximum of the two values
+            target_count = max(current_worker_count, dashboard_worker_count)
+
+            if current_worker_count != target_count:
                 logging.info(
-                    f"Syncing worker count: worker page({current_worker_count}) → dashboard({dashboard_worker_count})"
+                    "Syncing worker count: worker page(%s) → target(%s)",
+                    current_worker_count,
+                    target_count,
                 )
 
                 # Update the total count
-                worker_data["workers_total"] = dashboard_worker_count
+                worker_data["workers_total"] = target_count
 
                 # Adjust online/offline counts proportionally
                 current_online = worker_data.get("workers_online", 0)
@@ -197,22 +201,23 @@ class WorkerService:
                 online_ratio = current_online / current_total
 
                 # Recalculate online and offline counts
-                new_online_count = round(dashboard_worker_count * online_ratio)
-                new_offline_count = dashboard_worker_count - new_online_count
+                new_online_count = round(target_count * online_ratio)
+                new_offline_count = target_count - new_online_count
 
                 # Update the counts
                 worker_data["workers_online"] = new_online_count
                 worker_data["workers_offline"] = new_offline_count
 
-                msg = (
-                    f"Updated worker counts - Total: {dashboard_worker_count}, "
-                    f"Online: {new_online_count}, Offline: {new_offline_count}"
+                logging.info(
+                    "Updated worker counts - Total: %s, Online: %s, Offline: %s",
+                    target_count,
+                    new_online_count,
+                    new_offline_count,
                 )
-                logging.info(msg)
 
                 # If we have worker instances, try to adjust them as well
                 if "workers" in worker_data and isinstance(worker_data["workers"], list):
-                    self.adjust_worker_instances(worker_data, dashboard_worker_count)
+                    self.adjust_worker_instances(worker_data, target_count)
 
         # IMPORTANT: Use the dashboard's hashrate values for consistency
         # This ensures the workers page shows the same hashrate as the main dashboard
