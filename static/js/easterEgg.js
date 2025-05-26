@@ -20,7 +20,7 @@
     const useMatrix = document.documentElement.classList.contains('matrix-theme');
     let symbol;
     if (useMatrix) {
-      symbol = '💻';
+      symbol = '💲';
     } else if (useDeepSea) {
       symbol = '🐳';
     } else {
