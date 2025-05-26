@@ -5,7 +5,8 @@
         const canvas = document.createElement('canvas');
         canvas.id = 'matrixRain';
         canvas.className = 'matrix-rain';
-        document.body.appendChild(canvas);
+        // Insert the canvas as the first element so it stays behind
+        document.body.insertBefore(canvas, document.body.firstChild);
 
         const ctx = canvas.getContext('2d');
         let width, height, columns, drops;
