@@ -101,7 +101,9 @@
         // Add underwater effects for DeepSea theme, optimized for mobile
         document.addEventListener('DOMContentLoaded', function () {
             const isMobile = window.innerWidth < 768;
-            if (localStorage.getItem('useDeepSeaTheme') === 'true') {
+            const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+            const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+            if (isDeepSea && !isMatrix) {
                 document.body.style.background = 'linear-gradient(135deg, #030c14 0%, #071a30 100%)';
                 document.body.style.backgroundSize = '400% 400%';
                 document.body.style.animation = 'water-movement 30s ease infinite';

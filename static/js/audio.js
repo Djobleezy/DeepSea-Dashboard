@@ -12,9 +12,10 @@
         let isCrossfading = false;
 
         const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+        const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
         const deepSeaTracks = ['/static/audio/ocean.mp3'];
         const bitcoinTracks = ['/static/audio/bitcoin.mp3', '/static/audio/bitcoin1.mp3', '/static/audio/bitcoin2.mp3'];
-        let playlist = isDeepSea ? deepSeaTracks : bitcoinTracks;
+        let playlist = (isDeepSea && !isMatrix) ? deepSeaTracks : bitcoinTracks;
 
         let trackIndex = parseInt(localStorage.getItem('audioTrackIndex')) || 0;
         if (trackIndex >= playlist.length) {

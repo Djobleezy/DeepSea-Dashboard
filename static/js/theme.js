@@ -482,6 +482,17 @@ function applyMatrixTheme() {
         document.documentElement.classList.remove('bitcoin-theme', 'deepsea-theme');
         document.documentElement.classList.add('matrix-theme');
 
+        // Remove bubbles if they exist
+        const bubbles = document.querySelector('.underwater-bubbles');
+        if (bubbles) {
+            bubbles.remove();
+        }
+
+        // Switch audio to bitcoin playlist
+        if (window.crossfadeToTheme) {
+            window.crossfadeToTheme(false);
+        }
+
         if (window.initMatrixRain) {
             window.initMatrixRain();
         }
