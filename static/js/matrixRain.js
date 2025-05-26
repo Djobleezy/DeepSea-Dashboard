@@ -2,6 +2,10 @@
     "use strict";
 
     function initMatrixRain() {
+        if (document.getElementById('matrixRain')) {
+            return; // avoid duplicate canvases
+        }
+
         const canvas = document.createElement('canvas');
         canvas.id = 'matrixRain';
         canvas.className = 'matrix-rain';
