@@ -113,8 +113,11 @@
 
     const overlay = document.createElement('div');
     overlay.id = 'easterEggOverlay';
+    const useMatrix = document.documentElement.classList.contains('matrix-theme');
     const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
-    if (useDeepSea) {
+    if (useMatrix) {
+      overlay.classList.add('matrix');
+    } else if (useDeepSea) {
       overlay.classList.add('deepsea');
     } else {
       overlay.classList.add('bitcoin');
@@ -133,8 +136,6 @@
     const iconCount = window.innerWidth < 600
       ? 10
       : Math.max(20, Math.floor(window.innerHeight / 30));
-
-    const useMatrix = document.documentElement.classList.contains('matrix-theme');
     const seaIcons = ['🐳', '🐠', '🦀', '💰'];
     const matrixIcons = ['💻', '🖥️', '⌨️'];
 
