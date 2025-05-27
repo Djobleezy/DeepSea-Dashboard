@@ -186,8 +186,10 @@
 
       // Refresh the main chart with new theme colors
       try {
-        if (window.trendChart && window.initializeChart &&
-            window.updateChartWithNormalizedData && window.updateBlockAnnotations) {
+        if (typeof trendChart !== 'undefined' && trendChart &&
+            typeof initializeChart === 'function' &&
+            typeof updateChartWithNormalizedData === 'function' &&
+            typeof updateBlockAnnotations === 'function') {
           const fontConfig = {
             xTicks: { ...trendChart.options.scales.x.ticks.font },
             yTicks: { ...trendChart.options.scales.y.ticks.font },
@@ -213,7 +215,8 @@
             trendChart.options.plugins.tooltip.titleFont = fontConfig.tooltip.title;
             trendChart.options.plugins.tooltip.bodyFont = fontConfig.tooltip.body;
           }
-          updateChartWithNormalizedData(trendChart, window.latestMetrics);
+          const metrics = (typeof latestMetrics !== 'undefined') ? latestMetrics : null;
+          updateChartWithNormalizedData(trendChart, metrics);
           updateBlockAnnotations(trendChart);
           trendChart.update('none');
         }
