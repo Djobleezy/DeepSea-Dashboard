@@ -1,6 +1,6 @@
 (function() {
   const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
-  const matrix = ['i','d','d','q','d'];
+  const matrix = ['m','a','t','r','i','x'];
   let index = 0;
   let matrixIndex = 0;
   let cursorClicks = [];
@@ -183,6 +183,48 @@
       localStorage.setItem('useMatrixTheme', 'true');
       localStorage.setItem('useDeepSeaTheme', 'true');
       window.applyMatrixTheme();
+
+      // Refresh the main chart with new theme colors
+      try {
+        if (window.trendChart && window.initializeChart &&
+            window.updateChartWithNormalizedData && window.updateBlockAnnotations) {
+          const fontConfig = {
+            xTicks: { ...trendChart.options.scales.x.ticks.font },
+            yTicks: { ...trendChart.options.scales.y.ticks.font },
+            yTitle: { ...trendChart.options.scales.y.title.font },
+            tooltip: {
+              title: { ...trendChart.options.plugins.tooltip.titleFont },
+              body: { ...trendChart.options.plugins.tooltip.bodyFont }
+            }
+          };
+          const isMobile = window.innerWidth < 768;
+          trendChart.destroy();
+          trendChart = initializeChart();
+          if (isMobile) {
+            trendChart.options.scales.x.ticks.font = { ...fontConfig.xTicks };
+            trendChart.options.scales.y.ticks.font = { ...fontConfig.yTicks };
+            trendChart.options.scales.y.title.font = { ...fontConfig.yTitle };
+            trendChart.options.plugins.tooltip.titleFont = { ...fontConfig.tooltip.title };
+            trendChart.options.plugins.tooltip.bodyFont = { ...fontConfig.tooltip.body };
+          } else {
+            trendChart.options.scales.x.ticks.font = fontConfig.xTicks;
+            trendChart.options.scales.y.ticks.font = fontConfig.yTicks;
+            trendChart.options.scales.y.title.font = fontConfig.yTitle;
+            trendChart.options.plugins.tooltip.titleFont = fontConfig.tooltip.title;
+            trendChart.options.plugins.tooltip.bodyFont = fontConfig.tooltip.body;
+          }
+          updateChartWithNormalizedData(trendChart, window.latestMetrics);
+          updateBlockAnnotations(trendChart);
+          trendChart.update('none');
+        }
+      } catch (e) {
+        console.error('Error refreshing chart for Matrix theme:', e);
+      }
+
+      // Notify listeners of theme change
+      if (window.jQuery) {
+        window.jQuery(document).trigger('themeChanged');
+      }
 
       const overlay = document.createElement('div');
       overlay.id = 'matrixOverlay';

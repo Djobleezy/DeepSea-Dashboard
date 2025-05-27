@@ -36,3 +36,8 @@ html.matrix-theme body {
   pointer-events: none;
   z-index: 0; /* draw above background but below content */
 }
+
+/* Chart button text should be black to match navigation */
+html.matrix-theme .toggle-btn.active {
+  color: #000 !important;
+}

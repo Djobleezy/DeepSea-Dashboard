@@ -87,7 +87,7 @@ informed with minimal fuss.
 - **Theme Toggle**: Switch between Bitcoin and DeepSea themes with a single click.
 
 ### Secret Matrix Theme
-- **Activation**: Enable the easter egg with the Konami code and then enter `IDDQD` to reveal a green Matrix-style look. Now includes an animated matrix rain background for extra immersion.
+- **Activation**: Enable the easter egg with the Konami code and then enter `MATRIX` to reveal a green Matrix-style look. Now includes an animated matrix rain background for extra immersion.
 
 ## Documentation
 
