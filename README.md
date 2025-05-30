@@ -151,6 +151,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 ### Notifications
 - Real-time alerts for important events
 - Notification history with read/unread status
+- Block-found alerts are permanent and cannot be deleted
 
 ### System Monitor
 

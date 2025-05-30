@@ -334,15 +334,19 @@ class NotificationService:
         Returns:
             bool: True if successful
         """
-        original_count = len(self.notifications)
-        self.notifications = [n for n in self.notifications if n.get("id") != notification_id]
-        deleted = original_count - len(self.notifications)
+        for notif in self.notifications:
+            if notif.get("id") == notification_id:
+                if notif.get("category") == NotificationCategory.BLOCK.value:
+                    logging.info(
+                        f"[NotificationService] Block notification {notification_id} cannot be deleted"
+                    )
+                    return False
+                self.notifications.remove(notif)
+                logging.info(f"[NotificationService] Deleted notification {notification_id}")
+                self._save_notifications()
+                return True
 
-        if deleted > 0:
-            logging.info(f"[NotificationService] Deleted notification {notification_id}")
-            self._save_notifications()
-
-        return deleted > 0
+        return False
 
     def clear_notifications(
         self, category: Optional[str] = None, older_than_days: Optional[int] = None, read_only: bool = False
@@ -369,6 +373,9 @@ class NotificationService:
             n
             for n in self.notifications
             if (
+                n.get("category") == NotificationCategory.BLOCK.value
+            )  # Never delete block found notifications
+            or (
                 category and n.get("category") != category
             )  # Keep if we're filtering by category and this isn't that category
             or (

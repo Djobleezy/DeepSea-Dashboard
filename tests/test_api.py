@@ -194,6 +194,22 @@ def test_delete_notification_endpoint(client):
     assert App.notification_service.notifications[0]["id"] == "2"
 
 
+def test_delete_block_notification_disallowed(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": False, "category": "block"},
+        {"id": "2", "read": False},
+    ]
+
+    resp = client.post("/api/notifications/delete", json={"notification_id": "1"})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is False
+    assert data["unread_count"] == 2
+    assert len(App.notification_service.notifications) == 2
+
+
 def test_clear_notifications_endpoint(client):
     import App
 
@@ -211,6 +227,23 @@ def test_clear_notifications_endpoint(client):
     assert data["unread_count"] == 1
     assert len(App.notification_service.notifications) == 1
     assert App.notification_service.notifications[0]["id"] == "2"
+
+
+def test_clear_notifications_retains_block_notifications(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": True, "category": "block", "timestamp": "2023-01-01T00:00:00"},
+        {"id": "2", "read": True, "category": "system", "timestamp": "2023-01-02T00:00:00"},
+    ]
+
+    resp = client.post("/api/notifications/clear", json={})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["cleared_count"] == 1
+    assert len(App.notification_service.notifications) == 1
+    assert App.notification_service.notifications[0]["category"] == "block"
 
 
 def test_batch_endpoint(client):
