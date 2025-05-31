@@ -37,6 +37,14 @@ cause the application to fall back to default values and log an error.
 
 Refer to [INSTALL.md](INSTALL.md) and [DEPLOYMENT.md](DEPLOYMENT.md) for instructions on how these variables are used during setup and deployment.
 
+## Low Hashrate Mode
+
+Low hashrate mode engages automatically when the 60‑second hashrate hovers near
+zero. The logic is implemented in `static/js/main.js` and stores its state in
+`localStorage` so the mode persists across reloads. The thresholds are hard
+coded and not currently user configurable. See
+[LOW-HASHRATE-MODE.md](LOW-HASHRATE-MODE.md) for details.
+
 ## Caching
 
 Expensive operations such as network requests, complex calculations and Redis queries are cached to reduce

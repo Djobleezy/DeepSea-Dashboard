@@ -33,7 +33,8 @@ informed with minimal fuss.
 - **Pool Fee Analysis**: Monitor pool fee percentages with visual indicator when optimal rates (0.9-1.3%) are detected
 - **Official Ocean API**: Supplement scraping with data from the official Ocean.xyz API for greater accuracy
 - **Scraping Fallback**: When the API lacks payout history, the dashboard
-  scrapes each stats page to fill in missing records.
+   scrapes each stats page to fill in missing records.
+- **Low Hashrate Mode**: Switches to 3-hour data when the 60-second rate is nearly zero so trends stay visible. See [docs/LOW-HASHRATE-MODE.md](docs/LOW-HASHRATE-MODE.md).
 
 ### Multi-Currency Support
 - **Flexible Currency Configuration**: Set your preferred fiat currency for displaying Bitcoin value and earnings
