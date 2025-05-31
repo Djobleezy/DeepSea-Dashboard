@@ -594,8 +594,9 @@ class NotificationService:
                 elif "mh/s" in current_3hr_unit:
                     current_3hr /= 1000000
 
-                # If hashrate is less than 3 TH/s, consider it low hashrate mode
-                is_low_hashrate_mode = current_3hr < 3.0
+                cfg = load_config()
+                threshold = cfg.get("low_hashrate_threshold_ths", 3.0)
+                is_low_hashrate_mode = current_3hr < threshold
 
             logging.debug(f"[NotificationService] Low hashrate mode: {is_low_hashrate_mode}")
 

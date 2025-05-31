@@ -16,6 +16,8 @@ The default configuration file contains the following keys:
 | `timezone` | Local timezone identifier | `"America/Los_Angeles"` |
 | `network_fee` | Additional fees beyond pool fees | `0.0` |
 | `currency` | Preferred fiat currency for earnings display | `"USD"` |
+| `low_hashrate_threshold_ths` | Threshold below which the miner is considered in low hashrate mode (TH/s) | `3.0` |
+| `high_hashrate_threshold_ths` | Threshold above which normal hashrate mode resumes (TH/s) | `20.0` |
 
 Configuration files are validated when loaded. Missing keys or incorrect types
 cause the application to fall back to default values and log an error.

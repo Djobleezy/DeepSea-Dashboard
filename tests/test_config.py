@@ -23,6 +23,16 @@ def test_load_config_file(tmp_path, monkeypatch):
     assert "EXCHANGE_RATE_API_KEY" in cfg
 
 
+def test_load_config_thresholds(tmp_path, monkeypatch):
+    temp_file = tmp_path / "cfg.json"
+    with open(temp_file, "w") as fh:
+        json.dump({"low_hashrate_threshold_ths": 5.5, "high_hashrate_threshold_ths": 25.0}, fh)
+    monkeypatch.setattr(config_module, "CONFIG_FILE", str(temp_file))
+    cfg = importlib.reload(config_module).load_config()
+    assert cfg["low_hashrate_threshold_ths"] == 5.5
+    assert cfg["high_hashrate_threshold_ths"] == 25.0
+
+
 def test_config_caching(monkeypatch, tmp_path):
     temp_file = tmp_path / "cfg.json"
     with open(temp_file, "w") as fh:
@@ -64,6 +74,8 @@ def test_validate_config_valid():
         "timezone": "UTC",
         "network_fee": 0.0,
         "currency": "USD",
+        "low_hashrate_threshold_ths": 3.0,
+        "high_hashrate_threshold_ths": 20.0,
         "EXCHANGE_RATE_API_KEY": "KEY",
     }
     assert config_module.validate_config(cfg)
@@ -77,6 +89,8 @@ def test_validate_config_missing_key():
         "timezone": "UTC",
         "network_fee": 0.0,
         "currency": "USD",
+        "low_hashrate_threshold_ths": 3.0,
+        "high_hashrate_threshold_ths": 20.0,
         "EXCHANGE_RATE_API_KEY": "KEY",
     }
     cfg.pop("wallet")
