@@ -70,8 +70,11 @@ function fetchServerTimeAndInitializeMonitor() {
 }
 
 // Function to format currency values with commas
-function formatCurrency(amount) {
-    return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+// Provided by utils/formatCurrency.js but fallback defined for safety
+if (typeof formatCurrency === 'undefined') {
+    function formatCurrency(amount) {
+        return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
 }
 
 // Format all currency values on the page
