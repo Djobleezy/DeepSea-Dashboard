@@ -579,7 +579,9 @@ class NotificationService:
         """Check for significant hashrate changes using appropriate time window based on mode."""
         try:
             # Check if we're in low hashrate mode
-            # A simple threshold approach: if hashrate_3hr is below 1 TH/s, consider it low hashrate mode
+            # A simple threshold approach: if hashrate_3hr is below 3 TH/s
+            # (or the configured low hashrate threshold) consider it low
+            # hashrate mode
             is_low_hashrate_mode = False
 
             if "hashrate_3hr" in current:
