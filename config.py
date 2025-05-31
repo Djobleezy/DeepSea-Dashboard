@@ -25,6 +25,8 @@ DEFAULT_CONFIG = {
     "timezone": "America/Los_Angeles",
     "network_fee": 0.0,
     "currency": "USD",
+    "low_hashrate_threshold_ths": 3.0,
+    "high_hashrate_threshold_ths": 20.0,
     "EXCHANGE_RATE_API_KEY": "179cbeb07c900f20dde92d3b",
 }
 
@@ -38,6 +40,8 @@ def validate_config(config):
         "timezone": str,
         "network_fee": (int, float),
         "currency": str,
+        "low_hashrate_threshold_ths": (int, float),
+        "high_hashrate_threshold_ths": (int, float),
         "EXCHANGE_RATE_API_KEY": str,
     }
 

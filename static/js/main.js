@@ -303,6 +303,12 @@ const arrowIndicator = new ArrowIndicator();
 let dashboardTimezone = 'America/Los_Angeles'; // Default
 window.dashboardTimezone = dashboardTimezone; // Make it globally accessible
 
+// Hashrate thresholds
+let lowHashrateThresholdTHS = 3.0;
+let highHashrateThresholdTHS = 20.0;
+window.lowHashrateThresholdTHS = lowHashrateThresholdTHS;
+window.highHashrateThresholdTHS = highHashrateThresholdTHS;
+
 // Fetch the configured timezone when the page loads
 function fetchTimezoneConfig() {
     fetch('/api/timezone')
@@ -317,8 +323,27 @@ function fetchTimezoneConfig() {
         .catch(error => console.error('Error fetching timezone config:', error));
 }
 
+function fetchHashrateThresholds() {
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(cfg => {
+            if (cfg.low_hashrate_threshold_ths !== undefined) {
+                lowHashrateThresholdTHS = parseFloat(cfg.low_hashrate_threshold_ths);
+                window.lowHashrateThresholdTHS = lowHashrateThresholdTHS;
+            }
+            if (cfg.high_hashrate_threshold_ths !== undefined) {
+                highHashrateThresholdTHS = parseFloat(cfg.high_hashrate_threshold_ths);
+                window.highHashrateThresholdTHS = highHashrateThresholdTHS;
+            }
+        })
+        .catch(err => console.error('Error fetching hashrate thresholds:', err));
+}
+
 // Call this on page load
-document.addEventListener('DOMContentLoaded', fetchTimezoneConfig);
+document.addEventListener('DOMContentLoaded', () => {
+    fetchTimezoneConfig();
+    fetchHashrateThresholds();
+});
 
 // Global variables
 let previousMetrics = {};
@@ -2179,6 +2204,7 @@ function updateChartWithNormalizedData(chart, data) {
                         modeSwitchTimeoutId: null,
                         lastSpikeDecayTime: parsedState.lastSpikeDecayTime || 0
                     };
+                    delete chart.lowHashrateState.stableModePeriod;
                     console.log("Restored low hashrate mode from localStorage:", chart.lowHashrateState.isLowHashrateMode);
                 } catch (e) {
                     console.error("Error parsing stored low hashrate state:", e);
@@ -2192,8 +2218,8 @@ function updateChartWithNormalizedData(chart, data) {
         // Get values with enhanced stability
         let useHashrate3hr = false;
         const currentTime = Date.now();
-        const LOW_HASHRATE_THRESHOLD = 0.01; // TH/s 
-        const HIGH_HASHRATE_THRESHOLD = 20.0; // TH/s
+        const LOW_HASHRATE_THRESHOLD = window.lowHashrateThresholdTHS || 0.01; // TH/s
+        const HIGH_HASHRATE_THRESHOLD = window.highHashrateThresholdTHS || 20.0; // TH/s
         const MODE_SWITCH_DELAY = 120000;     // Increase to 2 minutes for more stability
         const CONSECUTIVE_SPIKES_THRESHOLD = 3; // Increase to require more consistent high readings
         const MIN_MODE_STABILITY_TIME = 120000; // 2 minutes minimum between mode switches
