@@ -6,6 +6,7 @@ Responsible for loading and managing application settings.
 import os
 import json
 import logging
+import threading
 
 # Default configuration file path. When the module is reloaded for testing,
 # a previously patched value for ``CONFIG_FILE`` should be preserved.  Using
@@ -16,6 +17,7 @@ CONFIG_FILE = globals().get("CONFIG_FILE", "config.json")
 # Cached configuration and its modification time
 _cached_config = None
 _config_mtime = None
+config_lock = threading.Lock()
 
 # Default configuration values
 DEFAULT_CONFIG = {
@@ -58,43 +60,43 @@ def validate_config(config):
 def load_config():
     """Load configuration with caching and modification time checks."""
     global _cached_config, _config_mtime
+    with config_lock:
+        file_exists = os.path.exists(CONFIG_FILE)
 
-    file_exists = os.path.exists(CONFIG_FILE)
+        if file_exists:
+            try:
+                mtime = os.path.getmtime(CONFIG_FILE)
+            except Exception as e:
+                logging.error(f"Error checking config mtime: {e}")
+                mtime = None
 
-    if file_exists:
-        try:
-            mtime = os.path.getmtime(CONFIG_FILE)
-        except Exception as e:
-            logging.error(f"Error checking config mtime: {e}")
-            mtime = None
+            if _cached_config is not None and _config_mtime == mtime:
+                return _cached_config
 
-        if _cached_config is not None and _config_mtime == mtime:
+            try:
+                with open(CONFIG_FILE, "r") as f:
+                    loaded = json.load(f)
+                config = {**DEFAULT_CONFIG, **loaded}
+                logging.info(f"Configuration loaded from {CONFIG_FILE}")
+
+                if not validate_config(config):
+                    raise ValueError("Invalid configuration file")
+
+                _cached_config = config
+                _config_mtime = mtime
+                return config
+            except Exception as e:
+                logging.error(f"Error loading config: {e}")
+
+        if _cached_config is not None:
             return _cached_config
 
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                loaded = json.load(f)
-            config = {**DEFAULT_CONFIG, **loaded}
-            logging.info(f"Configuration loaded from {CONFIG_FILE}")
+        if not file_exists:
+            logging.warning(f"Config file {CONFIG_FILE} not found, using defaults")
 
-            if not validate_config(config):
-                raise ValueError("Invalid configuration file")
-
-            _cached_config = config
-            _config_mtime = mtime
-            return config
-        except Exception as e:
-            logging.error(f"Error loading config: {e}")
-
-    if _cached_config is not None:
-        return _cached_config
-
-    if not file_exists:
-        logging.warning(f"Config file {CONFIG_FILE} not found, using defaults")
-
-    _cached_config = DEFAULT_CONFIG
-    _config_mtime = os.path.getmtime(CONFIG_FILE) if file_exists else None
-    return DEFAULT_CONFIG
+        _cached_config = DEFAULT_CONFIG
+        _config_mtime = os.path.getmtime(CONFIG_FILE) if file_exists else None
+        return DEFAULT_CONFIG
 
 
 def get_timezone():
@@ -129,14 +131,15 @@ def save_config(config):
     Returns:
         bool: True if save was successful, False otherwise
     """
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(config, f, indent=2)
-        logging.info(f"Configuration saved to {CONFIG_FILE}")
-        return True
-    except Exception as e:
-        logging.error(f"Error saving config: {e}")
-        return False
+    with config_lock:
+        try:
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(config, f, indent=2)
+            logging.info(f"Configuration saved to {CONFIG_FILE}")
+            return True
+        except Exception as e:
+            logging.error(f"Error saving config: {e}")
+            return False
 
 
 def get_value(key, default=None):

@@ -2,6 +2,7 @@ import json
 import importlib
 import os
 import config as config_module
+import threading
 
 
 def test_load_config_defaults(tmp_path, monkeypatch):
@@ -105,3 +106,68 @@ def test_load_config_invalid(monkeypatch, tmp_path):
     mod = importlib.reload(config_module)
     cfg = mod.load_config()
     assert cfg == mod.DEFAULT_CONFIG
+
+
+def test_thread_safe_load_config(tmp_path, monkeypatch):
+    temp_file = tmp_path / "cfg.json"
+    with open(temp_file, "w") as fh:
+        json.dump({"currency": "USD"}, fh)
+    monkeypatch.setattr(config_module, "CONFIG_FILE", str(temp_file))
+    mod = importlib.reload(config_module)
+
+    results = []
+    errors = []
+
+    def load_loop():
+        try:
+            for _ in range(20):
+                results.append(mod.load_config()["currency"])
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=load_loop) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert all(r == "USD" for r in results)
+
+
+def test_concurrent_load_and_save(tmp_path, monkeypatch):
+    temp_file = tmp_path / "cfg.json"
+    with open(temp_file, "w") as fh:
+        json.dump({"currency": "USD"}, fh)
+    monkeypatch.setattr(config_module, "CONFIG_FILE", str(temp_file))
+    mod = importlib.reload(config_module)
+
+    errors = []
+
+    def saver(cur):
+        try:
+            for _ in range(10):
+                cfg = {**mod.DEFAULT_CONFIG, "currency": cur}
+                mod.save_config(cfg)
+        except Exception as exc:
+            errors.append(exc)
+
+    def loader():
+        try:
+            for _ in range(20):
+                mod.load_config()
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=loader) for _ in range(3)]
+    threads += [threading.Thread(target=saver, args=("EUR",)),
+                threading.Thread(target=saver, args=("JPY",))]
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    final_cfg = mod.load_config()
+    assert final_cfg["currency"] in {"EUR", "JPY"}
