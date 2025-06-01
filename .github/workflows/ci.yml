@@ -28,3 +28,8 @@ jobs:
         node tests/js/formatDuration.test.js
         node tests/js/main_dom_safety.test.js
         node tests/js/normalizeHashrate.test.js
+        node tests/js/arrowIndicator.test.js
+        node tests/js/audioCrossfadeTheme.test.js
+        node tests/js/blockProbability.test.js
+        node tests/js/notificationsTimestamp.test.js
+        node tests/js/workerUtils.test.js
