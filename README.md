@@ -100,6 +100,7 @@ Comprehensive guides have been moved to the `docs` directory:
 - [Configuration options](docs/CONFIGURATION.md)
 - [Worker naming guide](docs/WORKER-NAMING.md)
 - [Testing guide](docs/TESTING.md)
+- [Keyboard shortcuts](docs/KEYBOARD-SHORTCUTS.md)
 
 ### Customization
 

@@ -225,11 +225,11 @@
     
             <!-- Navigation links (horizontal on desktop, vertical on mobile) -->
             <div class="navigation-links" id="navLinks">
-                <a href="/dashboard" class="nav-link {% block dashboard_active %}{% endblock %}">DASHBOARD</a>
-                <a href="/workers" class="nav-link {% block workers_active %}{% endblock %}">WORKERS</a>
-                <a href="/earnings" class="nav-link {% block earnings_active %}{% endblock %}">EARNINGS</a>
-                <a href="/blocks" class="nav-link {% block blocks_active %}{% endblock %}">BLOCKS</a>
-                <a href="/notifications" class="nav-link {% block notifications_active %}{% endblock %}">
+                <a id="navDashboard" href="/dashboard" class="nav-link {% block dashboard_active %}{% endblock %}">DASHBOARD</a>
+                <a id="navWorkers" href="/workers" class="nav-link {% block workers_active %}{% endblock %}">WORKERS</a>
+                <a id="navEarnings" href="/earnings" class="nav-link {% block earnings_active %}{% endblock %}">EARNINGS</a>
+                <a id="navBlocks" href="/blocks" class="nav-link {% block blocks_active %}{% endblock %}">BLOCKS</a>
+                <a id="navNotifications" href="/notifications" class="nav-link {% block notifications_active %}{% endblock %}">
                     NOTIFICATIONS
                     <span id="nav-unread-badge" class="nav-badge"></span>
                 </a>
@@ -421,6 +421,7 @@
     });
     </script>
     <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
+    <script src="/static/js/shortcuts.js"></script>
     <script src="/static/js/easterEgg.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
