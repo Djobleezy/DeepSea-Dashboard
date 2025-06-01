@@ -256,10 +256,9 @@ def check_for_memory_leaks():
                 logging.warning(f"Potential memory leaks detected: {potential_leaks}")
                 # Generate notification
                 notification_service.add_notification(
-                    "Potential memory leaks detected",
-                    f"Unusual growth in {len(potential_leaks)} object types. Check logs for details.",
-                    NotificationLevel.WARNING,
-                    NotificationCategory.SYSTEM,
+                    f"Potential memory leaks detected - {len(potential_leaks)} object types grew. Check logs for details.",
+                    level=NotificationLevel.WARNING,
+                    category=NotificationCategory.SYSTEM,
                 )
 
         # Store current counts for next comparison
@@ -336,10 +335,9 @@ def memory_watchdog():
 
             # 4. Notify about the memory issue
             notification_service.add_notification(
-                "High memory usage detected",
-                f"Memory usage reached {mem_percent:.1f}%. Emergency cleanup performed.",
-                NotificationLevel.WARNING,
-                NotificationCategory.SYSTEM,
+                f"High memory usage detected - {mem_percent:.1f}% (emergency cleanup performed)",
+                level=NotificationLevel.WARNING,
+                category=NotificationCategory.SYSTEM,
             )
 
             # Log memory after cleanup
@@ -1595,10 +1593,9 @@ def earnings():
                     }
 
             notification_service.add_notification(
-                "Data fetch timeout",
-                "Unable to fetch payment history data from Ocean.xyz. Showing limited earnings data.",
-                NotificationLevel.WARNING,
-                NotificationCategory.DATA,
+                "Data fetch timeout: Unable to fetch payment history data from Ocean.xyz. Showing limited earnings data.",
+                level=NotificationLevel.WARNING,
+                category=NotificationCategory.DATA,
             )
         except Exception as e:
             logging.error(f"Error fetching earnings data: {e}")
@@ -1617,7 +1614,9 @@ def earnings():
             }
 
             notification_service.add_notification(
-                "Error fetching earnings data", f"Error: {str(e)}", NotificationLevel.ERROR, NotificationCategory.DATA
+                f"Error fetching earnings data: {str(e)}",
+                level=NotificationLevel.ERROR,
+                category=NotificationCategory.DATA,
             )
 
         # Convert USD values to user's preferred currency if needed
