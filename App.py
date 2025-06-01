@@ -14,6 +14,8 @@ import sys
 import threading
 import json
 import requests
+import csv
+import io
 from flask import Flask, render_template, jsonify, Response, request, stream_with_context
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -1669,7 +1671,31 @@ def earnings():
         import traceback
 
         logging.error(traceback.format_exc())
-        return render_template("error.html", message="Failed to load earnings data. Please try again later."), 500
+        return render_template(
+            "error.html",
+            message="Failed to load earnings data. Please try again later.",
+        ), 500
+
+
+def payments_to_csv(payments):
+    """Convert a list of payment dictionaries to CSV string."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        ["date", "txid", "lightning_txid", "amount_btc", "amount_sats", "status"]
+    )
+    for pay in payments:
+        writer.writerow(
+            [
+                pay.get("date", ""),
+                pay.get("txid", ""),
+                pay.get("lightning_txid", ""),
+                pay.get("amount_btc", 0),
+                pay.get("amount_sats", 0),
+                pay.get("status", ""),
+            ]
+        )
+    return output.getvalue()
 
 
 @app.route("/api/earnings")
@@ -1679,6 +1705,11 @@ def api_earnings():
         # Get the earnings data with a reasonable timeout
         earnings_data = dashboard_service.get_earnings_data()
         state_manager.save_last_earnings(earnings_data)
+        fmt = request.args.get("format", "json").lower()
+        if fmt == "csv":
+            csv_data = payments_to_csv(earnings_data.get("payments", []))
+            headers = {"Content-Disposition": "attachment; filename=earnings.csv"}
+            return Response(csv_data, mimetype="text/csv", headers=headers)
         return jsonify(earnings_data)
     except Exception as e:
         logging.error(f"Error in earnings API endpoint: {e}")

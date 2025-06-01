@@ -294,3 +294,29 @@ def test_batch_too_many_requests(client, monkeypatch):
     assert resp.status_code == 400
     data = resp.get_json()
     assert data["error"] == "too many requests"
+
+
+def test_earnings_csv_export(client, monkeypatch):
+    import App
+
+    sample = {
+        "payments": [
+            {
+                "date": "2023-01-01 00:00",
+                "txid": "a",
+                "lightning_txid": "",
+                "amount_btc": 0.1,
+                "amount_sats": 10000000,
+                "status": "confirmed",
+            }
+        ]
+    }
+
+    monkeypatch.setattr(App.dashboard_service, "get_earnings_data", lambda: sample)
+    monkeypatch.setattr(App.state_manager, "save_last_earnings", lambda e: True)
+
+    resp = client.get("/api/earnings?format=csv")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/csv"
+    text = resp.data.decode()
+    assert "date,txid,lightning_txid,amount_btc,amount_sats,status" in text

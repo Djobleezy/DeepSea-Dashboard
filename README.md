@@ -142,6 +142,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 - Detailed earnings breakdown by time period
 - Currency conversion for earnings in selected fiat
 - Historical data for earnings analysis
+- Download payment history as CSV
 
 ### Blocks Explorer
 
