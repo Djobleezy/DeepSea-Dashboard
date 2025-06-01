@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import logging
 from pathlib import Path
+import re
 
 from cssmin import cssmin
 import htmlmin
@@ -33,9 +34,14 @@ def minify_js():
             continue
         out = out_dir / src.name.replace(".js", ".min.js")
         if _has_uglify():
-            subprocess.run(["uglifyjs", str(src), "-c", "-m", "-o", str(out)], check=True)
+            subprocess.run(
+                ["uglifyjs", str(src), "-c", "drop_console=true", "-m", "-o", str(out)],
+                check=True,
+            )
         elif jsmin:
-            out.write_text(jsmin(src.read_text()), encoding="utf-8")
+            code = jsmin(src.read_text())
+            code = re.sub(r"console\.log\([^;]*\);?", "", code)
+            out.write_text(code, encoding="utf-8")
         else:
             logger.warning("No JS minifier available for %s", src.name)
             continue
