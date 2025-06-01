@@ -22,3 +22,9 @@ jobs:
       run: ruff check .
     - name: Run tests
       run: pytest -q
+    - name: Run front-end tests
+      run: |
+        node tests/js/formatCurrency.test.js
+        node tests/js/formatDuration.test.js
+        node tests/js/main_dom_safety.test.js
+        node tests/js/normalizeHashrate.test.js
