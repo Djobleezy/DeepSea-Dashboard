@@ -523,6 +523,9 @@ function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
 
 // --- Block timer helpers ---
 function formatDuration(seconds) {
+    if (seconds < 0) {
+        seconds = 0;
+    }
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}m ${s.toString().padStart(2, '0')}s`;
