@@ -323,16 +323,15 @@ def test_earnings_csv_export(client, monkeypatch):
 
 
 
-def test_earnings_sanitizes_error_field(client, monkeypatch):
+def test_earnings_returns_generic_error(client, monkeypatch):
     import App
 
-    sample = {"payments": [], "error": "something went wrong"}
+    sample = {"payments": [], "error": "internal server error"}
     monkeypatch.setattr(App.dashboard_service, "get_earnings_data", lambda: sample)
     monkeypatch.setattr(App.state_manager, "save_last_earnings", lambda e: True)
 
     resp = client.get("/api/earnings")
-    assert resp.status_code == 200
+    assert resp.status_code == 500
     data = resp.get_json()
-    assert "error" not in data
-    assert data["payments"] == []
+    assert data["error"] == "internal server error"
 
