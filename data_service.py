@@ -991,16 +991,13 @@ class MiningDashboardService:
 
             return result
 
-        except Exception as e:
-            logging.error(f"Error fetching earnings data: {e}")
-            import traceback
-
-            logging.error(traceback.format_exc())
+        except Exception:
+            logging.exception("Error fetching earnings data")
             return {
                 "payments": [],
                 "total_payments": 0,
                 "avg_days_between_payouts": None,
-                "error": str(e),
+                "error": "internal server error",
                 "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
             }
 
