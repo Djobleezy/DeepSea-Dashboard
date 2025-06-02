@@ -50,3 +50,20 @@ def test_ttl_cache_unhashable(monkeypatch):
     fake_time[0] += 6
     assert add_dict(data) == 3
     assert call_count["count"] == 2
+
+
+def test_ttl_cache_cleanup(monkeypatch):
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    @ttl_cache(ttl_seconds=1)
+    def identity(x):
+        return x
+
+    for i in range(10):
+        assert identity(i) == i
+        assert identity.cache_size() == 1
+        fake_time[0] += 2
+
+    identity(99)
+    assert identity.cache_size() == 1

@@ -21,6 +21,11 @@ def ttl_cache(ttl_seconds=60):
                 except Exception:
                     return str(value)
 
+        def _purge_expired(now):
+            expired = [k for k, (_, ts) in cache.items() if now - ts >= ttl_seconds]
+            for k in expired:
+                del cache[k]
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             if args and hasattr(args[0], "__dict__"):
@@ -34,18 +39,25 @@ def ttl_cache(ttl_seconds=60):
             serialized_kwargs = tuple(sorted((k, _serialize(v)) for k, v in kwargs.items()))
             key = (key_prefix, serialized_args, serialized_kwargs)
             now = time.time()
+            _purge_expired(now)
             cached = cache.get(key)
             if cached and now - cached[1] < ttl_seconds:
                 return cached[0]
             result = func(*args, **kwargs)
             if result is not None:
+                now = time.time()
+                _purge_expired(now)
                 cache[key] = (result, now)
             return result
 
         def cache_clear():
             cache.clear()
 
+        def cache_size():
+            return len(cache)
+
         wrapper.cache_clear = cache_clear
+        wrapper.cache_size = cache_size
         return wrapper
 
     return decorator
