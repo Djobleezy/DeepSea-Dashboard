@@ -481,16 +481,26 @@ def test_get_blocks_api_nested(monkeypatch):
 
 def test_fetch_metrics_estimates_power(monkeypatch):
     class DummyWS:
+        def __init__(self):
+            self.last_cached_metrics = None
+
         def get_workers_data(self, cached_metrics, force_refresh=False):
+            self.last_cached_metrics = cached_metrics
             return {"workers": [{"power_consumption": 1000}, {"power_consumption": 1500}]}
 
-    svc = MiningDashboardService(0, 0, "w", worker_service=DummyWS())
+    dummy = DummyWS()
+    svc = MiningDashboardService(0, 0, "w", worker_service=dummy)
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
-        lambda: data_service.OceanData(hashrate_3hr=100, hashrate_3hr_unit="TH/s", pool_fees_percentage=0.0),
+        lambda: data_service.OceanData(
+            hashrate_3hr=100,
+            hashrate_3hr_unit="TH/s",
+            workers_hashing=2,
+            pool_fees_percentage=0.0,
+        ),
     )
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
 
@@ -499,6 +509,8 @@ def test_fetch_metrics_estimates_power(monkeypatch):
     assert metrics["daily_power_cost"] == 4.2
     assert metrics["power_usage_estimated"] is True
     assert abs(metrics["break_even_electricity_price"] - 0.375) < 1e-6
+    assert dummy.last_cached_metrics["workers_hashing"] == 2
+    assert dummy.last_cached_metrics["hashrate_3hr"] == 100
 
 
 def test_fetch_metrics_power_configured(monkeypatch):

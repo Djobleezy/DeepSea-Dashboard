@@ -39,6 +39,7 @@ class MiningDashboardService:
         self.cache = {}
         self.sats_per_btc = 100_000_000
         self.previous_values = {}
+        self.cached_metrics = None
         self.session = requests.Session()
         # Persistent executor for concurrent tasks
         self.executor = ThreadPoolExecutor(max_workers=6)
@@ -53,12 +54,14 @@ class MiningDashboardService:
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
 
-    def estimate_total_power(self):
+    def estimate_total_power(self, cached_metrics=None):
         """Estimate total power usage from worker data if available."""
         if not self.worker_service:
             return 0
+
+        metrics = cached_metrics if cached_metrics is not None else (self.cached_metrics or {})
         try:
-            data = self.worker_service.get_workers_data({}, force_refresh=False)
+            data = self.worker_service.get_workers_data(metrics, force_refresh=False)
             if data:
                 if "total_power" in data and data["total_power"]:
                     return data["total_power"]
@@ -153,7 +156,14 @@ class MiningDashboardService:
             power_usage_estimated = False
 
             if power_usage_for_calc is None or power_usage_for_calc <= 0:
-                estimated_power = self.estimate_total_power()
+                metrics_for_estimate = self.cached_metrics or {}
+                if not metrics_for_estimate:
+                    metrics_for_estimate = {
+                        "workers_hashing": ocean_data.workers_hashing,
+                        "hashrate_3hr": ocean_data.hashrate_3hr,
+                        "hashrate_3hr_unit": ocean_data.hashrate_3hr_unit,
+                    }
+                estimated_power = self.estimate_total_power(metrics_for_estimate)
                 if estimated_power:
                     power_usage_for_calc = estimated_power
                     power_usage_estimated = True
@@ -267,6 +277,7 @@ class MiningDashboardService:
             else:
                 logging.info(f"Metrics fetch completed in {execution_time:.2f} seconds")
 
+            self.cached_metrics = metrics
             return metrics
 
         except Exception as e:
