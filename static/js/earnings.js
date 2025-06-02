@@ -93,8 +93,13 @@ function formatCurrencyValues() {
 
         const value = parseFloat(valueText.replace(/[^\d.-]/g, ''));
         if (!isNaN(value)) {
-            // Keep the currency symbol and add commas to the number
-            cell.innerHTML = `<span class="currency-symbol">${symbol}</span>${formatCurrency(value.toFixed(2))}`;
+            // Keep the currency symbol and add commas to the number without using innerHTML
+            const span = document.createElement('span');
+            span.className = 'currency-symbol';
+            span.textContent = symbol;
+            cell.textContent = '';
+            cell.appendChild(span);
+            cell.append(formatCurrency(value.toFixed(2)));
         }
     });
 
@@ -175,7 +180,13 @@ function updateEarningsUI(data) {
     document.getElementById('total-paid-sats').textContent = formatSats(data.total_paid_sats);
     document.getElementById('total-paid-btc').textContent = formatBTC(data.total_paid_btc);
     if (data.total_paid_fiat !== undefined) {
-        document.getElementById('total-paid-fiat').innerHTML = `<span id="total-paid-currency-symbol">${currencySymbol}</span>${formatCurrency(parseFloat(data.total_paid_fiat).toFixed(2))}`;
+        const totalPaidFiat = document.getElementById('total-paid-fiat');
+        const span = document.createElement('span');
+        span.id = 'total-paid-currency-symbol';
+        span.textContent = currencySymbol;
+        totalPaidFiat.textContent = '';
+        totalPaidFiat.appendChild(span);
+        totalPaidFiat.append(formatCurrency(parseFloat(data.total_paid_fiat).toFixed(2)));
     }
     document.getElementById('payment-count').textContent = formatCurrency(data.total_payments);
     if (data.payments && data.payments.length > 0) {

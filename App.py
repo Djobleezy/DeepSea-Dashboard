@@ -1712,8 +1712,8 @@ def api_earnings():
             headers = {"Content-Disposition": "attachment; filename=earnings.csv"}
             return Response(csv_data, mimetype="text/csv", headers=headers)
         return jsonify(earnings_data)
-    except Exception as e:
-        logging.error(f"Error in earnings API endpoint: {e}")
+    except Exception:
+        logging.exception("Error in earnings API endpoint")
         return jsonify({"error": "internal server error"}), 500
 
 
