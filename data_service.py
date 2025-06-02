@@ -1182,13 +1182,7 @@ class MiningDashboardService:
 
     @ttl_cache(ttl_seconds=60)
     def get_all_worker_rows(self):
-        """
-        Iterate through wpage parameter values to collect all worker table rows.
-        Limited to 10 pages to balance between showing enough workers and maintaining performance.
-
-        Returns:
-            list: A list of BeautifulSoup row elements containing worker data.
-        """
+        """Collect worker row data from the stats pages."""
         all_rows = []
         page_num = 0
         max_pages = 10  # Limit to 10 pages of worker data
@@ -1213,7 +1207,13 @@ class MiningDashboardService:
                 break
 
             logging.info(f"Found {len(rows)} worker rows on page {page_num}")
-            all_rows.extend(rows)
+            for row in rows:
+                row_dict = {
+                    "text": row.get_text(separator=" ", strip=True),
+                    "cells": [c.get_text(strip=True) for c in row.find_all(["td", "th"])],
+                    "attrs": dict(row.attrs),
+                }
+                all_rows.append(row_dict)
             page_num += 1
 
         if page_num >= max_pages:
@@ -1605,11 +1605,11 @@ class MiningDashboardService:
 
             # Process each row from all pages
             for row_idx, row in enumerate(rows):
-                cells = row.find_all(["td", "th"])
+                cells = row.get("cells", [])
                 if not cells or len(cells) < 3:
                     continue
 
-                first_cell_text = cells[0].get_text(strip=True)
+                first_cell_text = cells[0]
                 if first_cell_text.lower() in invalid_names:
                     continue
 
@@ -1633,7 +1633,7 @@ class MiningDashboardService:
 
                     # Extract status from second cell if available
                     if len(cells) > 1:
-                        status_text = cells[1].get_text(strip=True).lower()
+                        status_text = cells[1].lower()
                         worker["status"] = "online" if "online" in status_text else "offline"
                         if worker["status"] == "online":
                             workers_online += 1
@@ -1642,11 +1642,11 @@ class MiningDashboardService:
 
                     # Parse last share from third cell if available
                     if len(cells) > 2:
-                        worker["last_share"] = cells[2].get_text(strip=True)
+                        worker["last_share"] = cells[2]
 
                     # Parse 60sec hashrate from fourth cell if available
                     if len(cells) > 3:
-                        hashrate_60s_text = cells[3].get_text(strip=True)
+                        hashrate_60s_text = cells[3]
                         try:
                             parts = hashrate_60s_text.split()
                             if parts:
@@ -1658,7 +1658,7 @@ class MiningDashboardService:
 
                     # Parse 3hr hashrate from fifth cell if available
                     if len(cells) > 4:
-                        hashrate_3hr_text = cells[4].get_text(strip=True)
+                        hashrate_3hr_text = cells[4]
                         try:
                             parts = hashrate_3hr_text.split()
                             if parts:
@@ -1671,8 +1671,7 @@ class MiningDashboardService:
                             logging.warning(f"Could not parse 3hr hashrate: {hashrate_3hr_text}")
 
                     # Look for earnings in any cell containing 'btc'
-                    for cell in cells:
-                        cell_text = cell.get_text(strip=True)
+                    for cell_text in cells:
                         if "btc" in cell_text.lower():
                             try:
                                 earnings_match = re.search(r"([\d\.]+)", cell_text)
