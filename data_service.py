@@ -408,6 +408,7 @@ class MiningDashboardService:
             if hasattr(data, key) and value is not None:
                 setattr(data, key, value)
 
+        soup = None
         try:
             response = self.session.get(stats_url, headers=headers, timeout=10)
             if not response.ok:
@@ -608,11 +609,16 @@ class MiningDashboardService:
             except Exception as e:
                 logging.error(f"Error parsing last share time: {e}")
 
-            soup.decompose()
             return data
         except Exception as e:
             logging.error(f"Error fetching Ocean data: {e}")
             return None
+        finally:
+            if soup is not None:
+                try:
+                    soup.decompose()
+                except Exception:
+                    pass
 
     def debug_dump_table(self, table_element, max_rows=3):
         """
@@ -810,66 +816,66 @@ class MiningDashboardService:
                     break
 
                 soup = BeautifulSoup(resp.text, "html.parser")
-                table = soup.find("tbody", id="payouts-tablerows") or soup.find("tbody", id="payout-tablerows")
-                if not table:
-                    if page == 0:
-                        logging.error("Payout table not found")
-                        soup.decompose()
-                        return None
-                    break
+                try:
+                    table = soup.find("tbody", id="payouts-tablerows") or soup.find("tbody", id="payout-tablerows")
+                    if not table:
+                        if page == 0:
+                            logging.error("Payout table not found")
+                            return None
+                        break
 
-                rows = table.find_all("tr", class_="table-row")
-                if not rows:
+                    rows = table.find_all("tr", class_="table-row")
+                    if not rows:
+                        break
+
+                    for row in rows:
+                        cells = row.find_all("td")
+                        if len(cells) < 3:
+                            continue
+                        date_text = cells[0].get_text(strip=True)
+                        link = cells[1].find("a")
+                        txid = cells[1].get_text(strip=True)
+                        lightning_txid = ""
+                        if link and link.get("href"):
+                            href = link["href"]
+                            if "lightning" in href:
+                                lightning_txid = href.rstrip("/").split("/")[-1]
+                                txid = ""
+                            else:
+                                txid = href.rstrip("/").split("/")[-1]
+                        amount_text = cells[-1].get_text(strip=True)
+                        amount_clean = amount_text.replace("BTC", "").replace(",", "").strip()
+                        try:
+                            amount_btc = float(amount_clean)
+                        except Exception:
+                            continue
+                        sats = int(round(amount_btc * self.sats_per_btc))
+                        date_iso = None
+                        date_str = date_text
+                        try:
+                            dt = datetime.strptime(date_text, "%Y-%m-%d %H:%M")
+                            dt = dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                            date_iso = dt.isoformat()
+                            date_str = dt.strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            pass
+                        payment = {
+                            "date": date_str,
+                            "txid": txid,
+                            "lightning_txid": lightning_txid,
+                            "amount_btc": amount_btc,
+                            "amount_sats": sats,
+                            "status": "confirmed",
+                            "date_iso": date_iso,
+                        }
+                        if btc_price is not None:
+                            payment["rate"] = btc_price
+                            payment["fiat_value"] = amount_btc * btc_price
+                        payments.append(payment)
+
+                    page += 1
+                finally:
                     soup.decompose()
-                    break
-
-                for row in rows:
-                    cells = row.find_all("td")
-                    if len(cells) < 3:
-                        continue
-                    date_text = cells[0].get_text(strip=True)
-                    link = cells[1].find("a")
-                    txid = cells[1].get_text(strip=True)
-                    lightning_txid = ""
-                    if link and link.get("href"):
-                        href = link["href"]
-                        if "lightning" in href:
-                            lightning_txid = href.rstrip("/").split("/")[-1]
-                            txid = ""
-                        else:
-                            txid = href.rstrip("/").split("/")[-1]
-                    amount_text = cells[-1].get_text(strip=True)
-                    amount_clean = amount_text.replace("BTC", "").replace(",", "").strip()
-                    try:
-                        amount_btc = float(amount_clean)
-                    except Exception:
-                        continue
-                    sats = int(round(amount_btc * self.sats_per_btc))
-                    date_iso = None
-                    date_str = date_text
-                    try:
-                        dt = datetime.strptime(date_text, "%Y-%m-%d %H:%M")
-                        dt = dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
-                        date_iso = dt.isoformat()
-                        date_str = dt.strftime("%Y-%m-%d %H:%M")
-                    except Exception:
-                        pass
-                    payment = {
-                        "date": date_str,
-                        "txid": txid,
-                        "lightning_txid": lightning_txid,
-                        "amount_btc": amount_btc,
-                        "amount_sats": sats,
-                        "status": "confirmed",
-                        "date_iso": date_iso,
-                    }
-                    if btc_price is not None:
-                        payment["rate"] = btc_price
-                        payment["fiat_value"] = amount_btc * btc_price
-                    payments.append(payment)
-
-                page += 1
-                soup.decompose()
 
             return payments
         except Exception as e:
@@ -1200,29 +1206,28 @@ class MiningDashboardService:
                 break
 
             soup = BeautifulSoup(response.text, "html.parser")
-            workers_table = soup.find("tbody", id="workers-tablerows")
-            if not workers_table:
-                logging.debug(f"No workers table found on page {page_num}")
+            try:
+                workers_table = soup.find("tbody", id="workers-tablerows")
+                if not workers_table:
+                    logging.debug(f"No workers table found on page {page_num}")
+                    break
+
+                rows = workers_table.find_all("tr", class_="table-row")
+                if not rows:
+                    logging.debug(f"No worker rows found on page {page_num}, stopping pagination")
+                    break
+
+                logging.info(f"Found {len(rows)} worker rows on page {page_num}")
+                for row in rows:
+                    row_dict = {
+                        "text": row.get_text(separator=" ", strip=True),
+                        "cells": [c.get_text(strip=True) for c in row.find_all(["td", "th"])],
+                        "attrs": dict(row.attrs),
+                    }
+                    all_rows.append(row_dict)
+                page_num += 1
+            finally:
                 soup.decompose()
-                break
-
-            rows = workers_table.find_all("tr", class_="table-row")
-            if not rows:
-                logging.debug(f"No worker rows found on page {page_num}, stopping pagination")
-                soup.decompose()
-                break
-
-            logging.info(f"Found {len(rows)} worker rows on page {page_num}")
-            for row in rows:
-                row_dict = {
-                    "text": row.get_text(separator=" ", strip=True),
-                    "cells": [c.get_text(strip=True) for c in row.find_all(["td", "th"])],
-                    "attrs": dict(row.attrs),
-                }
-                all_rows.append(row_dict)
-            page_num += 1
-            soup.decompose()
-
         if page_num >= max_pages:
             logging.info(
                 f"Reached maximum page limit ({max_pages}). Collected {len(all_rows)} worker rows total."
@@ -1364,6 +1369,7 @@ class MiningDashboardService:
             "Cache-Control": "no-cache",
         }
 
+        soup = None
         try:
             logging.info(f"Fetching worker data from {stats_url}")
             response = self.session.get(stats_url, headers=headers, timeout=15)
@@ -1381,7 +1387,6 @@ class MiningDashboardService:
             workers_table = soup.find("tbody", id="workers-tablerows")
             if not workers_table:
                 logging.error("Workers table not found in Ocean.xyz page")
-                soup.decompose()
                 return None
 
             # Debug: Dump table structure to help diagnose parsing issues
@@ -1563,7 +1568,6 @@ class MiningDashboardService:
             # Check if we found any workers
             if not workers:
                 logging.warning("No workers found in the table, possibly a parsing issue")
-                soup.decompose()
                 return None
 
             # Return worker stats dictionary
@@ -1580,7 +1584,6 @@ class MiningDashboardService:
             }
 
             logging.info(f"Successfully retrieved worker data: {len(workers)} workers")
-            soup.decompose()
             return result
 
         except Exception as e:
@@ -1589,6 +1592,12 @@ class MiningDashboardService:
 
             logging.error(traceback.format_exc())
             return None
+        finally:
+            if soup is not None:
+                try:
+                    soup.decompose()
+                except Exception:
+                    pass
 
     def get_worker_data_alternative(self):
         """
