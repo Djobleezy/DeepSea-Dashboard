@@ -862,7 +862,7 @@ def batch_requests():
         return jsonify({"responses": responses})
     except Exception as e:
         logging.error(f"Error in batch handler: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 @app.route("/api/available_timezones")
@@ -943,7 +943,7 @@ def get_config():
         return jsonify(config)
     except Exception as e:
         logging.error(f"Error getting configuration: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 @app.route("/api/config", methods=["POST"])
@@ -1027,7 +1027,7 @@ def update_config():
             return jsonify({"error": "Failed to save configuration"}), 500
     except Exception as e:
         logging.error(f"Error updating configuration: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 # Health check endpoint with detailed diagnostics
@@ -1121,7 +1121,8 @@ def scheduler_health():
         }
         return jsonify(scheduler_status)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Scheduler status error: {e}")
+        return jsonify({"error": "internal server error"}), 500
 
 
 # Add a health check route that can attempt to fix the scheduler if needed
@@ -1138,7 +1139,8 @@ def fix_scheduler():
             else:
                 return jsonify({"status": "error", "message": "Failed to recreate scheduler"}), 500
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logging.error(f"Scheduler recreation error: {e}")
+        return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
 @app.route("/api/force-refresh", methods=["POST"])
@@ -1165,7 +1167,7 @@ def force_refresh():
             return jsonify({"status": "error", "message": "Failed to fetch metrics"}), 500
     except Exception as e:
         logging.error(f"Force refresh error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
 @app.route("/api/memory-profile")
@@ -1235,7 +1237,7 @@ def memory_profile():
         )
     except Exception as e:
         logging.error(f"Error in memory profiling: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 @app.route("/api/memory-history")
@@ -1289,7 +1291,7 @@ def force_gc():
         )
     except Exception as e:
         logging.error(f"Error during forced GC: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
 @app.route("/api/notifications")
@@ -1416,7 +1418,7 @@ def reset_chart_data():
         return jsonify({"status": "success", "message": "Chart data reset successfully"})
     except Exception as e:
         logging.error(f"Error resetting chart data: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
 @app.route("/api/payout-history", methods=["GET", "POST", "DELETE"])
@@ -1452,7 +1454,7 @@ def payout_history():
         return jsonify({"status": "success"})
     except Exception as e:
         logging.error(f"Error handling payout history: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 # New endpoint to fetch recent block events for chart annotations
@@ -1489,7 +1491,7 @@ def block_events():
         return jsonify({"events": events})
     except Exception as e:
         logging.error(f"Error fetching block events: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 # First, register the template filter outside of any route function
@@ -1712,7 +1714,7 @@ def api_earnings():
         return jsonify(earnings_data)
     except Exception as e:
         logging.error(f"Error in earnings API endpoint: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "internal server error"}), 500
 
 
 # Add the middleware
