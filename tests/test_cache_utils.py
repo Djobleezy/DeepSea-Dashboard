@@ -1,4 +1,5 @@
 import time
+import threading
 
 from cache_utils import ttl_cache
 
@@ -67,3 +68,32 @@ def test_ttl_cache_cleanup(monkeypatch):
 
     identity(99)
     assert identity.cache_size() == 1
+
+
+def test_ttl_cache_thread_safety(monkeypatch):
+    monkeypatch.setattr(time, "time", lambda: 0)
+
+    call_count = {"count": 0}
+
+    @ttl_cache(ttl_seconds=10)
+    def identity(x):
+        call_count["count"] += 1
+        return x
+
+    errors = []
+
+    def worker(tid):
+        try:
+            for i in range(50):
+                assert identity((tid, i)) == (tid, i)
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert call_count["count"] == 250

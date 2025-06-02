@@ -2,14 +2,16 @@
 
 import json
 import time
+import threading
 from functools import wraps
 
 
 def ttl_cache(ttl_seconds=60):
-    """Simple decorator providing a time based cache."""
+    """Simple decorator providing a thread-safe time based cache."""
 
     def decorator(func):
         cache = {}
+        lock = threading.Lock()
 
         def _serialize(value):
             try:
@@ -22,9 +24,10 @@ def ttl_cache(ttl_seconds=60):
                     return str(value)
 
         def _purge_expired(now):
-            expired = [k for k, (_, ts) in cache.items() if now - ts >= ttl_seconds]
-            for k in expired:
-                del cache[k]
+            with lock:
+                expired = [k for k, (_, ts) in cache.items() if now - ts >= ttl_seconds]
+                for k in expired:
+                    del cache[k]
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -40,21 +43,25 @@ def ttl_cache(ttl_seconds=60):
             key = (key_prefix, serialized_args, serialized_kwargs)
             now = time.time()
             _purge_expired(now)
-            cached = cache.get(key)
-            if cached and now - cached[1] < ttl_seconds:
-                return cached[0]
+            with lock:
+                cached = cache.get(key)
+                if cached and now - cached[1] < ttl_seconds:
+                    return cached[0]
             result = func(*args, **kwargs)
             if result is not None:
                 now = time.time()
                 _purge_expired(now)
-                cache[key] = (result, now)
+                with lock:
+                    cache[key] = (result, now)
             return result
 
         def cache_clear():
-            cache.clear()
+            with lock:
+                cache.clear()
 
         def cache_size():
-            return len(cache)
+            with lock:
+                return len(cache)
 
         wrapper.cache_clear = cache_clear
         wrapper.cache_size = cache_size
