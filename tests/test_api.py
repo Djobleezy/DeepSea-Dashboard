@@ -320,3 +320,19 @@ def test_earnings_csv_export(client, monkeypatch):
     assert resp.mimetype == "text/csv"
     text = resp.data.decode()
     assert "date,txid,lightning_txid,amount_btc,amount_sats,status" in text
+
+
+
+def test_earnings_sanitizes_error_field(client, monkeypatch):
+    import App
+
+    sample = {"payments": [], "error": "something went wrong"}
+    monkeypatch.setattr(App.dashboard_service, "get_earnings_data", lambda: sample)
+    monkeypatch.setattr(App.state_manager, "save_last_earnings", lambda e: True)
+
+    resp = client.get("/api/earnings")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "error" not in data
+    assert data["payments"] == []
+

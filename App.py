@@ -1705,6 +1705,9 @@ def api_earnings():
     try:
         # Get the earnings data with a reasonable timeout
         earnings_data = dashboard_service.get_earnings_data()
+        if isinstance(earnings_data, dict) and "error" in earnings_data:
+            logging.error("Earnings data error: %s", earnings_data["error"])
+            earnings_data = {k: v for k, v in earnings_data.items() if k != "error"}
         state_manager.save_last_earnings(earnings_data)
         fmt = request.args.get("format", "json").lower()
         if fmt == "csv":
