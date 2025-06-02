@@ -1000,7 +1000,7 @@ class MiningDashboardService:
                 "payments": [],
                 "total_payments": 0,
                 "avg_days_between_payouts": None,
-                "error": str(e),
+                "error": "An internal error occurred while fetching earnings data.",
                 "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
             }
 
