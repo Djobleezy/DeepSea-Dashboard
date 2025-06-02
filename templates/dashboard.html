@@ -6,8 +6,8 @@
 {% block title %}BTC-OS Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/dashboard.css">
-<link rel="stylesheet" href="/static/css/theme-toggle.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
 {% endblock %}
 
 {% block dashboard_active %}active{% endblock %}
@@ -396,5 +396,5 @@
 
 {% block javascript %}
 <!-- External JavaScript file with our application logic -->
-<script src="/static/js/main.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

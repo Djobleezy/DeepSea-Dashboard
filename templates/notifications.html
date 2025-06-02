@@ -5,8 +5,8 @@
 {% block title %}NOTIFICATIONS - BTC-OS Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/notifications.css">
-<link rel="stylesheet" href="/static/css/theme-toggle.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/notifications.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
 {% endblock %}
 
 {% block header %}NOTIFICATION CENTER{% endblock %}
@@ -93,5 +93,5 @@
 {% endblock %}
 
 {% block javascript %}
-<script src="/static/js/notifications.js"></script>
+<script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
 {% endblock %}

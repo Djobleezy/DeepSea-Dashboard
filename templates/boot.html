@@ -14,12 +14,12 @@
     <link rel="apple-touch-icon" href="/static/favicon/apple-touch-icon.png">
     <link rel="manifest" href="/static/favicon/site.webmanifest">
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/boot.css">
-    <link rel="stylesheet" href="/static/css/theme-toggle.css">
-    <link rel="stylesheet" href="/static/css/matrix.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/boot.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/matrix.css') }}">
     <!-- Add Theme JS -->
-    <script src="/static/js/theme.js"></script>
-    <script src="/static/js/matrixRain.js"></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/matrixRain.js') }}"></script>
     <script>
         (function () {
             if (localStorage.getItem('hasStartedBefore') !== 'true') {

@@ -5,8 +5,8 @@
 {% block title %}BLOCKS - BTC-OS Dashboard {% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/blocks.css">
-<link rel="stylesheet" href="/static/css/theme-toggle.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/blocks.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
 {% endblock %}
 
 {% block header %}BLOCKCHAIN MONITOR{% endblock %}
@@ -104,5 +104,5 @@
 {% endblock %}
 
 {% block javascript %}
-<script src="/static/js/blocks.js"></script>
+<script src="{{ url_for('static', filename='js/blocks.js') }}"></script>
 {% endblock %}

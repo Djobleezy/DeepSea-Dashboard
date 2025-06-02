@@ -5,8 +5,8 @@
 {% block title %}WORKERS - BTC-OS Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/workers.css">
-<link rel="stylesheet" href="/static/css/theme-toggle.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workers.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
 {% endblock %}
 
 {% block header %}WORKERS OVERVIEW{% endblock %}
@@ -112,5 +112,5 @@
 {% endblock %}
 
 {% block javascript %}
-<script src="/static/js/workers.js"></script>
+<script src="{{ url_for('static', filename='js/workers.js') }}"></script>
 {% endblock %}

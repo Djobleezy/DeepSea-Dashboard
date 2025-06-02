@@ -25,20 +25,20 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Common CSS -->
-    <link rel="stylesheet" href="/static/css/common.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/theme-toggle.css">
-    <link rel="stylesheet" href="/static/css/easter-egg.css">
-    <link rel="stylesheet" href="/static/css/matrix.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-toggle.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/easter-egg.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/matrix.css') }}">
 
     <!-- Theme JS (added to ensure consistent application of theme) -->
-    <script src="/static/js/theme.js"></script>
-    <script src="/static/js/matrixRain.js"></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/matrixRain.js') }}"></script>
 
     <!-- Logging wrapper -->
-    <script src="/static/js/logger.js"></script>
-    <script src="/static/js/batchFetch.js"></script>
+    <script src="{{ url_for('static', filename='js/logger.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/batchFetch.js') }}"></script>
 
     <!-- Page-specific CSS -->
     {% block css %}{% endblock %}
@@ -306,7 +306,7 @@
     {% block javascript %}{% endblock %}
 
     <!-- Bitcoin Progress Bar -->
-    <script src="/static/js/BitcoinProgressBar.js"></script>
+    <script src="{{ url_for('static', filename='js/BitcoinProgressBar.js') }}"></script>
 
     <!-- Mobile Navigation Script -->
     <script>
@@ -422,12 +422,12 @@
     });
     </script>
     <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
-    <script src="/static/js/shortcuts.js"></script>
-    <script src="/static/js/easterEgg.js"></script>
+    <script src="{{ url_for('static', filename='js/shortcuts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/easterEgg.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/service-worker.js');
+                navigator.serviceWorker.register('{{ url_for('static', filename='js/service-worker.js') }}');
             }
         });
     </script>
