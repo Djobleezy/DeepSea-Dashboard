@@ -782,6 +782,8 @@ def dashboard():
                 "daily_power_cost": 0,
                 "daily_profit_usd": 0,
                 "monthly_profit_usd": 0,
+                "break_even_electricity_price": None,
+                "power_usage_estimated": True,
                 "daily_mined_sats": 0,
                 "monthly_mined_sats": 0,
                 "unpaid_earnings": "0",

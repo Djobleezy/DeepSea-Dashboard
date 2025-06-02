@@ -358,10 +358,16 @@
                 <p>
                     <strong>Daily Power Cost:</strong>
                     <span id="daily_power_cost" class="metric-value red">
-                        {% if metrics and metrics.daily_power_cost is defined and metrics.daily_power_cost is not none %}
-                        ${{ "%.2f"|format(metrics.daily_power_cost) }}
+                        {% if metrics %}
+                            {% if metrics.power_usage_estimated %}
+                                Calculating...
+                            {% elif metrics.daily_power_cost is not none %}
+                                ${{ "%.2f"|format(metrics.daily_power_cost) }}
+                            {% else %}
+                                $0.00
+                            {% endif %}
                         {% else %}
-                        $0.00
+                            Calculating...
                         {% endif %}
                     </span>
                     <span id="indicator_daily_power_cost"></span>

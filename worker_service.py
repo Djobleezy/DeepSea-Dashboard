@@ -19,6 +19,8 @@ class WorkerService:
         self.WORKER_DATA_CACHE_TIMEOUT = 60  # Cache worker data for 60 seconds
         self.dashboard_service = None  # Will be set by App.py during initialization
         self.sats_per_btc = 100_000_000  # Constant for conversion
+        # Track whether the last fetch returned real data or simulated fallback
+        self.last_fetch_was_real = False
 
     def set_dashboard_service(self, dashboard_service):
         """
@@ -102,6 +104,9 @@ class WorkerService:
                             f"Successfully retrieved {len(real_worker_data['workers'])} real workers from Ocean.xyz"
                         )
 
+                        # Mark that we obtained real worker data this cycle
+                        self.last_fetch_was_real = True
+
                         # Add hashrate history if available in cached metrics
                         if (
                             cached_metrics
@@ -132,6 +137,8 @@ class WorkerService:
             # Fallback to simulated data if real data fetch fails or returns no workers
             logging.info("Generating fallback simulated worker data")
             worker_data = self.generate_fallback_data(cached_metrics)
+            # Mark that we used simulated data
+            self.last_fetch_was_real = False
 
             # Add hashrate history if available in cached metrics
             if (
@@ -155,6 +162,8 @@ class WorkerService:
         except Exception as e:
             logging.error(f"Error getting worker data: {e}")
             fallback_data = self.generate_fallback_data(cached_metrics)
+            # Mark that we used simulated data due to error
+            self.last_fetch_was_real = False
 
             # Even on error, try to sync with dashboard metrics
             if cached_metrics:

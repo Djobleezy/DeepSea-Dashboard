@@ -166,7 +166,11 @@ class MiningDashboardService:
                 estimated_power = self.estimate_total_power(metrics_for_estimate)
                 if estimated_power:
                     power_usage_for_calc = estimated_power
-                    power_usage_estimated = True
+                    # Consider it an estimate only if worker data was simulated
+                    if self.worker_service and getattr(self.worker_service, "last_fetch_was_real", False):
+                        power_usage_estimated = False
+                    else:
+                        power_usage_estimated = True
                     if power_cost_for_calc is None or power_cost_for_calc <= 0:
                         power_cost_for_calc = 0.07
 

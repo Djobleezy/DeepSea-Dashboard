@@ -3535,7 +3535,9 @@ function updateUI() {
         }
 
         // Daily power cost with currency conversion
-        if (data.daily_power_cost != null) {
+        if (data.power_usage_estimated) {
+            updateElementText("daily_power_cost", "Calculating...");
+        } else if (data.daily_power_cost != null) {
             const dailyPowerCost = data.daily_power_cost;
             updateElementText("daily_power_cost", formatCurrencyValue(dailyPowerCost, currency));
         } else {
@@ -3544,9 +3546,12 @@ function updateUI() {
 
         // Break-even electricity price divider
         const bePrice = data.break_even_electricity_price;
-        const formattedBe = bePrice != null
-            ? formatCurrencyValue(bePrice, currency) + '/kWh'
-            : formatCurrencyValue(0, currency) + '/kWh';
+        let formattedBe;
+        if (data.power_usage_estimated || bePrice == null) {
+            formattedBe = 'Calculating...';
+        } else {
+            formattedBe = formatCurrencyValue(bePrice, currency) + '/kWh';
+        }
 
         const metricElPower = document.getElementById('daily_power_cost');
         if (!metricElPower) {
