@@ -650,7 +650,7 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error dumping table structure: {e}")
 
-    @ttl_cache(ttl_seconds=30)
+    @ttl_cache(ttl_seconds=30, maxsize=20)
     def fetch_url(self, url: str, timeout: int = 5):
         """
         Fetch URL with error handling.
@@ -1184,7 +1184,7 @@ class MiningDashboardService:
 
         return difficulty, network_hashrate, btc_price, block_count
 
-    @ttl_cache(ttl_seconds=60)
+    @ttl_cache(ttl_seconds=60, maxsize=1)
     def get_all_worker_rows(self):
         """Collect worker row data from the stats pages."""
         all_rows = []
