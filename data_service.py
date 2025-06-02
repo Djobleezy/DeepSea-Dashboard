@@ -608,6 +608,7 @@ class MiningDashboardService:
             except Exception as e:
                 logging.error(f"Error parsing last share time: {e}")
 
+            soup.decompose()
             return data
         except Exception as e:
             logging.error(f"Error fetching Ocean data: {e}")
@@ -813,11 +814,14 @@ class MiningDashboardService:
                 if not table:
                     if page == 0:
                         logging.error("Payout table not found")
+                        soup.decompose()
                         return None
+                    soup.decompose()
                     break
 
                 rows = table.find_all("tr", class_="table-row")
                 if not rows:
+                    soup.decompose()
                     break
 
                 for row in rows:
@@ -865,6 +869,7 @@ class MiningDashboardService:
                         payment["fiat_value"] = amount_btc * btc_price
                     payments.append(payment)
 
+                soup.decompose()
                 page += 1
 
             return payments
@@ -1205,15 +1210,18 @@ class MiningDashboardService:
             workers_table = soup.find("tbody", id="workers-tablerows")
             if not workers_table:
                 logging.debug(f"No workers table found on page {page_num}")
+                soup.decompose()
                 break
 
             rows = workers_table.find_all("tr", class_="table-row")
             if not rows:
                 logging.debug(f"No worker rows found on page {page_num}, stopping pagination")
+                soup.decompose()
                 break
 
             logging.info(f"Found {len(rows)} worker rows on page {page_num}")
             all_rows.extend(rows)
+            soup.decompose()
             page_num += 1
 
         if page_num >= max_pages:
@@ -1374,6 +1382,7 @@ class MiningDashboardService:
             workers_table = soup.find("tbody", id="workers-tablerows")
             if not workers_table:
                 logging.error("Workers table not found in Ocean.xyz page")
+                soup.decompose()
                 return None
 
             # Debug: Dump table structure to help diagnose parsing issues
@@ -1555,6 +1564,7 @@ class MiningDashboardService:
             # Check if we found any workers
             if not workers:
                 logging.warning("No workers found in the table, possibly a parsing issue")
+                soup.decompose()
                 return None
 
             # Return worker stats dictionary
@@ -1571,6 +1581,7 @@ class MiningDashboardService:
             }
 
             logging.info(f"Successfully retrieved worker data: {len(workers)} workers")
+            soup.decompose()
             return result
 
         except Exception as e:

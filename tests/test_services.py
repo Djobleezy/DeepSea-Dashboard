@@ -391,6 +391,51 @@ def test_get_worker_data_api(monkeypatch):
     assert "rig1" in names and "rig2" in names
 
 
+def test_get_worker_data_original(monkeypatch):
+    svc = MiningDashboardService(0, 0, "w")
+
+    html = """
+    <table><tbody id='workers-tablerows'>
+    <tr class='table-row'>
+        <td class='table-cell'>rig1</td>
+        <td class='table-cell'>online</td>
+        <td class='table-cell'>2025-05-01 00:00</td>
+        <td class='table-cell'>1.0 TH/s</td>
+        <td class='table-cell'>1.1 TH/s</td>
+        <td class='table-cell'>0.00000100 BTC</td>
+    </tr>
+    </tbody></table>
+    <div id='payoutsnap-statcards'>
+        <div class='blocks dashboard-container'>
+            <div class='blocks-label'>Earnings per Day</div>
+            <span>0.000002 BTC</span>
+        </div>
+    </div>
+    """
+
+    def fake_get(url, headers=None, timeout=15):
+        resp = MagicMock()
+        resp.ok = True
+        resp.text = html
+        return resp
+
+    monkeypatch.setattr(svc.session, "get", fake_get)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    import importlib
+    import sys
+
+    sys.modules.pop("bs4", None)
+    real_bs4 = importlib.import_module("bs4")
+    monkeypatch.setattr(data_service, "BeautifulSoup", real_bs4.BeautifulSoup)
+
+    data = svc.get_worker_data_original()
+
+    assert data["workers_total"] == 1
+    assert data["workers"][0]["name"] == "rig1"
+    assert data["workers"][0]["status"] == "online"
+    assert data["daily_sats"] == 200
+
+
 def test_get_worker_data_fallback(monkeypatch):
     """Ensure fallback data is returned when all fetch methods fail."""
     ws = WorkerService()
