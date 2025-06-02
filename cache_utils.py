@@ -5,7 +5,6 @@ import time
 import threading
 from functools import wraps
 
-
 def ttl_cache(ttl_seconds=60, maxsize=None):
     """Simple decorator providing a thread-safe time-based cache.
 

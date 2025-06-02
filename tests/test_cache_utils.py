@@ -98,7 +98,6 @@ def test_ttl_cache_thread_safety(monkeypatch):
     assert not errors
     assert call_count["count"] == 250
 
-
 def test_ttl_cache_maxsize(monkeypatch):
     fake_time = [0]
     monkeypatch.setattr(time, "time", lambda: fake_time[0])
