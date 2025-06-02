@@ -113,3 +113,43 @@ def test_get_worker_data_alternative_basic(monkeypatch):
     assert w["status"] == "online"
     assert w["hashrate_3hr"] == 90.0
 
+
+def test_get_worker_data_original_basic(monkeypatch):
+    svc = make_service()
+
+    html = """
+    <table><tbody id='workers-tablerows'>
+      <tr class='table-row'>
+        <td class='table-cell'>rig1</td>
+        <td class='table-cell'>online</td>
+        <td class='table-cell'>now</td>
+        <td class='table-cell'>100 TH/s</td>
+        <td class='table-cell'>90 TH/s</td>
+        <td class='table-cell'>0.00000100 BTC</td>
+      </tr>
+    </tbody></table>
+    <div id='payoutsnap-statcards'>
+      <div class='blocks dashboard-container'>
+        <div class='blocks-label'>Earnings per day <span>0.00001000 BTC</span></div>
+      </div>
+    </div>
+    """
+
+    def fake_get(url, headers=None, timeout=15):
+        resp = MagicMock()
+        resp.ok = True
+        resp.text = html
+        return resp
+
+    monkeypatch.setattr(svc.session, "get", fake_get)
+    import importlib
+    real_bs4 = importlib.import_module("bs4")
+    monkeypatch.setattr(data_service, "BeautifulSoup", real_bs4.BeautifulSoup)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+
+    data = svc.get_worker_data_original()
+    assert data["workers_total"] == 1
+    w = data["workers"][0]
+    assert w["name"] == "rig1"
+    assert data["daily_sats"] == int(0.00001000 * svc.sats_per_btc)
+
