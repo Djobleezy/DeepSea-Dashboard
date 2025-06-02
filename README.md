@@ -79,7 +79,9 @@ informed with minimal fuss.
 - **Default DeepSea Experience**: The dashboard launches in DeepSea mode on first run
 - **Ambient Audio**: Soft ocean sounds play in the DeepSea theme while the Bitcoin theme cycles through
   `bitcoin.mp3`, `bitcoin1.mp3` and `bitcoin2.mp3`. Playback position persists between page loads. Place the files
-  in `static/audio/`. The Docker configuration mounts this directory automatically. Hover the speaker icon to reveal
+  in `static/audio/`. The Docker configuration mounts this directory automatically.
+  All front-end assets in `static/css`, `static/js`, `static/vendor`, `static/favicon`, and `templates`
+  are mapped as well, allowing live editing while the container is running. Hover the speaker icon to reveal
   a vertical volume slider. Tracks now crossfade seamlessly with a 2 second overlap and when switching themes.
   Add an optional `block.mp3` file in the same directory to play a short sound whenever a new block is found.
 

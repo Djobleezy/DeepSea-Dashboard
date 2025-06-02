@@ -20,6 +20,11 @@ services:
     volumes:
         - ./logs:/app/logs
         - ./static/audio:/app/static/audio
+        - ./static/vendor:/app/static/vendor
+        - ./static/css:/app/static/css
+        - ./static/js:/app/static/js
+        - ./static/favicon:/app/static/favicon
+        - ./templates:/app/templates
 
 volumes:
   redis_data:

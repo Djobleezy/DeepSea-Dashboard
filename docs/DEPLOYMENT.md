@@ -104,6 +104,11 @@ For better performance and reliability in production environments:
       -e POWER_USAGE=3450 \
       -v $(pwd)/logs:/app/logs \
       -v $(pwd)/static/audio:/app/static/audio \
+      -v $(pwd)/static/vendor:/app/static/vendor \
+      -v $(pwd)/static/css:/app/static/css \
+      -v $(pwd)/static/js:/app/static/js \
+      -v $(pwd)/static/favicon:/app/static/favicon \
+      -v $(pwd)/templates:/app/templates \
       --name mining-dashboard \
       bitcoin-mining-dashboard
    ```
@@ -132,15 +137,20 @@ For better performance and reliability in production environments:
        ports:
          - "5000:5000"
        environment:
-         - REDIS_URL=redis://redis:6379
-         - WALLET=your-wallet-address
-         - POWER_COST=0.12
+        - REDIS_URL=redis://redis:6379
+        - WALLET=your-wallet-address
+        - POWER_COST=0.12
         - POWER_USAGE=3450
-       volumes:
-         - ./logs:/app/logs
-         - ./static/audio:/app/static/audio  # include block.mp3 here if desired
-       depends_on:
-         - redis
+      volumes:
+        - ./logs:/app/logs
+        - ./static/audio:/app/static/audio  # include block.mp3 here if desired
+        - ./static/vendor:/app/static/vendor
+        - ./static/css:/app/static/css
+        - ./static/js:/app/static/js
+        - ./static/favicon:/app/static/favicon
+        - ./templates:/app/templates
+      depends_on:
+        - redis
    
    volumes:
      redis_data:
