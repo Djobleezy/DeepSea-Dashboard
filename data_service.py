@@ -105,7 +105,20 @@ class MiningDashboardService:
                         pass
 
             # Cancel any pending futures and shutdown executor
-            self.executor.shutdown(wait=True, cancel_futures=True)
+            try:
+                from inspect import signature
+
+                shutdown_params = signature(self.executor.shutdown).parameters
+                if "cancel_futures" in shutdown_params:
+                    self.executor.shutdown(wait=True, cancel_futures=True)
+                else:
+                    self.executor.shutdown(wait=True)
+            except Exception:
+                # Fall back if we cannot introspect the signature
+                try:
+                    self.executor.shutdown(wait=True)
+                except Exception:
+                    pass
 
             # Close session and underlying adapters
             try:
