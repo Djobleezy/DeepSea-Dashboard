@@ -781,6 +781,7 @@ class MiningDashboardService:
 
         url = f"{api_base}/earnpay/{self.wallet}/{start_str}/{end_str}"
         payments = []
+        resp = None
 
         try:
             resp = self.session.get(url, timeout=10)
@@ -850,6 +851,8 @@ class MiningDashboardService:
             "Cache-Control": "no-cache",
         }
         payments = []
+        resp = None
+        soup = None
         try:
             page = 0
             while True:
@@ -923,7 +926,8 @@ class MiningDashboardService:
 
                     page += 1
                 finally:
-                    soup.decompose()
+                    if soup:
+                        soup.decompose()
                     if resp:
                         try:
                             resp.close()

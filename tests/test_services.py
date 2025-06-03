@@ -372,6 +372,21 @@ def test_get_payment_history_scrape_closes_on_error(monkeypatch):
     assert dummy_resp.closed
 
 
+def test_get_payment_history_api_handles_request_error(monkeypatch):
+    """Ensure API errors do not raise due to uninitialized variables."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    class DummySession:
+        def get(self, url, timeout=10):
+            raise ValueError("fail")
+
+    svc.session = DummySession()
+
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+
+    assert svc.get_payment_history_api() is None
+
+
 def test_get_earnings_data_fallback_to_scrape(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
