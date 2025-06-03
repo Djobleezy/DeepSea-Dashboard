@@ -369,6 +369,7 @@ class MiningDashboardService:
     def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
         """Fetch recent block data using /blocks."""
         api_base = "https://api.ocean.xyz/v1"
+        resp = None
         try:
             url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
             resp = self.session.get(url, timeout=10)
@@ -383,9 +384,14 @@ class MiningDashboardService:
                         blocks = result
                 if isinstance(blocks, list):
                     return blocks
-            resp.close()
         except Exception as e:
             logging.error(f"Error fetching blocks API: {e}")
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
         return []
 
     def get_ocean_data(self):
@@ -1089,6 +1095,7 @@ class MiningDashboardService:
         btc_price = self.cache.get("btc_price")
         block_count = self.cache.get("block_count")
 
+        responses = {}
         try:
             # Add all API endpoints to futures using the shared executor
             futures = {}
@@ -1214,6 +1221,13 @@ class MiningDashboardService:
 
         except Exception as e:
             logging.error(f"Error fetching Bitcoin stats: {e}")
+        finally:
+            for resp in responses.values():
+                if resp:
+                    try:
+                        resp.close()
+                    except Exception:
+                        pass
 
         return difficulty, network_hashrate, btc_price, block_count
 

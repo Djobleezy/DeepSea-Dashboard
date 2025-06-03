@@ -479,6 +479,58 @@ def test_get_blocks_api_nested(monkeypatch):
     assert blocks[0]["height"] == 101
 
 
+def test_get_blocks_api_closes_response(monkeypatch):
+    """Ensure HTTP response is closed when blocks API returns successfully."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    class DummyResp:
+        def __init__(self):
+            self.ok = True
+            self.closed = False
+
+        def json(self):
+            return {"blocks": [1]}
+
+        def close(self):
+            self.closed = True
+
+    dummy_resp = DummyResp()
+    monkeypatch.setattr(svc.session, "get", lambda url, timeout=10: dummy_resp)
+
+    assert svc.get_blocks_api() == [1]
+    assert dummy_resp.closed
+
+
+def test_get_bitcoin_stats_closes_responses(monkeypatch):
+    """Ensure all responses are closed to avoid memory leaks."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    class DummyResp:
+        def __init__(self):
+            self.ok = True
+            self.closed = False
+            self.text = "1"
+
+        def json(self):
+            return {}
+
+        def close(self):
+            self.closed = True
+
+    created = []
+
+    def fake_fetch_url(url, timeout=5):
+        resp = DummyResp()
+        created.append(resp)
+        return resp
+
+    monkeypatch.setattr(svc, "fetch_url", fake_fetch_url)
+
+    svc.get_bitcoin_stats()
+
+    assert all(r.closed for r in created)
+
+
 def test_fetch_metrics_estimates_power(monkeypatch):
     class DummyWS:
         def __init__(self):
