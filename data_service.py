@@ -1089,6 +1089,7 @@ class MiningDashboardService:
         btc_price = self.cache.get("btc_price")
         block_count = self.cache.get("block_count")
 
+        responses = {}
         try:
             # Add all API endpoints to futures using the shared executor
             futures = {}
@@ -1214,6 +1215,13 @@ class MiningDashboardService:
 
         except Exception as e:
             logging.error(f"Error fetching Bitcoin stats: {e}")
+        finally:
+            for resp in responses.values():
+                if resp is not None:
+                    try:
+                        resp.close()
+                    except Exception:
+                        pass
 
         return difficulty, network_hashrate, btc_price, block_count
 

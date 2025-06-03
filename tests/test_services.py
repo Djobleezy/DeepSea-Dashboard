@@ -78,6 +78,28 @@ def test_fetch_url_error(monkeypatch):
     assert svc.fetch_url("http://x") is None
 
 
+def test_get_bitcoin_stats_closes_responses(monkeypatch):
+    svc = MiningDashboardService(0, 0, "w")
+
+    created = []
+
+    def fake_get(url, timeout=5):
+        resp = MagicMock()
+        resp.ok = True
+        resp.text = "1"
+        resp.json.return_value = {}
+        resp.close = MagicMock()
+        created.append(resp)
+        return resp
+
+    monkeypatch.setattr(svc.session, "get", fake_get)
+
+    svc.get_bitcoin_stats()
+
+    assert created
+    assert all(r.close.called for r in created)
+
+
 def test_notification_update_currency(monkeypatch):
     class DummyState:
         def get_notifications(self):
