@@ -351,6 +351,27 @@ def test_get_payment_history_scrape_pagination(monkeypatch):
     assert payments[1]["txid"] == "tx2"
 
 
+def test_get_payment_history_scrape_closes_on_error(monkeypatch):
+    """Ensure HTTP response is closed when initial request fails."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    class DummyResp:
+        def __init__(self):
+            self.ok = False
+            self.closed = False
+            self.status_code = 500
+
+        def close(self):
+            self.closed = True
+
+    dummy_resp = DummyResp()
+
+    monkeypatch.setattr(svc.session, "get", lambda url, headers=None, timeout=10: dummy_resp)
+
+    assert svc.get_payment_history_scrape() is None
+    assert dummy_resp.closed
+
+
 def test_get_earnings_data_fallback_to_scrape(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 

@@ -857,7 +857,9 @@ class MiningDashboardService:
                 if not resp.ok:
                     if page == 0:
                         logging.error(f"Error fetching payout page: {resp.status_code}")
+                        resp.close()
                         return None
+                    resp.close()
                     break
 
                 soup = BeautifulSoup(resp.text, "html.parser")
