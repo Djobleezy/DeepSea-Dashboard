@@ -296,6 +296,42 @@ def test_batch_too_many_requests(client, monkeypatch):
     assert data["error"] == "too many requests"
 
 
+def test_batch_closes_responses(monkeypatch):
+    import App
+
+    closed = []
+
+    class DummyResp:
+        status_code = 200
+        data = b"{}"
+
+        def get_json(self):
+            return {}
+
+        def close(self):
+            closed.append(True)
+
+    class DummyClient:
+        def open(self, *args, **kwargs):
+            return DummyResp()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+    monkeypatch.setattr(App.app, "test_client", lambda: DummyClient())
+
+    with App.app.test_request_context(
+        "/api/batch",
+        json={"requests": [{"method": "GET", "path": "/api/health"}]},
+    ):
+        App.batch_requests()
+
+    assert closed and all(closed)
+
+
 def test_earnings_csv_export(client, monkeypatch):
     import App
 

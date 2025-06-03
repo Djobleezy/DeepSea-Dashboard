@@ -863,6 +863,11 @@ def batch_requests():
                     body_data = resp.get_json()
                 except Exception:
                     body_data = resp.data.decode("utf-8")
+                finally:
+                    try:
+                        resp.close()
+                    except Exception:
+                        pass
                 responses.append({"status": resp.status_code, "body": body_data})
         return jsonify({"responses": responses})
     except Exception as e:
