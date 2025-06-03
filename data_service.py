@@ -89,7 +89,8 @@ class MiningDashboardService:
         """Close any open network resources."""
         try:
             self.session.close()
-            self.executor.shutdown(wait=False)
+            # Wait for any running executor tasks to finish so resources are released
+            self.executor.shutdown(wait=True)
         except Exception as e:
             logging.error(f"Error closing session: {e}")
 
