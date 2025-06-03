@@ -223,6 +223,7 @@ def check_for_memory_leaks():
         return
 
     last_leak_check_time = current_time
+    gc.collect()  # trigger GC to prevent transient objects from skewing counts
 
     try:
         # Get current counts
