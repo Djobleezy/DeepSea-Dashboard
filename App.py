@@ -226,6 +226,18 @@ def check_for_memory_leaks():
     gc.collect()  # trigger GC to prevent transient objects from skewing counts
 
     try:
+        thread_count = threading.active_count()
+        dashboard_services = [
+            obj for obj in gc.get_objects() if isinstance(obj, MiningDashboardService)
+        ]
+        if len(dashboard_services) > 1:
+            logging.warning(
+                f"Multiple MiningDashboardService instances detected: {len(dashboard_services)}"
+            )
+        expected_thread_count = 50
+        if thread_count > expected_thread_count:
+            logging.warning(f"Excessive threads detected: {thread_count}")
+
         # Get current counts
         type_counts = {}
         for obj in gc.get_objects():

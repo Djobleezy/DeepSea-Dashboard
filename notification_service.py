@@ -1,6 +1,7 @@
 # notification_service.py
 import logging
 import uuid
+import weakref
 import pytz
 import re
 from datetime import datetime, timedelta, timezone, tzinfo
@@ -103,7 +104,13 @@ class NotificationService:
     def __init__(self, state_manager, dashboard_service=None):
         """Initialize with state manager for persistence."""
         self.state_manager = state_manager
-        self.dashboard_service = dashboard_service
+        if dashboard_service is not None:
+            try:
+                self._dashboard_service_ref = weakref.ref(dashboard_service)
+            except TypeError:
+                self._dashboard_service_ref = None
+        else:
+            self._dashboard_service_ref = None
         self.notifications = []
         self.daily_stats_time = "00:00:00"  # When to post daily stats (midnight)
         self.last_daily_stats = None
@@ -123,6 +130,22 @@ class NotificationService:
 
         # Load last block height from state
         self._load_last_block_height()
+
+    @property
+    def dashboard_service(self):
+        """Return the dashboard service if it is still alive."""
+        return self._dashboard_service_ref() if self._dashboard_service_ref else None
+
+    @dashboard_service.setter
+    def dashboard_service(self, value):
+        """Set the dashboard service using a weak reference."""
+        if value is not None:
+            try:
+                self._dashboard_service_ref = weakref.ref(value)
+            except TypeError:
+                self._dashboard_service_ref = None
+        else:
+            self._dashboard_service_ref = None
 
     def _get_current_time(self) -> datetime:
         """Get current datetime with the configured timezone."""
