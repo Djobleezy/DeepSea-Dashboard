@@ -4,6 +4,7 @@ Worker service module for managing workers data.
 
 import logging
 import random
+import weakref
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from config import get_timezone
@@ -17,10 +18,20 @@ class WorkerService:
         self.worker_data_cache = None
         self.last_worker_data_update = None
         self.WORKER_DATA_CACHE_TIMEOUT = 60  # Cache worker data for 60 seconds
-        self.dashboard_service = None  # Will be set by App.py during initialization
+        self._dashboard_service_ref = None  # Weak reference to dashboard service
         self.sats_per_btc = 100_000_000  # Constant for conversion
         # Track whether the last fetch returned real data or simulated fallback
         self.last_fetch_was_real = False
+
+    @property
+    def dashboard_service(self):
+        """Return the dashboard service instance if still alive."""
+        return self._dashboard_service_ref() if self._dashboard_service_ref else None
+
+    @dashboard_service.setter
+    def dashboard_service(self, value):
+        """Store a weak reference to the dashboard service."""
+        self._dashboard_service_ref = weakref.ref(value) if value else None
 
     def set_dashboard_service(self, dashboard_service):
         """

@@ -2,6 +2,8 @@ import types
 import sys
 import random
 import pytest
+import weakref
+import gc
 
 # Provide lightweight stubs for external deps if missing
 if "pytz" not in sys.modules:
@@ -44,6 +46,7 @@ if "bs4" not in sys.modules:
     sys.modules["bs4"] = bs4_module
 
 from worker_service import WorkerService
+from data_service import MiningDashboardService
 
 
 def test_generate_fallback_data_counts(monkeypatch):
@@ -214,3 +217,21 @@ def test_adjust_worker_instances_updates_counts(monkeypatch):
     assert worker_data["workers_total"] == 4
     assert worker_data["workers_online"] + worker_data["workers_offline"] == 4
     assert len(worker_data["workers"]) == 4
+
+
+def test_service_worker_cycle_collected(monkeypatch):
+    """Ensure dashboard and worker services don't leak via reference cycles."""
+    svc = MiningDashboardService(0, 0, "w")
+    ws = WorkerService()
+    svc.set_worker_service(ws)
+    ws.set_dashboard_service(svc)
+
+    ref_svc = weakref.ref(svc)
+    ref_ws = weakref.ref(ws)
+
+    svc = None
+    ws = None
+    gc.collect()
+
+    assert ref_svc() is None
+    assert ref_ws() is None
