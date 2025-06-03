@@ -63,9 +63,21 @@ def test_generate_default_workers_data(monkeypatch):
 
 def test_fetch_url_success(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
-    resp = MagicMock()
-    monkeypatch.setattr(svc.session, "get", lambda url, timeout=5: resp)
-    assert svc.fetch_url("http://x") is resp
+
+    class DummyResp:
+        status_code = 200
+        ok = True
+        text = "{\"a\": 1}"
+
+        def json(self):
+            return {"a": 1}
+
+    monkeypatch.setattr(svc.session, "get", lambda url, timeout=5: DummyResp())
+
+    result = svc.fetch_url("http://x")
+    assert result.ok
+    assert result.status_code == 200
+    assert result.json() == {"a": 1}
 
 
 def test_fetch_url_error(monkeypatch):

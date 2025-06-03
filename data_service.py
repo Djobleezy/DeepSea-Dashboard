@@ -11,11 +11,25 @@ from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from bs4 import BeautifulSoup
+from dataclasses import dataclass
 
 from models import OceanData, convert_to_ths
 from config import get_timezone
 from cache_utils import ttl_cache
 from miner_specs import parse_worker_name
+
+
+@dataclass
+class CachedResponse:
+    """Simplified response object storing only relevant fields."""
+
+    ok: bool
+    status_code: int
+    text: str
+
+    def json(self):
+        """Parse JSON from the stored text."""
+        return json.loads(self.text)
 
 
 class MiningDashboardService:
@@ -668,21 +682,24 @@ class MiningDashboardService:
 
     @ttl_cache(ttl_seconds=30, maxsize=20)
     def fetch_url(self, url: str, timeout: int = 5):
-        """
-        Fetch URL with error handling.
+        """Fetch URL content safely without leaking resources."""
 
-        Args:
-            url (str): URL to fetch
-            timeout (int): Timeout in seconds
-
-        Returns:
-            Response: Request response or None if failed
-        """
+        response = None
         try:
-            return self.session.get(url, timeout=timeout)
+            response = self.session.get(url, timeout=timeout)
+            text = response.text
+            status_code = response.status_code
+            ok = response.ok
+            return CachedResponse(ok=ok, status_code=status_code, text=text)
         except Exception as e:
             logging.error(f"Error fetching {url}: {e}")
             return None
+        finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
 
     # Add the fetch_exchange_rates method after the fetch_url method
     def fetch_exchange_rates(self, base_currency="USD"):
