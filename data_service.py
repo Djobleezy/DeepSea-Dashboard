@@ -733,6 +733,7 @@ class MiningDashboardService:
             logging.error("Exchange rate API key not configured")
             return {}
 
+        response = None
         try:
             # Use the configured API key with the v6 exchangerate-api endpoint
             url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}"
