@@ -299,19 +299,20 @@ class MiningDashboardService:
             resp = self.session.get(url, timeout=10)
             if resp.ok:
                 hr_data = resp.json()
-                result["hashrate_60sec"] = hr_data.get("hashrate_60s")
-                result["hashrate_5min"] = hr_data.get("hashrate_300s")
-                result["hashrate_10min"] = hr_data.get("hashrate_600s")
-                result["hashrate_24hr"] = hr_data.get("hashrate_86400")
-                # Try several keys for a ~3hr interval
-                result["hashrate_3hr"] = (
-                    hr_data.get("hashrate_10800") or hr_data.get("hashrate_7200") or hr_data.get("hashrate_3600")
-                )
-                result["hashrate_60sec_unit"] = "H/s"
-                result["hashrate_5min_unit"] = "H/s"
-                result["hashrate_10min_unit"] = "H/s"
-                result["hashrate_24hr_unit"] = "H/s"
-                result["hashrate_3hr_unit"] = "H/s"
+            result["hashrate_60sec"] = hr_data.get("hashrate_60s")
+            result["hashrate_5min"] = hr_data.get("hashrate_300s")
+            result["hashrate_10min"] = hr_data.get("hashrate_600s")
+            result["hashrate_24hr"] = hr_data.get("hashrate_86400")
+            # Try several keys for a ~3hr interval
+            result["hashrate_3hr"] = (
+                hr_data.get("hashrate_10800") or hr_data.get("hashrate_7200") or hr_data.get("hashrate_3600")
+            )
+            result["hashrate_60sec_unit"] = "H/s"
+            result["hashrate_5min_unit"] = "H/s"
+            result["hashrate_10min_unit"] = "H/s"
+            result["hashrate_24hr_unit"] = "H/s"
+            result["hashrate_3hr_unit"] = "H/s"
+            resp.close()
         except Exception as e:
             logging.error(f"Error fetching user_hashrate API: {e}")
 
@@ -328,6 +329,7 @@ class MiningDashboardService:
                 if ts:
                     dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
+            resp.close()
         except Exception as e:
             logging.error(f"Error fetching statsnap API: {e}")
 
@@ -359,6 +361,7 @@ class MiningDashboardService:
                 data["pool_total_hashrate_unit"] = "H/s"
                 data["workers_hashing"] = stat.get("workers") or stat.get("active_workers")
                 data["blocks_found"] = stat.get("blocks") or stat.get("blocks_found")
+            resp.close()
         except Exception as e:
             logging.error(f"Error fetching pool_stat API: {e}")
         return data
@@ -380,6 +383,7 @@ class MiningDashboardService:
                         blocks = result
                 if isinstance(blocks, list):
                     return blocks
+            resp.close()
         except Exception as e:
             logging.error(f"Error fetching blocks API: {e}")
         return []
@@ -409,6 +413,7 @@ class MiningDashboardService:
                 setattr(data, key, value)
 
         soup = None
+        response = None
         try:
             response = self.session.get(stats_url, headers=headers, timeout=10)
             if not response.ok:
@@ -614,6 +619,11 @@ class MiningDashboardService:
             logging.error(f"Error fetching Ocean data: {e}")
             return None
         finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
             if soup is not None:
                 try:
                     soup.decompose()
@@ -729,6 +739,12 @@ class MiningDashboardService:
             logging.error(f"Error fetching exchange rates: {e}")
             self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
             return {}
+        finally:
+            if response:
+                try:
+                    response.close()
+                except Exception:
+                    pass
 
     def get_payment_history_api(self, days=360, btc_price=None):
         """Fetch payout history using the Ocean.xyz API."""
@@ -794,6 +810,12 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error fetching payment history from API: {e}")
             return None
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
 
     def get_payment_history_scrape(self, btc_price=None):
         """Scrape payout history from the stats page as a fallback."""
@@ -876,6 +898,11 @@ class MiningDashboardService:
                     page += 1
                 finally:
                     soup.decompose()
+                    if resp:
+                        try:
+                            resp.close()
+                        except Exception:
+                            pass
 
             return payments
         except Exception as e:
@@ -1228,6 +1255,11 @@ class MiningDashboardService:
                 page_num += 1
             finally:
                 soup.decompose()
+                if response:
+                    try:
+                        response.close()
+                    except Exception:
+                        pass
         if page_num >= max_pages:
             logging.info(
                 f"Reached maximum page limit ({max_pages}). Collected {len(all_rows)} worker rows total."
@@ -1370,6 +1402,7 @@ class MiningDashboardService:
         }
 
         soup = None
+        response = None
         try:
             logging.info(f"Fetching worker data from {stats_url}")
             response = self.session.get(stats_url, headers=headers, timeout=15)
@@ -1593,6 +1626,11 @@ class MiningDashboardService:
             logging.error(traceback.format_exc())
             return None
         finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
             if soup is not None:
                 try:
                     soup.decompose()
@@ -1850,3 +1888,9 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error in API worker data fetch: {e}")
             return None
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
