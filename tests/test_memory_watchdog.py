@@ -1,8 +1,6 @@
 import importlib
 import types
 
-import pytest
-
 
 def test_memory_watchdog_emergency(monkeypatch):
     """Ensure memory watchdog performs emergency cleanup when usage exceeds the threshold."""
