@@ -294,9 +294,10 @@ def record_memory_metrics():
         with memory_usage_lock:
             memory_usage_history.append(entry)
 
-            # Prune old entries
-            if len(memory_usage_history) > MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]:
-                memory_usage_history = memory_usage_history[-MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"] :]
+            # Prune old entries in-place to avoid leaking the previous list
+            max_entries = MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]
+            if len(memory_usage_history) > max_entries:
+                del memory_usage_history[:-max_entries]
 
     except Exception as e:
         logging.error(f"Error recording memory metrics: {e}")
