@@ -1290,7 +1290,13 @@ class MiningDashboardService:
             logging.info(f"Fetching worker data from: {url} (page {page_num+1} of max {max_pages})")
             response = self.session.get(url, timeout=15)
             if not response.ok:
-                logging.error(f"Error fetching page {page_num}: status code {response.status_code}")
+                logging.error(
+                    f"Error fetching page {page_num}: status code {response.status_code}"
+                )
+                try:
+                    response.close()
+                except Exception:
+                    pass
                 break
 
             soup = BeautifulSoup(response.text, "html.parser")
