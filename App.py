@@ -1689,24 +1689,24 @@ def earnings():
 
 
 def payments_to_csv(payments):
-    """Convert a list of payment dictionaries to CSV string."""
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(
-        ["date", "txid", "lightning_txid", "amount_btc", "amount_sats", "status"]
-    )
-    for pay in payments:
+    """Convert a list of payment dictionaries to a CSV string."""
+    with io.StringIO() as output:
+        writer = csv.writer(output)
         writer.writerow(
-            [
-                pay.get("date", ""),
-                pay.get("txid", ""),
-                pay.get("lightning_txid", ""),
-                pay.get("amount_btc", 0),
-                pay.get("amount_sats", 0),
-                pay.get("status", ""),
-            ]
+            ["date", "txid", "lightning_txid", "amount_btc", "amount_sats", "status"]
         )
-    return output.getvalue()
+        for pay in payments:
+            writer.writerow(
+                [
+                    pay.get("date", ""),
+                    pay.get("txid", ""),
+                    pay.get("lightning_txid", ""),
+                    pay.get("amount_btc", 0),
+                    pay.get("amount_sats", 0),
+                    pay.get("status", ""),
+                ]
+            )
+        return output.getvalue()
 
 
 @app.route("/api/earnings")
