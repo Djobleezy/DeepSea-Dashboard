@@ -312,6 +312,8 @@ class MiningDashboardService:
         result = {}
 
         # Fetch hashrate info
+        resp = None
+        hr_data = {}
         try:
             url = f"{api_base}/user_hashrate/{self.wallet}"
             resp = self.session.get(url, timeout=10)
@@ -330,11 +332,17 @@ class MiningDashboardService:
             result["hashrate_10min_unit"] = "H/s"
             result["hashrate_24hr_unit"] = "H/s"
             result["hashrate_3hr_unit"] = "H/s"
-            resp.close()
         except Exception as e:
             logging.error(f"Error fetching user_hashrate API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
 
         # Fetch latest statsnap data
+        resp = None
         try:
             url = f"{api_base}/statsnap/{self.wallet}"
             resp = self.session.get(url, timeout=10)
@@ -347,9 +355,14 @@ class MiningDashboardService:
                 if ts:
                     dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
-            resp.close()
         except Exception as e:
             logging.error(f"Error fetching statsnap API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
 
         # Merge additional data from other endpoints
         result.update(self.get_pool_stat_api())
@@ -370,6 +383,7 @@ class MiningDashboardService:
         """Fetch overall pool statistics using /pool_stat."""
         api_base = "https://api.ocean.xyz/v1"
         data = {}
+        resp = None
         try:
             url = f"{api_base}/pool_stat"
             resp = self.session.get(url, timeout=10)
@@ -379,9 +393,14 @@ class MiningDashboardService:
                 data["pool_total_hashrate_unit"] = "H/s"
                 data["workers_hashing"] = stat.get("workers") or stat.get("active_workers")
                 data["blocks_found"] = stat.get("blocks") or stat.get("blocks_found")
-            resp.close()
         except Exception as e:
             logging.error(f"Error fetching pool_stat API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
         return data
 
     def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
