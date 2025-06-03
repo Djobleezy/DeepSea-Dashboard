@@ -1831,6 +1831,7 @@ class MiningDashboardService:
     def get_worker_data_api(self):
         """Fetch worker data using the Ocean.xyz API."""
         api_base = "https://api.ocean.xyz/v1"
+        resp = None
         try:
             url = f"{api_base}/user_hashrate_full/{self.wallet}"
             logging.info(f"Fetching worker data from API: {url}")
