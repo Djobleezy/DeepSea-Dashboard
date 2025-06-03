@@ -672,3 +672,19 @@ def test_server_start_time_constant(monkeypatch):
     metrics2 = svc.fetch_metrics()
 
     assert metrics1["server_start_time"] == metrics2["server_start_time"]
+
+
+def test_service_del_calls_close(monkeypatch):
+    """Ensure __del__ calls close to avoid lingering threads."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    called = {"flag": False}
+
+    def fake_close():
+        called["flag"] = True
+
+    monkeypatch.setattr(svc, "close", fake_close)
+
+    svc.__del__()
+
+    assert called["flag"]

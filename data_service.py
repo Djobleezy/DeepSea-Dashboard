@@ -93,6 +93,10 @@ class MiningDashboardService:
         except Exception as e:
             logging.error(f"Error closing session: {e}")
 
+    def __del__(self):
+        """Ensure resources are released when the service is garbage collected."""
+        self.close()
+
     def fetch_metrics(self):
         """
         Fetch metrics from Ocean.xyz and other sources.
