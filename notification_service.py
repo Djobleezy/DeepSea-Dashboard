@@ -586,10 +586,10 @@ class NotificationService:
             return float(value_str)
 
         if isinstance(value_str, str):
-            # Remove commas and extract leading numeric portion to handle
-            # values like "1,234.5TH/s" without a space before the unit.
+            # Remove commas and search for the first numeric portion to handle
+            # values like "Hashrate: 1,234.5TH/s" or "1,234.5TH/s".
             cleaned = value_str.replace(",", "").strip()
-            match = re.match(r"[-+]?\d*\.?\d+", cleaned)
+            match = re.search(r"[-+]?\d*\.?\d+", cleaned)
             if match:
                 try:
                     return float(match.group(0))

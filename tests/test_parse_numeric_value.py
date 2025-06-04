@@ -62,3 +62,9 @@ def test_parse_numeric_value_with_commas():
 def test_parse_numeric_value_without_space():
     svc = NotificationService(DummyState())
     assert svc._parse_numeric_value("1,234.56TH/s") == pytest.approx(1234.56)
+
+
+def test_parse_numeric_value_with_prefix_text():
+    """Numbers appearing after text should still be parsed correctly."""
+    svc = NotificationService(DummyState())
+    assert svc._parse_numeric_value("Hashrate: 1,234.5 TH/s") == pytest.approx(1234.5)
