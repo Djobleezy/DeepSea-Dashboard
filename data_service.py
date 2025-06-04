@@ -1329,41 +1329,47 @@ class MiningDashboardService:
 
         while page_num < max_pages:  # Only fetch up to max_pages
             url = f"https://ocean.xyz/stats/{self.wallet}?wpage={page_num}#workers-fulltable"
-            logging.info(f"Fetching worker data from: {url} (page {page_num+1} of max {max_pages})")
-            response = self.session.get(url, timeout=15)
-            if not response.ok:
-                logging.error(
-                    f"Error fetching page {page_num}: status code {response.status_code}"
-                )
-                try:
-                    response.close()
-                except Exception:
-                    pass
-                break
-
-            soup = BeautifulSoup(response.text, "html.parser")
+            logging.info(
+                f"Fetching worker data from: {url} (page {page_num+1} of max {max_pages})"
+            )
+            response = None
             try:
-                workers_table = soup.find("tbody", id="workers-tablerows")
-                if not workers_table:
-                    logging.debug(f"No workers table found on page {page_num}")
+                response = self.session.get(url, timeout=15)
+                if not response.ok:
+                    logging.error(
+                        f"Error fetching page {page_num}: status code {response.status_code}"
+                    )
                     break
 
-                rows = workers_table.find_all("tr", class_="table-row")
-                if not rows:
-                    logging.debug(f"No worker rows found on page {page_num}, stopping pagination")
-                    break
+                soup = BeautifulSoup(response.text, "html.parser")
+                try:
+                    workers_table = soup.find("tbody", id="workers-tablerows")
+                    if not workers_table:
+                        logging.debug(f"No workers table found on page {page_num}")
+                        break
 
-                logging.info(f"Found {len(rows)} worker rows on page {page_num}")
-                for row in rows:
-                    row_dict = {
-                        "text": row.get_text(separator=" ", strip=True),
-                        "cells": [c.get_text(strip=True) for c in row.find_all(["td", "th"])],
-                        "attrs": dict(row.attrs),
-                    }
-                    all_rows.append(row_dict)
-                page_num += 1
+                    rows = workers_table.find_all("tr", class_="table-row")
+                    if not rows:
+                        logging.debug(
+                            f"No worker rows found on page {page_num}, stopping pagination"
+                        )
+                        break
+
+                    logging.info(f"Found {len(rows)} worker rows on page {page_num}")
+                    for row in rows:
+                        row_dict = {
+                            "text": row.get_text(separator=" ", strip=True),
+                            "cells": [c.get_text(strip=True) for c in row.find_all(["td", "th"])],
+                            "attrs": dict(row.attrs),
+                        }
+                        all_rows.append(row_dict)
+                    page_num += 1
+                finally:
+                    soup.decompose()
+            except Exception as e:
+                logging.error(f"Error fetching worker page {page_num}: {e}")
+                break
             finally:
-                soup.decompose()
                 if response:
                     try:
                         response.close()
