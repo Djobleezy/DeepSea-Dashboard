@@ -525,6 +525,11 @@ def update_metrics_job(force=False):
         finally:
             # Cancel timer in finally block to ensure it's always canceled
             timer.cancel()
+            if timer.is_alive():
+                try:
+                    timer.join()
+                except Exception:
+                    pass
     except Exception as e:
         logging.error(f"Background job: Unhandled exception: {e}")
         import traceback
