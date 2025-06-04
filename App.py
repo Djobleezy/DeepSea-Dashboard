@@ -1777,7 +1777,8 @@ if last_update:
 # Initialize the scheduler, shutting down any previous instance first
 if _previous_scheduler:
     try:
-        _previous_scheduler.shutdown(wait=False)
+        # Wait for any running jobs to finish to prevent thread leaks
+        _previous_scheduler.shutdown(wait=True)
     except Exception as e:
         logging.error(f"Error shutting down previous scheduler: {e}")
 

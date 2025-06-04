@@ -33,10 +33,10 @@ def test_reload_shuts_down_scheduler(monkeypatch):
     class DummyScheduler:
         def __init__(self):
             self.running = True
-            self.shutdown_called = False
+            self.shutdown_wait = None
 
         def shutdown(self, wait=False):
-            self.shutdown_called = True
+            self.shutdown_wait = wait
 
         def add_job(self, *a, **k):
             pass
@@ -57,5 +57,5 @@ def test_reload_shuts_down_scheduler(monkeypatch):
 
     App = importlib.reload(App)
 
-    assert old_sched.shutdown_called
+    assert old_sched.shutdown_wait is True
     assert isinstance(App.scheduler, DummyScheduler)
