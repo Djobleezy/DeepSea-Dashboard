@@ -564,7 +564,7 @@ def create_scheduler():
                 # Check if scheduler is running before attempting to shut it down
                 if hasattr(scheduler, "running") and scheduler.running:
                     logging.info("Shutting down existing scheduler before creating a new one")
-                    scheduler.shutdown(wait=False)
+                    scheduler.shutdown(wait=True)
             except Exception as e:
                 logging.error(f"Error shutting down existing scheduler: {e}")
 
