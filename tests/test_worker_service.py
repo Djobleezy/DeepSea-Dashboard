@@ -66,6 +66,23 @@ def test_generate_fallback_data_counts(monkeypatch):
     assert data["daily_sats"] == 500
 
 
+def test_generate_fallback_data_workers_hashing_str(monkeypatch):
+    """String values for workers_hashing should be handled gracefully."""
+    monkeypatch.setattr("worker_service.get_timezone", lambda: "UTC")
+    svc = WorkerService()
+    metrics = {
+        "workers_hashing": "2",
+        "hashrate_3hr": 60,
+        "hashrate_3hr_unit": "TH/s",
+        "unpaid_earnings": 0.1,
+        "daily_mined_sats": 500,
+    }
+    data = svc.generate_fallback_data(metrics)
+    assert data["workers_total"] == 2
+    assert data["workers_online"] == 1
+    assert data["workers_offline"] == 1
+
+
 def test_generate_fallback_data_earnings_distribution(monkeypatch):
     monkeypatch.setattr("worker_service.get_timezone", lambda: "UTC")
     svc = WorkerService()

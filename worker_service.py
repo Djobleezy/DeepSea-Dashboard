@@ -391,11 +391,15 @@ class WorkerService:
         # Check if we have workers_hashing information
         workers_count = cached_metrics.get("workers_hashing")
 
-        # Handle None value for workers_count
+        # Normalize workers_count to an integer
+        try:
+            workers_count = int(float(workers_count))
+        except (TypeError, ValueError):
+            workers_count = None
+
         if workers_count is None:
             logging.warning("No workers_hashing value in cached metrics, defaulting to 1 worker")
             workers_count = 1
-        # Force at least 1 worker if the count is 0
         elif workers_count <= 0:
             logging.warning("No workers reported in metrics, forcing 1 worker")
             workers_count = 1
