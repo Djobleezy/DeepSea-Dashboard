@@ -332,12 +332,12 @@
                 navToggle.style.color = '#f2a900';
             }
         
-            // Toggle menu open/closed when hamburger is clicked
-            navToggle.addEventListener('click', function() {
+            // Toggle menu open/closed when hamburger is clicked or activated via keyboard
+            function toggleMenu() {
                 navLinks.classList.toggle('is-open');
                 const isOpen = navLinks.classList.contains('is-open');
                 navToggle.setAttribute('aria-expanded', isOpen);
-            
+
                 // Change icon based on state
                 const icon = navToggle.querySelector('i');
                 if (icon) {
@@ -348,6 +348,14 @@
                         icon.classList.remove('fa-times');
                         icon.classList.add('fa-bars');
                     }
+                }
+            }
+
+            navToggle.addEventListener('click', toggleMenu);
+            navToggle.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleMenu();
                 }
             });
         
