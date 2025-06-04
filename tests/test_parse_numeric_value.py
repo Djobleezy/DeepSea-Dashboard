@@ -68,3 +68,9 @@ def test_parse_numeric_value_with_prefix_text():
     """Numbers appearing after text should still be parsed correctly."""
     svc = NotificationService(DummyState())
     assert svc._parse_numeric_value("Hashrate: 1,234.5 TH/s") == pytest.approx(1234.5)
+
+
+def test_parse_numeric_value_with_sign_and_space():
+    """Negative values with spaces after the sign should parse correctly."""
+    svc = NotificationService(DummyState())
+    assert svc._parse_numeric_value("- 2,000.5 TH/s") == pytest.approx(-2000.5)

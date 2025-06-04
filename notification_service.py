@@ -588,7 +588,9 @@ class NotificationService:
         if isinstance(value_str, str):
             # Remove commas and search for the first numeric portion to handle
             # values like "Hashrate: 1,234.5TH/s" or "1,234.5TH/s".
-            cleaned = value_str.replace(",", "").strip()
+            cleaned = value_str.replace(",", "")
+            # Remove spaces between a sign and the digits (e.g. "- 1.2" -> "-1.2")
+            cleaned = re.sub(r"([+-])\s+(?=\d)", r"\1", cleaned).strip()
             match = re.search(r"[-+]?\d*\.?\d+", cleaned)
             if match:
                 try:
