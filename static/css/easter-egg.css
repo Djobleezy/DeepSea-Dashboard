@@ -65,30 +65,37 @@
 }
 
 @keyframes swim {
-  from { transform: translateX(0); }
-  to { transform: translateX(calc(100vw + 200px)); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(100vw + 200px));
+  }
 }
 
 @keyframes spin-move {
-  from { transform: translateX(0) rotate(0deg); }
-  to { transform: translateX(calc(100vw + 200px)) rotate(720deg); }
+  from {
+    transform: translateX(0) rotate(0deg);
+  }
+  to {
+    transform: translateX(calc(100vw + 200px)) rotate(720deg);
+  }
 }
 
 @media (max-width: 600px) {
-    #easterEggOverlay {
-      font-size: 1.2rem;
-    }
-
-    #easterEggOverlay .whale,
-    #easterEggOverlay .sea-icon {
-      font-size: 2rem;
-    }
-
-    #easterEggOverlay .btc {
-      font-size: 2rem;
-    }
+  #easterEggOverlay {
+    font-size: 1.2rem;
   }
 
+  #easterEggOverlay .whale,
+  #easterEggOverlay .sea-icon {
+    font-size: 2rem;
+  }
+
+  #easterEggOverlay .btc {
+    font-size: 2rem;
+  }
+}
 
 .cursor-whale {
   position: fixed;

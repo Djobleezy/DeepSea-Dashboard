@@ -133,7 +133,9 @@ html.deepsea-theme {
   position: relative;
   background-color: var(--bg-color);
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
@@ -392,8 +394,6 @@ html.deepsea-theme {
 .setting-item strong {
   color: var(--accent-color);
 }
-
-
 
 /* ----- ANIMATIONS ----- */
 @keyframes bounceUp {

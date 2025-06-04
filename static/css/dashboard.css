@@ -517,21 +517,21 @@ html.deepsea-theme .toggle-btn.active {
 
 /* Landscape orientation adjustments for short screens */
 @media (orientation: landscape) and (max-height: 500px) {
-    #graphContainer {
-        height: 200px;
-    }
-    .chart-controls {
-        flex-wrap: wrap;
-    }
-    .row.equal-height > [class*="col-"] .card-body {
-        padding: 0.5rem;
-    }
-    .row.equal-height > [class*="col-"] .card-body p {
-        font-size: 0.85rem;
-    }
-    .row.equal-height > [class*="col-"] .card-header {
-        font-size: 1rem;
-    }
+  #graphContainer {
+    height: 200px;
+  }
+  .chart-controls {
+    flex-wrap: wrap;
+  }
+  .row.equal-height > [class*="col-"] .card-body {
+    padding: 0.5rem;
+  }
+  .row.equal-height > [class*="col-"] .card-body p {
+    font-size: 0.85rem;
+  }
+  .row.equal-height > [class*="col-"] .card-header {
+    font-size: 1rem;
+  }
 }
 
 /* ----- RETRO LED ----- */

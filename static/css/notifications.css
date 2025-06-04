@@ -255,7 +255,7 @@
 
 /* Hide delete button for block notifications */
 .notification-item[data-category="block"] .delete-button {
-    display: none;
+  display: none;
 }
 
 /* ----- PAGINATION ----- */
