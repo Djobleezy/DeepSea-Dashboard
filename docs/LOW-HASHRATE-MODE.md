@@ -10,4 +10,4 @@ The notification service uses a simpler rule. When the 3‑hour average is under
 
 ## Configuration
 
-Low hashrate mode does not currently expose any settings in `config.json`. The thresholds are hard coded. If future versions add configurable keys they will be documented here.
+Low hashrate mode does not currently expose any settings in `config.json`. The thresholds are hard coded at **0.01&nbsp;TH/s** for entry and **20&nbsp;TH/s** for exit. The configuration key `low_hashrate_threshold_ths` only influences the notification service and does not change the chart behavior. If future versions add configurable keys they will be documented here.

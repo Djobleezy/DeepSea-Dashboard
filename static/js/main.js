@@ -2231,8 +2231,11 @@ function updateChartWithNormalizedData(chart, data) {
         // Get values with enhanced stability
         let useHashrate3hr = false;
         const currentTime = Date.now();
-        const LOW_HASHRATE_THRESHOLD = window.lowHashrateThresholdTHS || 0.01; // TH/s
-        const HIGH_HASHRATE_THRESHOLD = window.highHashrateThresholdTHS || 20.0; // TH/s
+        // Front-end low hashrate mode uses fixed thresholds independent of
+        // configuration to avoid accidental interference with notification
+        // settings.
+        const LOW_HASHRATE_THRESHOLD = 0.01; // TH/s
+        const HIGH_HASHRATE_THRESHOLD = 20.0; // TH/s
         const MODE_SWITCH_DELAY = 120000;     // Increase to 2 minutes for more stability
         const CONSECUTIVE_SPIKES_THRESHOLD = 3; // Increase to require more consistent high readings
         const MIN_MODE_STABILITY_TIME = 120000; // 2 minutes minimum between mode switches
