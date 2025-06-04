@@ -49,6 +49,7 @@ memory_usage_history = []
 memory_usage_lock = threading.Lock()
 last_leak_check_time = 0
 object_counts_history = {}
+leak_growth_tracker = {}
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -216,8 +217,8 @@ def adaptive_gc(force_level=None):
 
 
 def check_for_memory_leaks():
-    """Monitor object counts over time to identify potential memory leaks."""
-    global object_counts_history, last_leak_check_time
+    """Monitor object counts over time and flag persistent growth."""
+    global object_counts_history, last_leak_check_time, leak_growth_tracker
 
     current_time = time.time()
     if current_time - last_leak_check_time < 3600:  # Check once per hour
@@ -256,20 +257,27 @@ def check_for_memory_leaks():
                 # Only consider types with significant count
                 if prev_count > 100:
                     growth = count - prev_count
-                    # Alert on significant growth
                     if growth > 0 and (growth / prev_count) > 0.5:
-                        potential_leaks.append(
-                            {
-                                "type": obj_type,
-                                "previous": prev_count,
-                                "current": count,
-                                "growth": f"{growth} (+{(growth/prev_count)*100:.1f}%)",
-                            }
-                        )
+                        leak_growth_tracker[obj_type] = leak_growth_tracker.get(obj_type, 0) + 1
+                        if leak_growth_tracker[obj_type] >= 2:
+                            potential_leaks.append(
+                                {
+                                    "type": obj_type,
+                                    "previous": prev_count,
+                                    "current": count,
+                                    "growth": f"{growth} (+{(growth/prev_count)*100:.1f}%)",
+                                }
+                            )
+                    else:
+                        leak_growth_tracker.pop(obj_type, None)
+
+            # Remove trackers for types no longer growing
+            for t in list(leak_growth_tracker.keys()):
+                if t not in type_counts or type_counts[t] <= object_counts_history.get(t, 0):
+                    leak_growth_tracker.pop(t, None)
 
             if potential_leaks:
                 logging.warning(f"Potential memory leaks detected: {potential_leaks}")
-                # Generate notification
                 notification_service.add_notification(
                     f"Potential memory leaks detected - {len(potential_leaks)} object types grew. Check logs for details.",
                     level=NotificationLevel.WARNING,
