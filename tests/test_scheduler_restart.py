@@ -59,3 +59,36 @@ def test_reload_shuts_down_scheduler(monkeypatch):
 
     assert old_sched.shutdown_wait is True
     assert isinstance(App.scheduler, DummyScheduler)
+
+
+def test_previous_scheduler_cleared(monkeypatch):
+    """Ensure old scheduler reference is cleared after reload to prevent memory leaks."""
+    App = importlib.reload(importlib.import_module("App"))
+
+    class DummyScheduler:
+        def __init__(self):
+            self.shutdown_called = False
+            self.running = True
+
+        def shutdown(self, wait=False):
+            self.shutdown_called = True
+
+        def add_job(self, *a, **k):
+            pass
+
+        def start(self):
+            pass
+
+        def get_jobs(self):
+            return []
+
+    App.scheduler = DummyScheduler()
+
+    monkeypatch.setattr(
+        "apscheduler.schedulers.background.BackgroundScheduler",
+        lambda job_defaults=None: DummyScheduler(),
+    )
+
+    App = importlib.reload(App)
+
+    assert App._previous_scheduler is None

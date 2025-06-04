@@ -1800,6 +1800,9 @@ if _previous_scheduler:
         _previous_scheduler.shutdown(wait=True)
     except Exception as e:
         logging.error(f"Error shutting down previous scheduler: {e}")
+    finally:
+        # Clear reference so old scheduler can be garbage collected
+        _previous_scheduler = None
 
 scheduler = create_scheduler()
 
