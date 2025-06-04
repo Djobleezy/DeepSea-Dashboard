@@ -1061,6 +1061,12 @@ function displayPayoutComparison(comparison) {
     // Remove old comparison element if exists
     $("#payout-comparison").remove();
 
+    // Skip displaying the line entirely when Matrix theme is active
+    const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+    if (useMatrix) {
+        return;
+    }
+
     // Create a new comparison element
     const comparisonElement = $("<p id='payout-comparison'></p>");
 
@@ -1125,7 +1131,7 @@ function initPayoutTracking() {
         click: togglePayoutHistoryDisplay,
         class: "btn btn-sm mt-2",
         style: `
-            background-color: ${theme.PRIMARY}; 
+            background-color: ${theme.PRIMARY};
             color: ${isDeepSea ? 'white' : 'black'};
             border-radius: 0;
             font-style: bold;
@@ -1148,7 +1154,8 @@ function initPayoutTracking() {
 
         $("#view-payout-history").css({
             'background-color': updatedTheme.PRIMARY,
-            'color': isDeepSeaActive ? 'white' : 'black'  // White for DeepSea, Black for Bitcoin
+            // Use black text for Matrix and Bitcoin themes
+            'color': isDeepSeaActive ? 'white' : 'black'
         });
     });
 
