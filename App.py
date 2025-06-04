@@ -1800,6 +1800,13 @@ def graceful_shutdown(signum, frame):
         except Exception as e:
             logging.error(f"Error closing dashboard service: {e}")
 
+    # Close all logging handlers to avoid file descriptor leaks
+    for handler in logging.getLogger().handlers:
+        try:
+            handler.close()
+        except Exception as e:
+            logging.error(f"Error closing log handler: {e}")
+
     # Log connection info before exit
     logging.info(f"Active SSE connections at shutdown: {active_sse_connections}")
 
