@@ -25,3 +25,37 @@ def test_create_scheduler_waits(monkeypatch):
 
     assert existing.shutdown_called is True
     assert isinstance(new_sched, DummyScheduler)
+
+
+def test_reload_shuts_down_scheduler(monkeypatch):
+    App = importlib.reload(importlib.import_module("App"))
+
+    class DummyScheduler:
+        def __init__(self):
+            self.running = True
+            self.shutdown_called = False
+
+        def shutdown(self, wait=False):
+            self.shutdown_called = True
+
+        def add_job(self, *a, **k):
+            pass
+
+        def start(self):
+            pass
+
+        def get_jobs(self):
+            return []
+
+    old_sched = DummyScheduler()
+    App.scheduler = old_sched
+
+    monkeypatch.setattr(
+        "apscheduler.schedulers.background.BackgroundScheduler",
+        lambda job_defaults=None: DummyScheduler(),
+    )
+
+    App = importlib.reload(App)
+
+    assert old_sched.shutdown_called
+    assert isinstance(App.scheduler, DummyScheduler)

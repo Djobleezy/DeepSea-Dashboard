@@ -99,6 +99,7 @@ scheduler_last_successful_run = None
 scheduler_recreate_lock = threading.Lock()
 
 # Track scheduler health
+_previous_scheduler = globals().get("scheduler")
 scheduler = None
 
 # Global start time
@@ -1773,7 +1774,13 @@ if last_run:
 if last_update:
     last_metrics_update_time = last_update
 
-# Initialize the scheduler
+# Initialize the scheduler, shutting down any previous instance first
+if _previous_scheduler:
+    try:
+        _previous_scheduler.shutdown(wait=False)
+    except Exception as e:
+        logging.error(f"Error shutting down previous scheduler: {e}")
+
 scheduler = create_scheduler()
 
 
