@@ -1122,7 +1122,8 @@ function initPayoutTracking() {
 
     // Add a button to view payout history with theme-aware styling
     const theme = getCurrentTheme();
-    const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+    const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+    const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true' && !useMatrix;
 
     // Create button with theme-aware text color
     const viewHistoryButton = $("<button>", {
@@ -1149,8 +1150,8 @@ function initPayoutTracking() {
     // Update theme-change listener for the button with fixed colors for each theme
     $(document).on('themeChanged', function () {
         const updatedTheme = getCurrentTheme();
-        // Check if DeepSea theme is active
-        const isDeepSeaActive = localStorage.getItem('useDeepSeaTheme') === 'true';
+        const matrixActive = localStorage.getItem('useMatrixTheme') === 'true';
+        const isDeepSeaActive = localStorage.getItem('useDeepSeaTheme') === 'true' && !matrixActive;
 
         $("#view-payout-history").css({
             'background-color': updatedTheme.PRIMARY,
@@ -1323,7 +1324,8 @@ function displayPayoutSummary() {
 
     // Add view more link to the earnings page
     const viewMoreLink = $("<div class='text-center'></div>");
-    const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
+    const matrixActive = localStorage.getItem('useMatrixTheme') === 'true';
+    const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true' && !matrixActive;
     viewMoreLink.html(`
         <a href='/earnings' class='btn btn-sm' style='background-color:${theme.PRIMARY};color:${isDeepSea ? 'white' : 'black'};'>
             Complete Payout History
