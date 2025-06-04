@@ -1,9 +1,12 @@
 (function() {
     "use strict";
 
+    let matrixIntervalId = null;
+    let resizeHandler = null;
+
     function initMatrixRain() {
         if (document.getElementById('matrixRain')) {
-            return; // avoid duplicate canvases
+            cleanupMatrixRain();
         }
 
         const canvas = document.createElement('canvas');
@@ -41,8 +44,24 @@
         }
 
         resize();
-        window.addEventListener('resize', resize);
-        setInterval(draw, 50);
+        resizeHandler = resize;
+        window.addEventListener('resize', resizeHandler);
+        matrixIntervalId = setInterval(draw, 50);
+    }
+
+    function cleanupMatrixRain() {
+        const canvas = document.getElementById('matrixRain');
+        if (canvas) {
+            canvas.remove();
+        }
+        if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+            resizeHandler = null;
+        }
+        if (matrixIntervalId) {
+            clearInterval(matrixIntervalId);
+            matrixIntervalId = null;
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -52,4 +71,5 @@
     });
 
     window.initMatrixRain = initMatrixRain;
+    window.cleanupMatrixRain = cleanupMatrixRain;
 })();

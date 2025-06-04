@@ -160,6 +160,10 @@ function applyDeepSeaTheme() {
     try {
         console.log("Applying DeepSea theme...");
 
+        if (window.cleanupMatrixRain) {
+            window.cleanupMatrixRain();
+        }
+
         // Update the data-text attribute for DeepSea theme
         updateDashboardDataText(true);
 
@@ -514,6 +518,9 @@ function toggleTheme() {
 
     // Disable secret Matrix theme when toggling
     localStorage.setItem('useMatrixTheme', 'false');
+    if (window.cleanupMatrixRain) {
+        window.cleanupMatrixRain();
+    }
 
     // Update the data-text attribute based on the new theme
     updateDashboardDataText(useDeepSea);
