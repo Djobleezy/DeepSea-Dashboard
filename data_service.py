@@ -149,20 +149,27 @@ class MiningDashboardService:
         # Add execution time tracking
         start_time = time.time()
 
+        future_ocean = self.executor.submit(self.get_ocean_data)
+        future_btc = self.executor.submit(self.get_bitcoin_stats)
         try:
-            future_ocean = self.executor.submit(self.get_ocean_data)
-            future_btc = self.executor.submit(self.get_bitcoin_stats)
-            try:
-                ocean_data = future_ocean.result(timeout=15)
-                btc_stats = future_btc.result(timeout=15)
-            except Exception as e:
-                logging.error(f"Error fetching metrics concurrently: {e}")
-                return None
+            ocean_data = future_ocean.result(timeout=15)
+            btc_stats = future_btc.result(timeout=15)
+        except Exception as e:
+            logging.error(f"Error fetching metrics concurrently: {e}")
+            return None
+        finally:
+            for fut in (future_ocean, future_btc):
+                try:
+                    if fut and not fut.done():
+                        fut.cancel()
+                except Exception:
+                    pass
 
-            if ocean_data is None:
-                logging.error("Failed to retrieve Ocean data")
-                return None
+        if ocean_data is None:
+            logging.error("Failed to retrieve Ocean data")
+            return None
 
+        try:
             difficulty, network_hashrate, btc_price, block_count = btc_stats
 
             # If we failed to get network hashrate, use a reasonable default to prevent division by zero

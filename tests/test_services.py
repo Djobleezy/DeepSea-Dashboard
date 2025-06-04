@@ -703,3 +703,32 @@ def test_service_del_calls_close(monkeypatch):
     svc.__del__()
 
     assert called["flag"]
+
+
+def test_fetch_metrics_cancels_futures(monkeypatch):
+    """Futures should be cancelled when fetch_metrics times out."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    class DummyFuture:
+        def __init__(self):
+            self.cancelled = False
+
+        def result(self, timeout=None):
+            raise TimeoutError
+
+        def cancel(self):
+            self.cancelled = True
+
+        def done(self):
+            return False
+
+    ocean_future = DummyFuture()
+    btc_future = DummyFuture()
+
+    def fake_submit(func):
+        return ocean_future if func == svc.get_ocean_data else btc_future
+
+    monkeypatch.setattr(svc.executor, "submit", fake_submit)
+
+    assert svc.fetch_metrics() is None
+    assert ocean_future.cancelled and btc_future.cancelled
