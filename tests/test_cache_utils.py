@@ -1,5 +1,7 @@
 import time
 import threading
+import gc
+import weakref
 
 from cache_utils import ttl_cache
 
@@ -116,3 +118,25 @@ def test_ttl_cache_maxsize(monkeypatch):
     # Oldest entry (1) should have been removed
     assert identity(1) == 1
     assert identity.cache_size() == 2
+
+
+def test_ttl_cache_releases_object_cache(monkeypatch):
+    """Cache entries for object methods should be removed when the object is garbage collected."""
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    class Foo:
+        @ttl_cache(ttl_seconds=60)
+        def bar(self, x):
+            return x * 2
+
+    obj = Foo()
+    assert obj.bar(3) == 6
+    assert Foo.bar.cache_size() == 1
+
+    ref = weakref.ref(obj)
+    del obj
+    gc.collect()
+
+    assert ref() is None
+    assert Foo.bar.cache_size() == 0
