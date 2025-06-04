@@ -123,6 +123,12 @@ file_handler.setFormatter(formatter)
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 
+# Close any existing handlers before replacing them to avoid leaks
+for handler in list(logger.handlers):
+    try:
+        handler.close()
+    except Exception:
+        pass
 logger.handlers.clear()
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
