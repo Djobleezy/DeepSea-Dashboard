@@ -68,6 +68,8 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
                 cache.clear()
 
         def cache_size():
+            now = time.time()
+            _purge_expired(now)
             with lock:
                 return len(cache)
 
