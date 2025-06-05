@@ -49,7 +49,7 @@ class StateManager:
 
         # Initialize in-memory structures for historical data
         self.arrow_history = {}  # Stored per second
-        self.hashrate_history = []
+        self.hashrate_history = deque(maxlen=MAX_HISTORY_ENTRIES)
         self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
         self.payout_history = []
         # Maintain short-term history for 3hr variance calculations
@@ -153,7 +153,9 @@ class StateManager:
                         )
 
                     # Restore hashrate_history
-                    self.hashrate_history = state.get("hashrate_history", [])
+                    self.hashrate_history = deque(
+                        state.get("hashrate_history", []), maxlen=MAX_HISTORY_ENTRIES
+                    )
 
                     # Restore variance_history if present
                     compact_variance = state.get("variance_history", {})
@@ -185,7 +187,9 @@ class StateManager:
                     self.arrow_history = {
                         key: deque(values, maxlen=MAX_HISTORY_ENTRIES) for key, values in raw_history.items()
                     }
-                    self.hashrate_history = state.get("hashrate_history", [])
+                    self.hashrate_history = deque(
+                        state.get("hashrate_history", []), maxlen=MAX_HISTORY_ENTRIES
+                    )
                     self.metrics_log = deque(state.get("metrics_log", []), maxlen=MAX_HISTORY_ENTRIES)
 
                 logging.info(f"Loaded graph state from Redis (format version {version}).")
@@ -235,7 +239,7 @@ class StateManager:
 
             # Compact hashrate_history
             compact_hashrate_history = (
-                self.hashrate_history[-60:] if len(self.hashrate_history) > 60 else self.hashrate_history
+                list(self.hashrate_history)[-60:] if len(self.hashrate_history) > 60 else list(self.hashrate_history)
             )
 
             # Compact metrics_log with unit preservation

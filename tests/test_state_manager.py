@@ -225,3 +225,31 @@ def test_prune_old_data():
 
     assert len(mgr.arrow_history["hashrate_60sec"]) <= MAX_HISTORY_ENTRIES
     assert len(mgr.metrics_log) <= MAX_HISTORY_ENTRIES
+
+
+def test_hashrate_history_limit():
+    mgr = StateManager()
+    for i in range(MAX_HISTORY_ENTRIES + 10):
+        mgr.hashrate_history.append(i)
+
+    assert isinstance(mgr.hashrate_history, deque)
+    assert len(mgr.hashrate_history) == MAX_HISTORY_ENTRIES
+
+
+def test_hashrate_history_loaded_as_deque(monkeypatch):
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+    data = {
+        "arrow_history": {},
+        "hashrate_history": list(range(5)),
+        "metrics_log": [],
+    }
+    mgr.redis_client.set(f"{mgr.STATE_KEY}_version", "2.0")
+    mgr.redis_client.set(mgr.STATE_KEY, json.dumps(data))
+
+    new_mgr = StateManager()
+    new_mgr.redis_client = mgr.redis_client
+    new_mgr.load_graph_state()
+
+    assert isinstance(new_mgr.hashrate_history, deque)
+    assert new_mgr.hashrate_history.maxlen == MAX_HISTORY_ENTRIES
