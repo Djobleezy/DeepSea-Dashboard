@@ -102,6 +102,7 @@ scheduler_recreate_lock = threading.Lock()
 
 # Track scheduler health
 _previous_scheduler = globals().get("scheduler")
+_previous_dashboard_service = globals().get("dashboard_service")
 scheduler = None
 
 # Global start time
@@ -1787,6 +1788,15 @@ if hasattr(dashboard_service, "set_worker_service"):
     dashboard_service.set_worker_service(worker_service)
 worker_service.set_dashboard_service(dashboard_service)
 notification_service.dashboard_service = dashboard_service
+
+# Close any previous dashboard service instance to avoid resource leaks
+if _previous_dashboard_service:
+    try:
+        _previous_dashboard_service.close()
+    except Exception as e:
+        logging.error(f"Error closing previous dashboard service: {e}")
+    finally:
+        _previous_dashboard_service = None
 
 # Restore critical state if available
 last_run, last_update = state_manager.load_critical_state()
