@@ -601,7 +601,12 @@ class StateManager:
             metrics["arrow_history"] = aggregated_history
             metrics["history"] = self.hashrate_history
 
-            entry = {"timestamp": datetime.now().isoformat(), "metrics": metrics}
+            # Store a lightweight snapshot in metrics_log to avoid memory growth
+            snapshot = metrics.copy()
+            snapshot.pop("arrow_history", None)
+            snapshot.pop("history", None)
+
+            entry = {"timestamp": datetime.now().isoformat(), "metrics": snapshot}
             self.metrics_log.append(entry)
 
     def save_notifications(self, notifications):

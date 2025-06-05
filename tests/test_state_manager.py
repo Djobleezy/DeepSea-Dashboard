@@ -226,7 +226,6 @@ def test_prune_old_data():
     assert len(mgr.arrow_history["hashrate_60sec"]) <= MAX_HISTORY_ENTRIES
     assert len(mgr.metrics_log) <= MAX_HISTORY_ENTRIES
 
-
 def test_hashrate_history_limit():
     mgr = StateManager()
     for i in range(MAX_HISTORY_ENTRIES + 10):
@@ -253,3 +252,16 @@ def test_hashrate_history_loaded_as_deque(monkeypatch):
 
     assert isinstance(new_mgr.hashrate_history, deque)
     assert new_mgr.hashrate_history.maxlen == MAX_HISTORY_ENTRIES
+
+def test_metrics_log_snapshot_omits_history(monkeypatch):
+    """metrics_log should not store arrow_history or history fields."""
+    mgr = StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    metrics = {"hashrate_60sec": 1}
+    mgr.update_metrics_history(metrics)
+
+    latest = mgr.metrics_log[-1]["metrics"]
+    assert "arrow_history" not in latest
+    assert "history" not in latest
+
