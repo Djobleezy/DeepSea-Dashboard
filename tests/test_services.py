@@ -705,6 +705,23 @@ def test_service_del_calls_close(monkeypatch):
     assert called["flag"]
 
 
+def test_close_clears_resources(monkeypatch):
+    """close() should drop session and executor references."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    monkeypatch.setattr(svc.executor, "shutdown", lambda **kw: None)
+    class DummySession:
+        def close(self):
+            pass
+
+    svc.session = DummySession()
+
+    svc.close()
+
+    assert svc.session is None
+    assert svc.executor is None
+
+
 def test_fetch_metrics_cancels_futures(monkeypatch):
     """Futures should be cancelled when fetch_metrics times out."""
     svc = MiningDashboardService(0, 0, "w")

@@ -120,6 +120,9 @@ class MiningDashboardService:
                 except Exception:
                     pass
 
+            # Release the executor reference to free threads
+            self.executor = None
+
             # Close session and underlying adapters
             try:
                 self.session.close()
@@ -130,6 +133,8 @@ class MiningDashboardService:
                             adapter.close()
                         except Exception:
                             pass
+                # Drop the session reference to free connection pools
+                self.session = None
         except Exception as e:
             logging.error(f"Error closing session: {e}")
 
