@@ -599,7 +599,7 @@ class StateManager:
                 )
 
             metrics["arrow_history"] = aggregated_history
-            metrics["history"] = self.hashrate_history
+            metrics["history"] = list(self.hashrate_history)
 
             # Store a lightweight snapshot in metrics_log to avoid memory growth
             snapshot = metrics.copy()

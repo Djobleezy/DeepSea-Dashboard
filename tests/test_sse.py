@@ -63,3 +63,18 @@ def test_stream_connection_limit(sse_client, monkeypatch):
     assert resp.status_code == 200
     body = resp.data.decode()
     assert "Too many connections" in body
+
+
+def test_stream_converts_deque(sse_client, monkeypatch):
+    """SSE output should convert deque objects to lists."""
+    import App
+    from collections import deque
+
+    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    monkeypatch.setattr(App.time, "sleep", lambda x: None)
+    App.cached_metrics = {"server_timestamp": 1, "history": deque([1, 2])}
+
+    resp = sse_client.get("/stream")
+    assert resp.status_code == 200
+    events = parse_events(resp.data)
+    assert any('"history": [1, 2]' in e for e in events)

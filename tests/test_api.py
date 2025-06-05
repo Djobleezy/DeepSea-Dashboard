@@ -147,6 +147,23 @@ def test_metrics_endpoint(client, monkeypatch):
     assert resp.get_json() == metrics
 
 
+def test_metrics_endpoint_converts_deques(client, monkeypatch):
+    """Ensure /api/metrics serializes deque objects as lists."""
+    import App
+    from collections import deque
+
+    metrics = {"history": deque([1, 2]), "server_timestamp": 1}
+
+    def fake_update(force=False):
+        App.cached_metrics = metrics
+
+    monkeypatch.setattr(App, "update_metrics_job", fake_update)
+    App.cached_metrics = None
+    resp = client.get("/api/metrics")
+    assert resp.status_code == 200
+    assert resp.get_json()["history"] == [1, 2]
+
+
 def test_notifications_unread_count_endpoint(client):
     import App
 
