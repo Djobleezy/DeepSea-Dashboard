@@ -354,6 +354,7 @@ let trendLabels = [];
 let trendChart = null;
 // Stored block annotations as ISO timestamp strings
 let blockAnnotations = [];
+const sparklineCharts = {};
 let connectionRetryCount = 0;
 let maxRetryCount = 10;
 let reconnectionDelay = 1000; // Start with 1 second
@@ -2053,6 +2054,65 @@ function updateWorkersCount() {
             updateElementHTML("datum_status", "<span class='status-red'>OFFLINE</span> <i class='fa-solid fa-satellite-dish satellite-dish satellite-dish-offline'></i>");
         }
     }
+}
+
+function initializeFlippableCards() {
+    document.querySelectorAll('.flip-card').forEach(card => {
+        card.addEventListener('click', () => {
+            card.classList.toggle('flip');
+        });
+    });
+}
+
+function createOrUpdateSparkline(metric, history) {
+    const ctx = document.getElementById(`spark_${metric}`);
+    if (!ctx || !history) return;
+    const values = history.map(item => parseFloat(item.value) || 0);
+    const labels = history.map(() => '');
+    if (!sparklineCharts[metric]) {
+        sparklineCharts[metric] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    borderColor: '#1137F5',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: false,
+                        min: Math.min(...values) * 0.9,
+                        max: Math.max(...values) * 1.1
+                    }
+                },
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                animation: false
+            }
+        });
+    } else {
+        const chart = sparklineCharts[metric];
+        chart.data.datasets[0].data = values;
+        chart.options.scales.y.min = Math.min(...values) * 0.9;
+        chart.options.scales.y.max = Math.max(...values) * 1.1;
+        chart.update('none');
+    }
+}
+
+function updateSparklines() {
+    if (!latestMetrics || !latestMetrics.arrow_history) return;
+    const history = latestMetrics.arrow_history;
+    Object.keys(history).forEach(key => {
+        createOrUpdateSparkline(key, history[key]);
+    });
 }
 
 // Check for block updates and show congratulatory messages
@@ -3779,6 +3839,8 @@ function updateUI() {
         updateIndicators(data);
         checkForBlockUpdates(data);
 
+        updateSparklines();
+
         // Add this call before storing current metrics as previous metrics
         trackPayoutPerformance(data);
 
@@ -4128,6 +4190,7 @@ $(document).ready(function () {
         // Setup theme change listener
         setupThemeChangeListener();
         loadBlockAnnotations();
+        initializeFlippableCards();
     } catch (e) {
         console.error("Error handling theme:", e);
     }

@@ -28,9 +28,11 @@
 <!-- Miner Status and Payout Info -->
 <div class="row mb-2 equal-height">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">Miner Status</div>
-            <div class="card-body">
+        <div class="flip-card">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header">Miner Status</div>
+                    <div class="card-body">
                 <p>
                     <strong>Status:</strong>
                     <span id="miner_status" class="metric-value">
@@ -72,14 +74,26 @@
                     </span>
                     <span id="indicator_blocks_found"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">Miner Status</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="workers_hashing">
+                            <canvas id="spark_workers_hashing"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card" id="payoutMiscCard">
-            <div class="card-header">Payout Info</div>
-            <div class="card-body">
+        <div class="flip-card" id="payoutMiscCard">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header">Payout Info</div>
+                    <div class="card-body">
                 <!-- Original Pool Fees line - modified to show just percentage and SATS -->
                 <p>
                     <strong>Pool Fees:</strong>
@@ -131,6 +145,16 @@
                     </span>
                     <span id="indicator_est_time_to_payout"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">Payout Info</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="unpaid_earnings">
+                            <canvas id="spark_unpaid_earnings"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -139,9 +163,11 @@
 <!-- Pool Hashrates and Bitcoin Network Stats -->
 <div class="row equal-height">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">Pool Hashrates</div>
-            <div class="card-body">
+        <div class="flip-card">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header">Pool Hashrates</div>
+                    <div class="card-body">
                 <p>
                     <strong>Pool Hashrate:</strong>
                     <span id="pool_total_hashrate" class="metric-value white">
@@ -218,14 +244,38 @@
                     </span>
                     <span id="indicator_hashrate_60sec"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">Pool Hashrates</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="pool_total_hashrate">
+                            <canvas id="spark_pool_total_hashrate"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="hashrate_24hr">
+                            <canvas id="spark_hashrate_24hr"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="hashrate_3hr">
+                            <canvas id="spark_hashrate_3hr"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="hashrate_10min">
+                            <canvas id="spark_hashrate_10min"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="hashrate_60sec">
+                            <canvas id="spark_hashrate_60sec"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">Network Stats</div>
-            <div class="card-body">
+        <div class="flip-card">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header">Network Stats</div>
+                    <div class="card-body">
                 <p>
                     <strong>₿ Price:</strong>
                     <span id="btc_price" class="metric-value yellow">
@@ -270,6 +320,25 @@
                     </span>
                     <span id="indicator_difficulty"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">Network Stats</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="btc_price">
+                            <canvas id="spark_btc_price"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="block_number">
+                            <canvas id="spark_block_number"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="network_hashrate">
+                            <canvas id="spark_network_hashrate"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="difficulty">
+                            <canvas id="spark_difficulty"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -278,9 +347,11 @@
 <!-- Satoshi and USD Metrics -->
 <div class="row equal-height">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">SATOSHI EARNINGS</div>
-            <div class="card-body">
+        <div class="flip-card">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header">SATOSHI EARNINGS</div>
+                    <div class="card-body">
                 <p>
                     <strong>Projected Daily (Net):</strong>
                     <span id="daily_mined_sats" class="metric-value yellow">
@@ -336,14 +407,38 @@
                     </span>
                     <span id="indicator_estimated_rewards_in_window_sats"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">SATOSHI EARNINGS</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="daily_mined_sats">
+                            <canvas id="spark_daily_mined_sats"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="monthly_mined_sats">
+                            <canvas id="spark_monthly_mined_sats"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="estimated_earnings_per_day_sats">
+                            <canvas id="spark_estimated_earnings_per_day_sats"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="estimated_earnings_next_block_sats">
+                            <canvas id="spark_estimated_earnings_next_block_sats"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="estimated_rewards_in_window_sats">
+                            <canvas id="spark_estimated_rewards_in_window_sats"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header" id="currency-earnings-header">{% if metrics and metrics.power_usage_estimated %}Est. {% endif %}{{ user_currency|default('') }} EARNINGS</div>
-            <div class="card-body">
+        <div class="flip-card">
+            <div class="flip-card-inner">
+                <div class="card card-front">
+                    <div class="card-header" id="currency-earnings-header">{% if metrics and metrics.power_usage_estimated %}Est. {% endif %}{{ user_currency|default('') }} EARNINGS</div>
+                    <div class="card-body">
                 <p>
                     <strong>Daily Revenue:</strong>
                     <span id="daily_revenue" class="metric-value green">
@@ -394,6 +489,25 @@
                     </span>
                     <span id="indicator_monthly_profit_usd"></span>
                 </p>
+                    </div>
+                </div>
+                <div class="card card-back">
+                    <div class="card-header">{{ user_currency|default('') }} EARNINGS</div>
+                    <div class="card-body">
+                        <div class="sparkline-chart" data-metric="daily_revenue">
+                            <canvas id="spark_daily_revenue"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="daily_power_cost">
+                            <canvas id="spark_daily_power_cost"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="daily_profit_usd">
+                            <canvas id="spark_daily_profit_usd"></canvas>
+                        </div>
+                        <div class="sparkline-chart" data-metric="monthly_profit_usd">
+                            <canvas id="spark_monthly_profit_usd"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
