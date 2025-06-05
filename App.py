@@ -9,6 +9,7 @@ import time
 import gc
 import psutil
 from collections import deque
+from json_utils import convert_deques
 import signal
 import sys
 import threading
@@ -688,7 +689,8 @@ def stream():
 
             # Send initial data immediately to prevent delay in dashboard updates
             if cached_metrics:
-                yield f"data: {json.dumps(cached_metrics)}\n\n"
+                initial_data = json.dumps(convert_deques(cached_metrics))
+                yield f"data: {initial_data}\n\n"
                 last_timestamp = cached_metrics.get("server_timestamp")
             else:
                 # Send ping if no data available yet
@@ -710,8 +712,8 @@ def stream():
                                 if len(values) > num_points:
                                     sse_metrics["arrow_history"][key] = values[-num_points:]
 
-                        # Serialize data only once
-                        data = json.dumps(sse_metrics)
+                        # Serialize data only once, converting deques to lists
+                        data = json.dumps(convert_deques(sse_metrics))
                         last_timestamp = cached_metrics.get("server_timestamp")
                         yield f"data: {data}\n\n"
 
@@ -846,7 +848,7 @@ def api_metrics():
     """API endpoint for metrics data."""
     if cached_metrics is None:
         update_metrics_job()
-    return jsonify(cached_metrics)
+    return jsonify(convert_deques(cached_metrics))
 
 
 @app.route("/api/batch", methods=["POST"])
