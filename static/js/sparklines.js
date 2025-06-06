@@ -18,12 +18,38 @@
         return canvas;
     }
 
+    /**
+     * Initialize sparkline canvases and ensure metrics are structured
+     * consistently so the charts appear inline with the metric value.
+     */
     function initSparklines() {
+        const skipKeys = new Set(['workers_hashing', 'unpaid_earnings']);
+
         document.querySelectorAll('[id^="indicator_"]').forEach(indicator => {
             const key = indicator.id.replace('indicator_', '');
+            if (skipKeys.has(key)) {
+                return; // skip sparklines for specified metrics
+            }
+
             const canvas = ensureCanvas(`sparkline_${key}`);
-            if (!indicator.nextSibling || indicator.nextSibling.id !== canvas.id) {
-                indicator.after(canvas);
+
+            // Ensure a container span so the metric, indicator and chart
+            // share the same grid cell regardless of divider usage
+            let mainMetric = indicator.closest('.main-metric');
+            if (!mainMetric) {
+                const metricEl = document.getElementById(key);
+                if (metricEl && metricEl.parentNode === indicator.parentNode) {
+                    mainMetric = document.createElement('span');
+                    mainMetric.className = 'main-metric';
+                    metricEl.parentNode.insertBefore(mainMetric, metricEl);
+                    mainMetric.appendChild(metricEl);
+                    mainMetric.appendChild(indicator);
+                }
+            }
+
+            const container = mainMetric || indicator.parentNode;
+            if (!canvas.parentNode || canvas.parentNode !== container) {
+                container.appendChild(canvas);
             }
         });
     }
