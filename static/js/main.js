@@ -1130,7 +1130,7 @@ function initPayoutTracking() {
         id: "view-payout-history",
         text: "VIEW LAST PAYOUT",
         click: togglePayoutHistoryDisplay,
-        class: "btn btn-sm mt-2",
+        class: "btn btn-sm mt-2 d-block",
         style: `
             background-color: ${theme.PRIMARY};
             color: ${isDeepSea ? 'white' : 'black'};
@@ -1139,13 +1139,18 @@ function initPayoutTracking() {
         `
     });
 
-    $("#est_time_to_payout").parent().after(viewHistoryButton);
+    const viewHistoryWrapper = $("<p>", {
+        id: "last-payout-btn-wrapper",
+        class: "mt-2 mb-0"
+    }).append(viewHistoryButton);
+
+    $("#est_time_to_payout").parent().after(viewHistoryWrapper);
 
     // Create a container for the payout history (initially hidden)
     $("<div>", {
         id: "payout-history-container",
         style: "display: none; margin-top: 10px;"
-    }).insertAfter(viewHistoryButton);
+    }).insertAfter(viewHistoryWrapper);
 
     // Update theme-change listener for the button with fixed colors for each theme
     $(document).on('themeChanged', function () {
@@ -3244,9 +3249,12 @@ function updateUI() {
                     poolFeesPercentage.insertAdjacentElement('afterend', poolFeesSats);
                 }
 
-                // Update the text and styling
-                poolFeesSats.textContent = " (" + formattedPoolFee + ")";
-                poolFeesSats.setAttribute("style", "color: #ff5555 !important; font-weight: bold !important; margin-left: 6px;");
+                // Update the text and styling with tighter spacing
+                poolFeesSats.textContent = "(" + formattedPoolFee + ")";
+                poolFeesSats.setAttribute(
+                    "style",
+                    "color: #ff5555 !important; font-weight: bold !important; margin-left: 4px; display: inline;"
+                );
             }
         }
 
