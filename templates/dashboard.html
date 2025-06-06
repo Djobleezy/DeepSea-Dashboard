@@ -402,5 +402,6 @@
 
 {% block javascript %}
 <!-- External JavaScript file with our application logic -->
+<script src="{{ url_for('static', filename='js/sparklines.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

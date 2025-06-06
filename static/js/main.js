@@ -2946,6 +2946,11 @@ function updateUI() {
             width: 1rem;
             display: inline-flex;
         }
+        .sparkline {
+            width: 60px;
+            height: 16px;
+            margin-left: 4px;
+        }
         `;
             document.head.appendChild(styleEl);
         }
@@ -3779,6 +3784,9 @@ function updateUI() {
         updateIndicators(data);
         checkForBlockUpdates(data);
 
+        if (window.SparklineModule) {
+            SparklineModule.updateSparklines(data);
+        }
         // Add this call before storing current metrics as previous metrics
         trackPayoutPerformance(data);
 
@@ -4128,6 +4136,13 @@ $(document).ready(function () {
         // Setup theme change listener
         setupThemeChangeListener();
         loadBlockAnnotations();
+        if (window.SparklineModule) {
+            try {
+                SparklineModule.initSparklines();
+            } catch (err) {
+                console.error("Error initializing sparklines:", err);
+            }
+        }
     } catch (e) {
         console.error("Error handling theme:", e);
     }

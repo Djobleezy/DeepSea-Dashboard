@@ -796,3 +796,10 @@ html.bitcoin-theme #btc_price:hover {
     0 0 2px #fff !important;
   text-decoration: underline wavy #ffd700 !important;
 }
+
+/* Sparkline charts */
+.sparkline {
+    width: 60px;
+    height: 16px;
+    margin-left: 4px;
+}
