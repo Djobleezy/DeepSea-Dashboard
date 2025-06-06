@@ -2921,7 +2921,7 @@ function updateUI() {
         .metric-divider {
             display: inline-flex;
             align-items: center;
-            margin-left: 1rem;
+            margin-left: 0;
             padding-left: 0.75rem;
             height: 1.5em;
             white-space: nowrap;
@@ -2949,7 +2949,7 @@ function updateUI() {
         .sparkline {
             width: 60px;
             height: 16px;
-            margin-left: 4px;
+            margin-left: 0.5rem;
         }
         `;
             document.head.appendChild(styleEl);
