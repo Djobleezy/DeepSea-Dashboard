@@ -1130,7 +1130,7 @@ function initPayoutTracking() {
         id: "view-payout-history",
         text: "VIEW LAST PAYOUT",
         click: togglePayoutHistoryDisplay,
-        class: "btn btn-sm mt-2",
+        class: "btn btn-sm mt-2 d-block",
         style: `
             background-color: ${theme.PRIMARY};
             color: ${isDeepSea ? 'white' : 'black'};
@@ -3244,9 +3244,12 @@ function updateUI() {
                     poolFeesPercentage.insertAdjacentElement('afterend', poolFeesSats);
                 }
 
-                // Update the text and styling
-                poolFeesSats.textContent = " (" + formattedPoolFee + ")";
-                poolFeesSats.setAttribute("style", "color: #ff5555 !important; font-weight: bold !important; margin-left: 6px;");
+                // Update the text and styling with tighter spacing
+                poolFeesSats.textContent = "(" + formattedPoolFee + ")";
+                poolFeesSats.setAttribute(
+                    "style",
+                    "color: #ff5555 !important; font-weight: bold !important; margin-left: 4px; display: inline;"
+                );
             }
         }
 
