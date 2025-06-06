@@ -24,6 +24,6 @@ assert.strictEqual(context.calculateBlockProbability(0, 'th/s', 100), 'N/A');
 assert.strictEqual(context.calculateBlockTime(100, 'th/s', 100), '19 years');
 assert.strictEqual(context.formatTimeRemaining(0), 'N/A');
 assert.strictEqual(context.formatTimeRemaining(600), '10 minutes');
-assert.strictEqual(context.formatTimeRemaining(3153600001), 'Never (statistically)');
+assert.strictEqual(context.formatTimeRemaining(3153600001), 'Never');
 
 console.log('block probability and time calculation tests passed');
