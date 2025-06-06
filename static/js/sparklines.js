@@ -24,7 +24,14 @@
      * consistently so the charts appear inline with the metric value.
      */
     function initSparklines() {
-        const skipKeys = new Set(['workers_hashing', 'unpaid_earnings']);
+        // Metrics under the Payout Info section don't require sparklines
+        const skipKeys = new Set([
+            'workers_hashing',
+            'unpaid_earnings',
+            'pool_fees_percentage',
+            'last_block',
+            'est_time_to_payout'
+        ]);
 
         document.querySelectorAll('[id^="indicator_"]').forEach(indicator => {
             const key = indicator.id.replace('indicator_', '');
