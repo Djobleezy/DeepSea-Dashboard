@@ -199,6 +199,12 @@ const BitcoinMinuteRefresh = (function () {
             showButton.style.color = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
             showButton.style.boxShadow = `0 0 10px rgba(${currentThemeRGB}, 0.5)`;
         }
+
+        const symbolColor = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
+        const controlSymbols = terminalElement.querySelectorAll('.control-symbol');
+        controlSymbols.forEach(symbol => {
+            symbol.style.color = symbolColor;
+        });
     }
 
     /**
@@ -1060,6 +1066,7 @@ const BitcoinMinuteRefresh = (function () {
     function addStyles() {
         // Get current theme colors for initial styling
         const theme = getThemeColors();
+        const controlSymbolColor = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
 
         const styleElement = document.createElement('style');
         styleElement.id = DOM_IDS.STYLES;
@@ -1126,9 +1133,9 @@ const BitcoinMinuteRefresh = (function () {
         justify-content: center;
         position: relative;
       }
-      
+
       .control-symbol {
-        color: #333;
+        color: ${controlSymbolColor};
         font-size: 9px;
         font-weight: bold;
         position: absolute;
