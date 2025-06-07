@@ -1345,7 +1345,7 @@ const BitcoinMinuteRefresh = (function () {
         display: none;
         flex-direction: row;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         padding: 4px 10px;
         background-color: #000;
         position: relative;
@@ -1383,14 +1383,12 @@ const BitcoinMinuteRefresh = (function () {
         text-transform: uppercase;
         letter-spacing: 1px;
         opacity: 0.7;
-        margin-left: 45px;
         color: var(--primary-color, ${theme.color});
       }
       
       #${DOM_IDS.MINIMIZED_UPTIME} {
         font-size: 0.9rem;
         font-weight: bold;
-        margin-left: 45px;
         color: #dee2e6;
       }
       
@@ -1398,7 +1396,7 @@ const BitcoinMinuteRefresh = (function () {
         width: 6px;
         height: 6px;
         border-radius: 50%;
-        margin-left: 10px;
+        margin-left: auto;
         position: relative;
         z-index: 2;
       }
