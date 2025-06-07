@@ -20,7 +20,7 @@ To ensure your miners are detected correctly, include one of the keywords below 
 |--------------|----------------------------|
 | **Bitmain Antminer** | `s9`, `s17 pro`, `t19`, `s19`, `s19 pro`, `s19j`, `s19j pro`, `s19j pro+`, `s19 pro++`, `s19k pro`, `s19 xp`, `s19 xp hyd`, `s19 pro+ hyd`, `t21`, `s21`, `s21 hydro`, `s21 pro`, `s21+`, `s21+ hydro`, `s21 xp hydro` |
 | **MicroBT Whatsminer** | `m20s`, `m30s`, `m30s+`, `m30s++`, `m31s`, `m31s+`, `m50`, `m50s`, `m50s++`, `m53`, `m56`, `m60s`, `m66s` |
-| **Canaan AvalonMiner** | `1166`, `1246`, `1346`, `1366`, `1466`, `1466i`, `1566` |
+| **Canaan AvalonMiner** | `1166`, `1246`, `1346`, `1366`, `1466`, `1466i`, `1566`, `avalon q`, `avalon mini 3`, `avalon nano 3s`, `avalon nano 3` |
 | **Other / DIY** | `sealminer a2`, `t3+`, `e11++`, `apollo`, `apollo btc ii`, `compac`, `bitaxe`, `nerdaxe`, `bitchimney`, `loki`, `urlacher`, `slim`, `heatbit` |
 
 The table lists only the identifying portion that needs to appear anywhere in the name. For instance, both `rig-s19pro-01` and `S19 Pro Worker` will match `s19 pro`.

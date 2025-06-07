@@ -103,6 +103,10 @@ const ASIC_EFFICIENCY_DATA = {
     "Canaan Avalon A1346": { efficiency: 0.035, defaultWatts: 3276 },
     "Canaan Avalon A1466I": { efficiency: 0.051, defaultWatts: 3315 },
     "Canaan Avalon A1466": { efficiency: 0.047, defaultWatts: 3225 },
+    "Canaan Avalon Q": { efficiency: 0.0186, defaultWatts: 1674 },
+    "Canaan Avalon Mini 3": { efficiency: 0.0213, defaultWatts: 800 },
+    "Canaan Avalon Nano 3S": { efficiency: 0.0233, defaultWatts: 140 },
+    "Canaan Avalon Nano 3": { efficiency: 0.035, defaultWatts: 140 },
 
     // BitAxe and DIY Mining Devices (much smaller scale)
     "BitAxe": { efficiency: 0.005, defaultWatts: 35 },

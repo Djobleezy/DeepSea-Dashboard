@@ -65,3 +65,21 @@ def test_parse_worker_name_separator_variations():
         miner_specs.parse_worker_name("apollo-btc_ii")["model"]
         == "FutureBit Apollo BTC II"
     )
+
+
+def test_parse_worker_name_canaan_home_models():
+    specs = miner_specs.parse_worker_name("my-avalon_q")
+    assert specs["model"] == "Canaan Avalon Q"
+    assert specs["type"] == "ASIC"
+    assert round(specs["power"]) == round(90 * 18.6)
+
+    specs = miner_specs.parse_worker_name("avalon-mini3")
+    assert specs["model"] == "Canaan Avalon Mini 3"
+
+    specs = miner_specs.parse_worker_name("avalon-nano3s_home")
+    assert specs["model"] == "Canaan Avalon Nano 3S"
+
+    specs = miner_specs.parse_worker_name("Avalon_Nano3")
+    assert specs["model"] == "Canaan Avalon Nano 3"
+
+

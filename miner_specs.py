@@ -61,6 +61,11 @@ MODEL_SPECS = [
         {"model": "Canaan AvalonMiner 1566 Immersion", "type": "ASIC", "hashrate": 195, "efficiency": 19},
     ),
     (r"1566", {"model": "Canaan AvalonMiner 1566", "type": "ASIC", "hashrate": 185, "efficiency": 19.9}),
+    # Canaan home series
+    (r"avalon[-_\s]*q", {"model": "Canaan Avalon Q", "type": "ASIC", "hashrate": 90, "efficiency": 18.6}),
+    (r"avalon[-_\s]*mini[-_\s]*3", {"model": "Canaan Avalon Mini 3", "type": "ASIC", "hashrate": 37.5, "efficiency": 21.3}),
+    (r"avalon[-_\s]*nano[-_\s]*3s", {"model": "Canaan Avalon Nano 3S", "type": "ASIC", "hashrate": 6, "efficiency": 23.3}),
+    (r"avalon[-_\s]*nano[-_\s]*3", {"model": "Canaan Avalon Nano 3", "type": "ASIC", "hashrate": 4, "efficiency": 35}),
     # Other ASICs and DIY devices
     (r"sealminer[-_\s]*a2", {"model": "Sealminer A2", "type": "ASIC", "hashrate": 260, "efficiency": 16.5}),
     (r"t3\+", {"model": "Innosilicon T3+", "type": "ASIC", "hashrate": 52, "efficiency": 53.8}),
