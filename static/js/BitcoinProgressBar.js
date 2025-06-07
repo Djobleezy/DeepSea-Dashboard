@@ -198,7 +198,11 @@ const BitcoinMinuteRefresh = (function () {
             showButton.style.backgroundColor = themeConfig.color;
             showButton.style.color = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
             showButton.style.boxShadow = `0 0 10px rgba(${currentThemeRGB}, 0.5)`;
+            showButton.style.opacity = '0.95';
         }
+
+        // Ensure terminal opacity remains consistent
+        terminalElement.style.opacity = '0.95';
 
         const symbolColor = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
         const controlSymbols = terminalElement.querySelectorAll('.control-symbol');
@@ -1088,6 +1092,7 @@ const BitcoinMinuteRefresh = (function () {
         padding: 8px;
         transition: all 0.3s ease;
         box-shadow: 0 0 5px rgba(var(--primary-color-rgb, ${theme.rgb}), 0.3);
+        opacity: 0.95;
       }
       
       /* Terminal Header */
@@ -1269,7 +1274,7 @@ const BitcoinMinuteRefresh = (function () {
         z-index: 9999;
         display: none;
         box-shadow: 0 0 10px rgba(var(--primary-color-rgb, ${theme.rgb}), 0.5);
-        opacity: 0.85;
+        opacity: 0.95;
       }
 
       /* Page system */
@@ -1869,6 +1874,7 @@ const BitcoinMinuteRefresh = (function () {
             const theme = getThemeColors();
             showButton.style.backgroundColor = theme.color;
             showButton.style.boxShadow = `0 0 10px rgba(${theme.rgb}, 0.5)`;
+            showButton.style.opacity = '0.95';
         }
 
         document.getElementById(DOM_IDS.SHOW_BUTTON).style.display = 'block';
