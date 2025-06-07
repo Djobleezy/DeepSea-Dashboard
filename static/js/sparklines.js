@@ -30,7 +30,22 @@
             'unpaid_earnings',
             'pool_fees_percentage',
             'last_block',
-            'est_time_to_payout'
+            'est_time_to_payout',
+            'daily_mined_sats',
+            'monthly_mined_sats',
+            'estimated_earnings_per_day_sats',
+            'estimated_earnings_next_block_sats',
+            'estimated_rewards_in_window_sats',
+            'daily_revenue',
+            'daily_power_cost',
+            'daily_profit_usd',
+            'monthly_profit_usd',
+            'difficulty',
+            'block_number',
+            'hashrate_24hr',
+            'hashrate_3hr',
+            'hashrate_10min',
+            'hashrate_60sec'
         ]);
 
         document.querySelectorAll('[id^="indicator_"]').forEach(indicator => {
