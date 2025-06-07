@@ -87,6 +87,36 @@ class MiningDashboardService:
             logging.error(f"Error estimating power usage: {e}")
         return 0
 
+    def get_block_reward(self):
+        """Return the current block subsidy using mempool.guide."""
+        try:
+            url = "https://mempool.guide/api/blocks/tip/height"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                height = int(resp.text)
+                halvings = height // 210000
+                reward = 50 / (2 ** halvings)
+                return reward
+        except Exception as e:
+            logging.error(f"Error fetching block reward: {e}")
+        # Default to the current known reward
+        return 3.125
+
+    def get_average_fee_per_block(self):
+        """Return the average transaction fee per block from mempool.guide."""
+        try:
+            url = "https://mempool.guide/api/v1/mining/blocks/day"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                if isinstance(data, dict):
+                    avg_fee = data.get("avgFee")
+                    if avg_fee is not None:
+                        return float(avg_fee) / self.sats_per_btc
+        except Exception as e:
+            logging.error(f"Error fetching average fee: {e}")
+        return 0.0
+
     def close(self):
         """Close any open network resources."""
         if getattr(self, "_closed", False):
@@ -188,14 +218,23 @@ class MiningDashboardService:
                 btc_price = 75000  # $75,000 as a reasonable fallback
 
             # Convert hashrates to a common unit (TH/s) for consistency
-            hr3 = ocean_data.hashrate_3hr or 0
-            hr3_unit = (ocean_data.hashrate_3hr_unit or "th/s").lower()
-            local_hashrate = convert_to_ths(hr3, hr3_unit) * 1e12  # Convert to H/s for calculation
+            hr24 = ocean_data.hashrate_24hr or 0
+            hr24_unit = (ocean_data.hashrate_24hr_unit or "th/s").lower()
+            local_hashrate = convert_to_ths(hr24, hr24_unit) * 1e12  # Convert to H/s for calculation
 
             hash_proportion = local_hashrate / network_hashrate if network_hashrate else 0
-            block_reward = 3.125
-            blocks_per_day = 86400 / 600
-            daily_btc_gross = hash_proportion * block_reward * blocks_per_day
+
+            block_reward = self.get_block_reward()
+            avg_fee_per_block = self.get_average_fee_per_block()
+            reward_per_block = block_reward + avg_fee_per_block
+
+            if network_hashrate and difficulty:
+                seconds_per_block = difficulty * (2 ** 32) / network_hashrate
+                blocks_per_day = 86400 / seconds_per_block if seconds_per_block else 144
+            else:
+                blocks_per_day = 86400 / 600
+
+            daily_btc_gross = hash_proportion * reward_per_block * blocks_per_day
 
             # Use actual pool fees instead of hardcoded values
             # Get the pool fee percentage from ocean_data, default to 2.0% if not available
@@ -232,8 +271,8 @@ class MiningDashboardService:
                 if not metrics_for_estimate:
                     metrics_for_estimate = {
                         "workers_hashing": ocean_data.workers_hashing,
-                        "hashrate_3hr": ocean_data.hashrate_3hr,
-                        "hashrate_3hr_unit": ocean_data.hashrate_3hr_unit,
+                        "hashrate_24hr": ocean_data.hashrate_24hr,
+                        "hashrate_24hr_unit": ocean_data.hashrate_24hr_unit,
                     }
                 estimated_power = self.estimate_total_power(metrics_for_estimate)
                 if estimated_power:
@@ -286,6 +325,7 @@ class MiningDashboardService:
                 "block_number": block_count,
                 "network_hashrate": (network_hashrate / 1e18) if network_hashrate else None,
                 "difficulty": difficulty,
+                "avg_fee_per_block": avg_fee_per_block,
                 "daily_btc_gross": daily_btc_gross,
                 "daily_btc_net": daily_btc_net,
                 "pool_fee_percent": pool_fee_percent,

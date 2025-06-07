@@ -53,8 +53,10 @@ class MetricsConversionTest(unittest.TestCase):
             patch.object(svc, "get_ocean_data") as go,
             patch.object(svc, "get_bitcoin_stats") as gb,
             patch.object(svc, "fetch_exchange_rates") as fer,
+            patch.object(svc, "get_block_reward", return_value=3.125),
+            patch.object(svc, "get_average_fee_per_block", return_value=0.0),
         ):
-            go.return_value = OceanData(hashrate_3hr=100, hashrate_3hr_unit="TH/s", pool_fees_percentage=0.0)
+            go.return_value = OceanData(hashrate_24hr=100, hashrate_24hr_unit="TH/s", pool_fees_percentage=0.0)
             gb.return_value = (0, 100e18, 10000, 0)
             fer.return_value = {"EUR": 0.5}
             metrics = svc.fetch_metrics()

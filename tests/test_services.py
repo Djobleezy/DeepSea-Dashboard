@@ -464,7 +464,7 @@ def test_get_worker_data_fallback(monkeypatch):
         }
 
     monkeypatch.setattr(ws, "generate_fallback_data", fake_generate)
-    svc.cached_metrics = {"workers_hashing": 1, "hashrate_3hr": 0, "hashrate_3hr_unit": "TH/s"}
+    svc.cached_metrics = {"workers_hashing": 1, "hashrate_24hr": 0, "hashrate_24hr_unit": "TH/s"}
 
     data = svc.get_worker_data()
 
@@ -597,13 +597,15 @@ def test_fetch_metrics_estimates_power(monkeypatch):
         svc,
         "get_ocean_data",
         lambda: data_service.OceanData(
-            hashrate_3hr=100,
-            hashrate_3hr_unit="TH/s",
+            hashrate_24hr=100,
+            hashrate_24hr_unit="TH/s",
             workers_hashing=2,
             pool_fees_percentage=0.0,
         ),
     )
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
+    monkeypatch.setattr(svc, "get_block_reward", lambda: 3.125)
+    monkeypatch.setattr(svc, "get_average_fee_per_block", lambda: 0.0)
 
     metrics = svc.fetch_metrics()
 
@@ -611,7 +613,7 @@ def test_fetch_metrics_estimates_power(monkeypatch):
     assert metrics["power_usage_estimated"] is True
     assert abs(metrics["break_even_electricity_price"] - 0.375) < 1e-6
     assert dummy.last_cached_metrics["workers_hashing"] == 2
-    assert dummy.last_cached_metrics["hashrate_3hr"] == 100
+    assert dummy.last_cached_metrics["hashrate_24hr"] == 100
 
 
 def test_fetch_metrics_real_worker_data(monkeypatch):
@@ -632,13 +634,15 @@ def test_fetch_metrics_real_worker_data(monkeypatch):
         svc,
         "get_ocean_data",
         lambda: data_service.OceanData(
-            hashrate_3hr=100,
-            hashrate_3hr_unit="TH/s",
+            hashrate_24hr=100,
+            hashrate_24hr_unit="TH/s",
             workers_hashing=2,
             pool_fees_percentage=0.0,
         ),
     )
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
+    monkeypatch.setattr(svc, "get_block_reward", lambda: 3.125)
+    monkeypatch.setattr(svc, "get_average_fee_per_block", lambda: 0.0)
 
     metrics = svc.fetch_metrics()
 
@@ -660,9 +664,11 @@ def test_fetch_metrics_power_configured(monkeypatch):
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
-        lambda: data_service.OceanData(hashrate_3hr=100, hashrate_3hr_unit="TH/s", pool_fees_percentage=0.0),
+        lambda: data_service.OceanData(hashrate_24hr=100, hashrate_24hr_unit="TH/s", pool_fees_percentage=0.0),
     )
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
+    monkeypatch.setattr(svc, "get_block_reward", lambda: 3.125)
+    monkeypatch.setattr(svc, "get_average_fee_per_block", lambda: 0.0)
 
     metrics = svc.fetch_metrics()
 
@@ -678,9 +684,11 @@ def test_server_start_time_constant(monkeypatch):
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
-        lambda: data_service.OceanData(hashrate_3hr=100, hashrate_3hr_unit="TH/s", pool_fees_percentage=0.0),
+        lambda: data_service.OceanData(hashrate_24hr=100, hashrate_24hr_unit="TH/s", pool_fees_percentage=0.0),
     )
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 100e18, 50000, 0))
+    monkeypatch.setattr(svc, "get_block_reward", lambda: 3.125)
+    monkeypatch.setattr(svc, "get_average_fee_per_block", lambda: 0.0)
     monkeypatch.setattr(svc, "fetch_exchange_rates", lambda: {"USD": 1})
 
     metrics1 = svc.fetch_metrics()
