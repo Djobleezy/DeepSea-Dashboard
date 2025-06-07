@@ -2919,8 +2919,13 @@ function updateUI() {
         .metric-divider-container {
             grid-column: 3;
             justify-self: end;
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
             display: flex;
             align-items: center;
+            justify-content: flex-end;
         }
         
         .metric-divider {
