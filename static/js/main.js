@@ -2931,7 +2931,7 @@ function updateUI() {
         .metric-divider {
             display: inline-flex;
             align-items: center;
-            margin-left: 0;
+            margin-left: auto;
             padding-left: 0.75rem;
             height: 1.5em;
             white-space: nowrap;
