@@ -803,3 +803,9 @@ html.bitcoin-theme #btc_price:hover {
     height: 16px;
     margin-left: 4px;
 }
+
+@media (max-width: 576px) {
+  .sparkline {
+    width: 45px;
+  }
+}
