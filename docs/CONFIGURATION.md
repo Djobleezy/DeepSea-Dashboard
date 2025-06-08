@@ -2,7 +2,10 @@
 
 The dashboard can be customized through a combination of a `config.json` file and environment variables. Environment variables always override values found in the configuration file.
 
-Profitability calculations are always performed in USD. When a non-USD currency is configured, values are converted using the latest exchange rates before being displayed.
+Profitability calculations are always performed in USD. When a non-USD currency is configured,
+values are converted using the latest exchange rates before being displayed.
+Earnings projections now rely on your 24-hour average hashrate rather than shorter intervals to
+smooth volatility.
 
 ## `config.json`
 

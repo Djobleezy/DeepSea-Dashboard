@@ -22,12 +22,13 @@ informed with minimal fuss.
 ## Key Features
 
 
-### Real-Time Mining Metrics
+-### Real-Time Mining Metrics
 - **Live Hashrate Tracking**: Monitor 60-second, 10-minute, 3-hour, and 24-hour average hashrates
-- **Profitability Analysis**: View daily and monthly earnings in both BTC and USD
+- **Profitability Analysis**: View daily and monthly earnings in both BTC and USD using your 24-hour hashrate
 - **Financial Calculations**: Automatically calculate revenue, power costs, and net profit
 - **Break-Even Electricity Price**: Shows the maximum power rate that still yields profit
-- **Network Statistics**: Track current Bitcoin price, difficulty, and network hashrate
+- **Dynamic Reward Modeling**: Combines the block subsidy with the average fee per block for accurate projections
+- **Network Statistics**: Track current Bitcoin price, difficulty, network hashrate, and average fee per block
 - **Payout Monitoring**: View unpaid balance and estimated time to next payout
 - **Pool Fee Analysis**: Monitor pool fee percentages with visual indicator when optimal rates (0.9-1.3%) are detected
 - **Official Ocean API**: Supplement scraping with data from the official Ocean.xyz API for greater accuracy

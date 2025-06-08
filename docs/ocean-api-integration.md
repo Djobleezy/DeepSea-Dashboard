@@ -70,6 +70,7 @@ https://api.ocean.xyz/v1/user_hashrate/3QomtEj5nfzEkxPXoVD3hvxgJDzA6M6evt
 - username typically refers to the user's Bitcoin payout address.
 - Append /csv or /text to endpoints to receive alternate formats if supported.
 - Ocean uses a proprietary reward model called TIDES, which depends on time-based difficulty1 share logs.
+- The dashboard calculates rewards dynamically using the current block subsidy and the `avg_fee_per_block` metric.
 - Timestamps can be formatted as:
   - YYYY-MM-DD
   - YYYY-MM-DDTHH:MM:SS
