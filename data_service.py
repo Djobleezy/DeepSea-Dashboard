@@ -87,12 +87,13 @@ class MiningDashboardService:
             logging.error(f"Error estimating power usage: {e}")
         return 0
 
+    @ttl_cache(ttl_seconds=3600, maxsize=1)
     def get_block_reward(self):
         """Return the current block subsidy using mempool.guide."""
         try:
             url = "https://mempool.guide/api/blocks/tip/height"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
+            resp = self.fetch_url(url, timeout=10)
+            if resp and resp.ok:
                 height = int(resp.text)
                 halvings = height // 210000
                 reward = 50 / (2 ** halvings)
@@ -102,12 +103,13 @@ class MiningDashboardService:
         # Default to the current known reward
         return 3.125
 
+    @ttl_cache(ttl_seconds=3600, maxsize=1)
     def get_average_fee_per_block(self):
         """Return the average transaction fee per block from mempool.guide."""
         try:
             url = "https://mempool.guide/api/v1/mining/blocks/day"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
+            resp = self.fetch_url(url, timeout=10)
+            if resp and resp.ok:
                 data = resp.json()
                 if isinstance(data, dict):
                     avg_fee = data.get("avgFee")

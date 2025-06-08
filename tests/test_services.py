@@ -614,6 +614,7 @@ def test_fetch_metrics_estimates_power(monkeypatch):
     assert abs(metrics["break_even_electricity_price"] - 0.375) < 1e-6
     assert dummy.last_cached_metrics["workers_hashing"] == 2
     assert dummy.last_cached_metrics["hashrate_24hr"] == 100
+    assert metrics["avg_fee_per_block"] == 0.0
 
 
 def test_fetch_metrics_real_worker_data(monkeypatch):
@@ -648,6 +649,7 @@ def test_fetch_metrics_real_worker_data(monkeypatch):
 
     assert metrics["power_usage_estimated"] is False
     assert dummy.last_cached_metrics["workers_hashing"] == 2
+    assert metrics["avg_fee_per_block"] == 0.0
 
 
 def test_fetch_metrics_power_configured(monkeypatch):
@@ -674,6 +676,7 @@ def test_fetch_metrics_power_configured(monkeypatch):
 
     assert metrics["power_usage_estimated"] is False
     assert abs(metrics["break_even_electricity_price"] - 0.46875) < 1e-4
+    assert metrics["avg_fee_per_block"] == 0.0
 
 
 def test_server_start_time_constant(monkeypatch):
