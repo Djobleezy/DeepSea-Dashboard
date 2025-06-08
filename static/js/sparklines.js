@@ -157,3 +157,12 @@
     window.SparklineModule = { initSparklines, updateSparklines, destroySparklines };
 })();
 
+// Refresh sparklines when the theme changes so colors stay in sync
+if (window.jQuery) {
+    window.jQuery(document).on('themeChanged', function () {
+        if (typeof latestMetrics !== 'undefined' && latestMetrics && window.SparklineModule) {
+            window.SparklineModule.updateSparklines(latestMetrics);
+        }
+    });
+}
+
