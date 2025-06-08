@@ -21,7 +21,11 @@
     <!-- Summary Cards Section -->
     <div class="stats-grid">
         <div class="stat-card">
-            <h2><i class="fa-solid fa-coins"></i> Unpaid Earnings</h2>
+            <h2><i class="fa-solid fa-coins"></i> Unpaid Earnings
+                <span class="tooltip">?
+                    <span class="tooltip-text">Balance awaiting payout. Timing shown below.</span>
+                </span>
+            </h2>
             <div class="stat-value">
                 <span id="unpaid-sats">{{ earnings.unpaid_earnings_sats|default(0)|int|commafy }}</span>
                 <span class="stat-unit">sats</span>
@@ -33,7 +37,11 @@
         </div>
 
         <div class="stat-card">
-            <h2><i class="fa-solid fa-wallet"></i> Total Paid</h2>
+            <h2><i class="fa-solid fa-wallet"></i> Total Paid
+                <span class="tooltip">?
+                    <span class="tooltip-text">All payouts sent to your wallet</span>
+                </span>
+            </h2>
             <div class="stat-value">
                 <span id="total-paid-sats">{{ earnings.total_paid_sats|default(0)|int|commafy }}</span>
                 <span class="stat-unit">sats</span>
@@ -47,7 +55,11 @@
         </div>
 
         <div class="stat-card">
-            <h2><i class="fa-solid fa-file-invoice-dollar"></i> Total Payments</h2>
+            <h2><i class="fa-solid fa-file-invoice-dollar"></i> Total Payments
+                <span class="tooltip">?
+                    <span class="tooltip-text">Number of payouts received</span>
+                </span>
+            </h2>
             <div class="stat-value">
                 <span id="payment-count">{{ earnings.total_payments|default(0) }}</span>
             </div>

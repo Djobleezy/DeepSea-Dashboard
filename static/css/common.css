@@ -9,6 +9,8 @@
   --bg-gradient: linear-gradient(135deg, #0a0a0a, #1a1a1a);
   --primary-color: #f7931a;
   --primary-color-rgb: 247, 147, 26;
+  --bitcoin-color: #f7931a;
+  --deepsea-color: #0088cc;
   --accent-color: #00ffff;
   --text-color: #ffffff;
   --card-padding: 0.5rem;
@@ -1307,4 +1309,47 @@ html.deepsea-theme #congratsMessage {
   .audio-controls {
     flex-direction: row;
   }
+}
+
+/* ----- TOOLTIP STYLING (shared) ----- */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    margin-left: 5px;
+    width: 14px;
+    height: 14px;
+    background-color: #333;
+    color: var(--text-color);
+    border-radius: 50%;
+    text-align: center;
+    line-height: 14px;
+    font-size: 10px;
+    cursor: help;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: #000;
+    color: var(--text-color);
+    text-align: center;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 14px;
+    border: 1px solid var(--bitcoin-color);
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+body.deepsea-theme .tooltip .tooltip-text {
+    border: 1px solid var(--deepsea-color);
 }
