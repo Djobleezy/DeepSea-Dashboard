@@ -329,8 +329,10 @@ For optimal performance:
 
 ## Easter Egg
 
-Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to reveal a brief
-deep sea surprise complete with random fun facts!
+Activate the Konami Code (⇡ ⇡ ⇣ ⇣ ◀ ▶ ◀ ▶ b a) on any page to toggle the emoji
+easter egg. Each theme now pulls from over a dozen unique quotes, with the
+Bitcoin set featuring lines from Satoshi Nakamoto and Hal Finney. The transition
+message adapts to Bitcoin, DeepSea or the secret Matrix mode accordingly.
 
 ## Debug Logging
 
