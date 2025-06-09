@@ -57,6 +57,23 @@ def test_update_config_endpoint(client):
     assert data["status"] == "success"
 
 
+def test_update_config_with_api_key(client, monkeypatch):
+    import App
+    saved = {}
+
+    def capture(cfg):
+        saved.update(cfg)
+        return True
+
+    monkeypatch.setattr(App, "save_config", capture)
+    resp = client.post(
+        "/api/config",
+        json={"wallet": "abc", "EXCHANGE_RATE_API_KEY": "KEY"},
+    )
+    assert resp.status_code == 200
+    assert saved.get("EXCHANGE_RATE_API_KEY") == "KEY"
+
+
 def test_payout_history_endpoint(client):
     resp = client.get("/api/payout-history")
     assert resp.status_code == 200

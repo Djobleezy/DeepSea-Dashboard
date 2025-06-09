@@ -1018,6 +1018,7 @@ def update_config():
             "power_cost": 0.0,
             "power_usage": 0.0,
             "currency": "USD",  # Add default currency
+            "EXCHANGE_RATE_API_KEY": ""
         }
 
         # Merge new config with defaults for any missing fields

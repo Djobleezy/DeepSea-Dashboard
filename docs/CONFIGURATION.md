@@ -19,6 +19,7 @@ The default configuration file contains the following keys:
 | `timezone` | Local timezone identifier | `"America/Los_Angeles"` |
 | `network_fee` | Additional fees beyond pool fees | `0.0` |
 | `currency` | Preferred fiat currency for earnings display | `"USD"` |
+| `EXCHANGE_RATE_API_KEY` | ExchangeRate-API key for currency conversion | `""` |
 | `low_hashrate_threshold_ths` | Threshold used by the notification service to determine low hashrate mode (TH/s). Does **not** affect the front-end chart. | `3.0` |
 | `high_hashrate_threshold_ths` | Threshold above which normal hashrate mode resumes (TH/s) | `20.0` |
 
@@ -36,6 +37,7 @@ cause the application to fall back to default values and log an error.
 | `NETWORK_FEE` | Additional fees beyond pool fees | from `config.json` |
 | `TIMEZONE` | Local timezone identifier | from `config.json` |
 | `CURRENCY` | Preferred fiat currency | from `config.json` |
+| `EXCHANGE_RATE_API_KEY` | ExchangeRate-API key for currency rates | from `config.json` |
 | `FLASK_ENV` | Application environment | `development` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 | `PORT` | Application port | `5000` |
