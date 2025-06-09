@@ -36,13 +36,11 @@
             'estimated_earnings_per_day_sats',
             'estimated_earnings_next_block_sats',
             'estimated_rewards_in_window_sats',
-            'daily_revenue',
             'daily_power_cost',
             'daily_profit_usd',
             'monthly_profit_usd',
             'difficulty',
             'block_number',
-            'hashrate_24hr',
             'hashrate_3hr',
             'hashrate_10min',
             'hashrate_60sec'
