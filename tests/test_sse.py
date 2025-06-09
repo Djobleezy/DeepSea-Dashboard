@@ -78,3 +78,31 @@ def test_stream_converts_deque(sse_client, monkeypatch):
     assert resp.status_code == 200
     events = parse_events(resp.data)
     assert any('"history": [1, 2]' in e for e in events)
+
+
+def test_stream_decrements_active_connections(sse_client, monkeypatch):
+    """active_sse_connections should return to zero after stream ends."""
+    import App
+
+    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    monkeypatch.setattr(App.time, "sleep", lambda x: None)
+    App.active_sse_connections = 0
+    App.cached_metrics = {"server_timestamp": 1}
+
+    resp = sse_client.get("/stream")
+    assert resp.status_code == 200
+    _ = resp.data  # consume generator
+    assert App.active_sse_connections == 0
+
+
+def test_stream_connection_limit_does_not_decrement(sse_client, monkeypatch):
+    """Connection limit errors should not change active_sse_connections."""
+    import App
+
+    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    App.active_sse_connections = App.MAX_SSE_CONNECTIONS
+
+    resp = sse_client.get("/stream")
+    assert resp.status_code == 200
+    _ = resp.data  # consume generator
+    assert App.active_sse_connections == App.MAX_SSE_CONNECTIONS

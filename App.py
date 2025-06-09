@@ -668,6 +668,7 @@ def stream():
         """Yield Server-Sent Events for dashboard updates."""
         global active_sse_connections, cached_metrics
         client_id = None
+        incremented = False
 
         try:
             # Check if we're at the connection limit
@@ -678,6 +679,7 @@ def stream():
                     return
 
                 active_sse_connections += 1
+                incremented = True
                 client_id = f"client-{int(time.time() * 1000) % 10000}"
                 logging.info(f"SSE {client_id}: Connection established (total: {active_sse_connections})")
 
@@ -748,10 +750,13 @@ def stream():
             # Don't yield here - just let the generator exit normally
 
         finally:
-            # Always decrement the connection counter when done
+            # Always decrement the connection counter when a connection was established
             with sse_connections_lock:
-                active_sse_connections = max(0, active_sse_connections - 1)
-                logging.info(f"SSE {client_id}: Connection closed (remaining: {active_sse_connections})")
+                if incremented:
+                    active_sse_connections = max(0, active_sse_connections - 1)
+                logging.info(
+                    f"SSE {client_id}: Connection closed (remaining: {active_sse_connections})"
+                )
 
     # Configure response with improved error handling
     try:
