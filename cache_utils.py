@@ -25,8 +25,10 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
                 hash(value)
                 return value
             except TypeError:
+                if isinstance(value, (set, frozenset)):
+                    value = sorted(value)
                 try:
-                    return json.dumps(value, sort_keys=True)
+                    return json.dumps(value, sort_keys=True, default=str)
                 except Exception:
                     return str(value)
 
