@@ -63,6 +63,20 @@ class StateManager:
         self.load_payout_history()
         self.load_last_earnings()
 
+    def close(self):
+        """Close Redis connection and release resources."""
+        if self.redis_client:
+            try:
+                self.redis_client.close()
+            except Exception as e:
+                logging.error(f"Error closing Redis connection: {e}")
+            finally:
+                self.redis_client = None
+
+    def __del__(self):
+        """Ensure Redis connection is closed on garbage collection."""
+        self.close()
+
     def _connect_to_redis(self, redis_url):
         """
         Connect to Redis with retry logic.

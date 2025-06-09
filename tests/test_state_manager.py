@@ -265,3 +265,25 @@ def test_metrics_log_snapshot_omits_history(monkeypatch):
     assert "arrow_history" not in latest
     assert "history" not in latest
 
+
+def test_close_closes_redis_connection():
+    mgr = StateManager()
+
+    class DummyRedis:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+        def ping(self):
+            pass
+
+    dummy = DummyRedis()
+    mgr.redis_client = dummy
+
+    mgr.close()
+
+    assert dummy.closed
+    assert mgr.redis_client is None
+
