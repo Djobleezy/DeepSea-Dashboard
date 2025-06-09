@@ -128,6 +128,9 @@ def test_exchange_rate_caching(monkeypatch):
     fake_time = [0]
     monkeypatch.setattr(data_service.time, "time", lambda: fake_time[0])
 
+    # Provide a dummy API key so the service does not abort early
+    monkeypatch.setenv("EXCHANGE_RATE_API_KEY", "TESTKEY")
+
     call_count = {"count": 0}
 
     def fake_get(url, timeout=5):
