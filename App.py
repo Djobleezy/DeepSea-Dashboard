@@ -1008,27 +1008,32 @@ def update_config():
 
         # Get current config to check if currency is changing
         current_config = load_config()
-        currency_changed = "currency" in new_config and new_config.get("currency") != current_config.get(
-            "currency", "USD"
+        # Determine if currency is changing before merging
+        currency_changed = (
+            "currency" in new_config
+            and new_config.get("currency") != current_config.get("currency", "USD")
         )
 
-        # Required fields and default values
+        # Default values for any completely new keys
         defaults = {
             "wallet": "yourwallethere",
             "power_cost": 0.0,
             "power_usage": 0.0,
-            "currency": "USD",  # Add default currency
-            "EXCHANGE_RATE_API_KEY": ""
+            "currency": "USD",
+            "EXCHANGE_RATE_API_KEY": "",
         }
 
-        # Merge new config with defaults for any missing fields
+        # Start with the current configuration and update only provided fields
+        merged_config = {**current_config}
         for key, value in defaults.items():
-            if key not in new_config or new_config[key] is None:
-                new_config[key] = value
+            merged_config.setdefault(key, value)
+        for key, value in new_config.items():
+            if value is not None:
+                merged_config[key] = value
 
         # Save the configuration
-        logging.info(f"Saving configuration: {new_config}")
-        if save_config(new_config):
+        logging.info(f"Saving configuration: {merged_config}")
+        if save_config(merged_config):
             # Important: Reinitialize the dashboard service with the new configuration
             if dashboard_service:
                 try:
@@ -1037,13 +1042,15 @@ def update_config():
                     logging.error(f"Error closing old dashboard service: {e}")
 
             dashboard_service = MiningDashboardService(
-                new_config.get("power_cost", 0.0),
-                new_config.get("power_usage", 0.0),
-                new_config.get("wallet"),
-                network_fee=new_config.get("network_fee", 0.0),
+                merged_config.get("power_cost", 0.0),
+                merged_config.get("power_usage", 0.0),
+                merged_config.get("wallet"),
+                network_fee=merged_config.get("network_fee", 0.0),
                 worker_service=worker_service,
             )
-            logging.info(f"Dashboard service reinitialized with new wallet: {new_config.get('wallet')}")
+            logging.info(
+                f"Dashboard service reinitialized with new wallet: {merged_config.get('wallet')}"
+            )
 
             # Update worker service to use the new dashboard service (with the updated wallet)
             worker_service.set_dashboard_service(dashboard_service)
@@ -1056,9 +1063,15 @@ def update_config():
             if currency_changed:
                 try:
                     old_currency = current_config.get("currency", "USD")
-                    logging.info(f"Currency changed from {old_currency} to {new_config['currency']}")
-                    updated_count = notification_service.update_notification_currency(new_config["currency"])
-                    logging.info(f"Updated {updated_count} notifications to use {new_config['currency']} currency")
+                    logging.info(
+                        f"Currency changed from {old_currency} to {merged_config['currency']}"
+                    )
+                    updated_count = notification_service.update_notification_currency(
+                        merged_config["currency"]
+                    )
+                    logging.info(
+                        f"Updated {updated_count} notifications to use {merged_config['currency']} currency"
+                    )
                 except Exception as e:
                     logging.error(f"Error updating notification currency: {e}")
 
@@ -1067,7 +1080,13 @@ def update_config():
             logging.info("Forced metrics update after configuration change")
 
             # Return success response with the saved configuration
-            return jsonify({"status": "success", "message": "Configuration saved successfully", "config": new_config})
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": "Configuration saved successfully",
+                    "config": merged_config,
+                }
+            )
         else:
             logging.error("Failed to save configuration")
             return jsonify({"error": "Failed to save configuration"}), 500

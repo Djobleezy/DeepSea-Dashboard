@@ -74,6 +74,28 @@ def test_update_config_with_api_key(client, monkeypatch):
     assert saved.get("EXCHANGE_RATE_API_KEY") == "KEY"
 
 
+def test_partial_update_preserves_existing_fields(client, monkeypatch):
+    """Updating a single field should keep other config values."""
+    import App
+
+    current = {"wallet": "old", "currency": "EUR", "network_fee": 0.1}
+    monkeypatch.setattr(App, "load_config", lambda: current)
+
+    saved = {}
+
+    def capture(cfg):
+        saved.update(cfg)
+        return True
+
+    monkeypatch.setattr(App, "save_config", capture)
+
+    resp = client.post("/api/config", json={"wallet": "new"})
+    assert resp.status_code == 200
+    assert saved["wallet"] == "new"
+    assert saved["currency"] == "EUR"
+    assert saved["network_fee"] == 0.1
+
+
 def test_payout_history_endpoint(client):
     resp = client.get("/api/payout-history")
     assert resp.status_code == 200
