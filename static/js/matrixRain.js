@@ -27,14 +27,23 @@
             drops = Array(columns).fill(0);
         }
 
+        const charSet =
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ';
+        const fonts = [
+            '16px "Courier New", monospace',
+            '16px "Consolas", monospace',
+            '16px "MS Gothic", monospace',
+            '16px "Noto Sans JP", monospace'
+        ];
+
         function draw() {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
             ctx.fillRect(0, 0, width, height);
             ctx.fillStyle = '#39ff14';
-            ctx.font = '16px monospace';
 
             for (let i = 0; i < drops.length; i++) {
-                const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+                const text = charSet[Math.floor(Math.random() * charSet.length)];
+                ctx.font = fonts[Math.floor(Math.random() * fonts.length)];
                 ctx.fillText(text, i * 20, drops[i] * 20);
                 if (drops[i] * 20 > height && Math.random() > 0.975) {
                     drops[i] = 0;
