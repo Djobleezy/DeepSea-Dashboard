@@ -289,9 +289,10 @@ function createNotificationElement(notification) {
         fullTimestamp = notificationDate.toLocaleString('en-US'); // Fallback without timezone
     }
 
-    // Append the message and formatted timestamp
-    const messageWithTimestamp = `${notification.message}<br><span class="full-timestamp">${fullTimestamp}</span>`;
-    element.find('.notification-message').html(messageWithTimestamp);
+    // Append the message and formatted timestamp using text() to avoid XSS
+    const msgElem = element.find('.notification-message');
+    msgElem.text(notification.message);
+    msgElem.append(`<br><span class="full-timestamp">${fullTimestamp}</span>`);
 
     // Set metadata for relative time display
     element.find('.notification-time').text(formatTimestamp(notificationDate));
