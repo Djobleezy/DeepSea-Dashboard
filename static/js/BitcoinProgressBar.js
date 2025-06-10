@@ -1910,6 +1910,10 @@ const BitcoinMinuteRefresh = (function () {
             showButton.style.display = 'none';
         }
 
+        // Recalculate position now that the terminal is visible
+        // Delay slightly so the browser can compute dimensions
+        setTimeout(restoreTerminalPosition, 50);
+
         // Clear hidden state when shown
         localStorage.setItem(STORAGE_KEYS.HIDDEN, 'false');
     }
