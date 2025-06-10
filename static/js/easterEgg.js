@@ -293,6 +293,35 @@
 
   window.addEventListener('keydown', handleKey);
 
+  // --- Mobile Matrix Theme Activation ---
+  let headerTaps = [];
+
+  /**
+   * Track taps on card headers and enable the Matrix theme when
+   * 10 taps occur within two seconds while the easter egg is active.
+   */
+  function handleHeaderTap() {
+    const now = Date.now();
+    headerTaps.push(now);
+    headerTaps = headerTaps.filter(t => now - t < 2000);
+    const active = document.body.classList.contains('easterEggActive') ||
+                   localStorage.getItem('easterEggActive') === 'true';
+    if (headerTaps.length >= 10 && active) {
+      headerTaps = [];
+      activateMatrixTheme();
+    }
+  }
+
+  /**
+   * Listener for clicks or touches on card headers.
+   */
+  function headerListener(e) {
+    const target = e.target.closest('.card-header');
+    if (target) {
+      handleHeaderTap();
+    }
+  }
+
   function handleCursorClick() {
     const now = Date.now();
     cursorClicks.push(now);
@@ -309,6 +338,9 @@
       handleCursorClick();
     }
   }
+
+  window.addEventListener('click', headerListener);
+  window.addEventListener('touchstart', headerListener);
 
   window.addEventListener('click', cursorListener);
   window.addEventListener('touchstart', cursorListener);
