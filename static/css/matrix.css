@@ -9,6 +9,7 @@ html.matrix-theme #themeToggle,
 html.matrix-theme .theme-toggle-btn {
   color: #39ff14;
   border-color: #39ff14;
+  background-color: #000;
 }
 
 html.matrix-theme #themeToggle:hover,
