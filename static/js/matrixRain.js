@@ -72,7 +72,8 @@
                 ctx.font = fonts[Math.floor(Math.random() * fonts.length)];
                 ctx.save();
                 ctx.translate(i * 20, drop.y * 20);
-                const angle = (Math.random() - 0.5) * (Math.PI / 3);
+                // Only rotate 30% of characters for a subtle effect
+                const angle = Math.random() < 0.3 ? (Math.random() - 0.5) * (Math.PI / 3) : 0;
                 ctx.rotate(angle);
                 ctx.fillText(char, 0, 0);
                 ctx.restore();
