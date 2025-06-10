@@ -9,6 +9,8 @@
   --bitcoin-rgb: 247, 147, 26;
   --deepsea-color: #0088cc;
   --deepsea-rgb: 0, 136, 204;
+  --matrix-color: #39ff14;
+  --matrix-rgb: 57, 255, 20;
   --bg-color: #0a0a0a;
   --text-color: white;
   --success-color: #32cd32;
@@ -477,6 +479,117 @@ body.deepsea-theme #skip-button {
 body.deepsea-theme #skip-button:hover {
   background-color: #00b3ff;
   box-shadow: 0 0 12px rgba(var(--deepsea-rgb), 0.7);
+}
+
+/* ----- MATRIX THEME ----- */
+body.matrix-theme #terminal,
+body.matrix-theme #output,
+body.matrix-theme #prompt-container,
+body.matrix-theme #prompt-text,
+body.matrix-theme #user-input,
+body.matrix-theme #loading-message {
+    color: var(--matrix-color);
+}
+
+body.matrix-theme .cursor,
+body.matrix-theme .prompt-cursor {
+    background-color: var(--matrix-color);
+    box-shadow: 0 0 5px rgba(var(--matrix-rgb), 0.8);
+}
+
+body.matrix-theme #bitcoin-logo {
+    color: transparent;
+    position: relative;
+    text-shadow: none;
+    min-height: 120px;
+    border: 2px solid var(--matrix-color);
+    box-shadow: 0 0 15px rgba(var(--matrix-rgb), 0.5);
+}
+
+body.matrix-theme #bitcoin-logo::after {
+    content: "WELCOME TO THE MATRIX";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 100%;
+    font-weight: bold;
+    line-height: 1.2;
+    color: var(--matrix-color);
+    white-space: pre;
+    display: block;
+    text-shadow: 0 0 10px rgba(var(--matrix-rgb), 0.5);
+    font-family: monospace;
+    z-index: 1;
+    padding: 10px 0;
+}
+
+body.matrix-theme #bitcoin-logo::before {
+    content: "v.21";
+    position: absolute;
+    bottom: 0;
+    right: 10px;
+    color: var(--matrix-color);
+    font-size: 16px;
+    text-shadow: 0 0 5px rgba(var(--matrix-rgb), 0.5);
+    font-family: var(--terminal-font);
+    z-index: 2;
+}
+
+body.matrix-theme #config-form {
+    border: 1px solid var(--matrix-color);
+    box-shadow: 0 0 10px rgba(var(--matrix-rgb), 0.5);
+}
+
+body.matrix-theme .config-title {
+    color: var(--matrix-color);
+}
+
+body.matrix-theme .form-group label {
+    color: var(--matrix-color);
+}
+
+body.matrix-theme .form-group input,
+body.matrix-theme .form-group select {
+    border: 1px solid var(--matrix-color);
+}
+
+body.matrix-theme .form-group input:focus,
+body.matrix-theme .form-group select:focus {
+    box-shadow: 0 0 5px var(--matrix-color);
+}
+
+body.matrix-theme .btn {
+    background-color: var(--matrix-color);
+}
+
+body.matrix-theme .btn:hover {
+    background-color: #66ff66;
+}
+
+body.matrix-theme .btn-secondary {
+    background-color: #333;
+    color: var(--matrix-color);
+}
+
+body.matrix-theme .tooltip .tooltip-text {
+    border: 1px solid var(--matrix-color);
+}
+
+body.matrix-theme .form-group select {
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--matrix-color) 50%),
+        linear-gradient(135deg, var(--matrix-color) 50%, transparent 50%);
+}
+
+body.matrix-theme #skip-button {
+    background-color: var(--matrix-color);
+    box-shadow: 0 0 8px rgba(var(--matrix-rgb), 0.5);
+}
+
+body.matrix-theme #skip-button:hover {
+    background-color: #66ff66;
+    box-shadow: 0 0 12px rgba(var(--matrix-rgb), 0.7);
 }
 
 /* ----- UNDERWATER EFFECTS ----- */
