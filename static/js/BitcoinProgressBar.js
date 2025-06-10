@@ -1293,7 +1293,10 @@ const BitcoinMinuteRefresh = (function () {
       .page-controls {
         display: flex;
         justify-content: space-between;
-        margin-top: 5px;
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
       }
 
       .page-btn {
