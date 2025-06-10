@@ -20,12 +20,28 @@
         let word_cycle_index = 0;
 
         function resize() {
+            const prev_columns = columns || 0;
             width = window.innerWidth;
             height = window.innerHeight;
+
+            const new_columns = Math.floor(width / 20);
+
             canvas.width = width;
             canvas.height = height;
-            columns = Math.floor(width / 20);
-            drops = Array.from({ length: columns }, () => ({ y: 0, word: null, index: 0 }));
+
+            if (!drops) {
+                drops = Array.from({ length: new_columns }, () => ({ y: 0, word: null, index: 0 }));
+            } else {
+                if (new_columns > prev_columns) {
+                    for (let i = prev_columns; i < new_columns; i++) {
+                        drops[i] = { y: Math.floor(Math.random() * (height / 20)), word: null, index: 0 };
+                    }
+                } else if (new_columns < prev_columns) {
+                    drops.length = new_columns;
+                }
+            }
+
+            columns = new_columns;
         }
 
         const charSet =
