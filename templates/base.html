@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/matrix.css') }}">
 
     <!-- Theme JS (added to ensure consistent application of theme) -->
+    <script src="{{ url_for('static', filename='js/themeQuotes.js') }}"></script>
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='js/matrixRain.js') }}"></script>
 
@@ -73,8 +74,15 @@
                 const loaderName = useMatrix ? 'Matrix' : (useDeepSea ? 'DeepSea' : 'Bitcoin');
                 text.textContent = 'Loading ' + loaderName + ' Theme';
 
+                const quote = document.createElement('div');
+                quote.id = 'loader-quote';
+                if (window.get_theme_quote) {
+                    quote.textContent = get_theme_quote(useDeepSea, useMatrix);
+                }
+
                 loader.appendChild(icon);
                 loader.appendChild(text);
+                loader.appendChild(quote);
                 document.body.appendChild(loader);
 
                 // Add fade-in effect for content once theme is loaded

@@ -545,8 +545,15 @@ function toggleTheme() {
     text.id = 'loader-text';
     text.textContent = 'Applying ' + (useDeepSea ? 'DeepSea' : 'Bitcoin') + ' Theme';
 
+    const quote = document.createElement('div');
+    quote.id = 'loader-quote';
+    if (window.get_theme_quote) {
+        quote.textContent = get_theme_quote(useDeepSea, false);
+    }
+
     loadingMessage.appendChild(icon);
     loadingMessage.appendChild(text);
+    loadingMessage.appendChild(quote);
 
     // Apply immediate styling
     loadingMessage.style.position = 'fixed';

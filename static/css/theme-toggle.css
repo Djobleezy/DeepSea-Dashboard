@@ -180,6 +180,13 @@ html.deepsea-theme #theme-loader {
   letter-spacing: 1px;
 }
 
+#loader-quote {
+  font-size: 20px;
+  max-width: 80%;
+  text-align: center;
+  margin-top: 10px;
+}
+
 /* ----- ANIMATIONS ----- */
 @keyframes spin {
   0% {
