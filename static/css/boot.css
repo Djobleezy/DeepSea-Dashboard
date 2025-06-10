@@ -71,6 +71,7 @@ body::before {
   border-radius: 4px;
   z-index: 100;
   position: relative;
+  font-size: 16px;
 }
 
 .config-title {
@@ -98,7 +99,7 @@ body::before {
   border: 1px solid var(--bitcoin-color);
   color: var(--text-color);
   font-family: var(--terminal-font);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .form-group input:focus,
@@ -138,7 +139,7 @@ body::before {
   border: none;
   cursor: pointer;
   font-family: var(--terminal-font);
-  font-size: 18px;
+  font-size: 16px;
   transition: all 0.2s ease;
 }
 
