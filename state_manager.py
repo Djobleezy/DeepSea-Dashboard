@@ -27,6 +27,8 @@ MAX_HISTORY_ENTRIES = 180  # 3 hours worth at 1 min intervals
 MAX_VARIANCE_HISTORY_ENTRIES = 180  # 3 hours at 1 min intervals
 # Maximum number of minutes to autofill when variance data is missing
 MAX_FILL_GAP_MINUTES = 3
+# Limit for stored payout records to prevent memory leaks
+MAX_PAYOUT_HISTORY_ENTRIES = 100
 
 # Lock for thread safety
 state_lock = threading.Lock()
@@ -688,6 +690,10 @@ class StateManager:
     def save_payout_history(self, history):
         """Save payout history to Redis and memory."""
         try:
+            # Trim to the most recent MAX_PAYOUT_HISTORY_ENTRIES records
+            if len(history) > MAX_PAYOUT_HISTORY_ENTRIES:
+                history = history[:MAX_PAYOUT_HISTORY_ENTRIES]
+
             self.payout_history = history
             if self.redis_client:
                 self.redis_client.set("payout_history", json.dumps(history))
