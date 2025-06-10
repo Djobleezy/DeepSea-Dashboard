@@ -1873,6 +1873,7 @@ const BitcoinMinuteRefresh = (function () {
             // Apply current theme to the button
             const theme = getThemeColors();
             showButton.style.backgroundColor = theme.color;
+            showButton.style.color = isDeepSea() && !isMatrix() ? '#ffffff' : '#000000';
             showButton.style.boxShadow = `0 0 10px rgba(${theme.rgb}, 0.5)`;
             showButton.style.opacity = '0.95';
         }
