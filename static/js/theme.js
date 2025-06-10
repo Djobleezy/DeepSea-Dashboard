@@ -483,6 +483,12 @@ function applyMatrixTheme() {
             themeToggle.style.color = '#39ff14';
         }
 
+        const mobileNavToggle = document.getElementById('mobileNavToggle');
+        if (mobileNavToggle) {
+            mobileNavToggle.style.borderColor = '#39ff14';
+            mobileNavToggle.style.color = '#39ff14';
+        }
+
         document.documentElement.classList.remove('bitcoin-theme', 'deepsea-theme');
         document.documentElement.classList.add('matrix-theme');
 
