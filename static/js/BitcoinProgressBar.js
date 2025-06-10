@@ -935,10 +935,10 @@ const BitcoinMinuteRefresh = (function () {
               <div class="page-title">DATA AGE</div>
               <div id="${DOM_IDS.DATA_AGE}" class="data-age"></div>
             </div>
-            <div class="page-controls">
-              <span id="${DOM_IDS.PREV_BTN}" class="page-btn">&#9664;</span>
-              <span id="${DOM_IDS.NEXT_BTN}" class="page-btn">&#9654;</span>
-            </div>
+          </div>
+          <div class="page-controls">
+            <span id="${DOM_IDS.PREV_BTN}" class="page-btn">&#9664;</span>
+            <span id="${DOM_IDS.NEXT_BTN}" class="page-btn">&#9654;</span>
           </div>
           <div class="terminal-minimized">
             <div class="minimized-uptime">
@@ -1293,7 +1293,14 @@ const BitcoinMinuteRefresh = (function () {
       .page-controls {
         display: flex;
         justify-content: space-between;
-        margin-top: 5px;
+        position: absolute;
+        bottom: 4px;
+        left: 8px;
+        right: 8px;
+      }
+
+      .bitcoin-terminal.collapsed .page-controls {
+        display: none;
       }
 
       .page-btn {
