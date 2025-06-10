@@ -40,7 +40,8 @@ const BitcoinMinuteRefresh = (function () {
         POSITION_LEFT: 'bitcoin_terminal_left',
         POSITION_TOP: 'bitcoin_terminal_top',
         SNAP_POINT: 'bitcoin_terminal_snap_point',
-        COLLAPSED_SNAP_POINT: 'bitcoin_terminal_collapsed_snap_point'
+        COLLAPSED_SNAP_POINT: 'bitcoin_terminal_collapsed_snap_point',
+        HIDDEN: 'bitcoin_terminal_hidden'
     };
     const SELECTORS = {
         HEADER: '.terminal-header',
@@ -1706,6 +1707,13 @@ const BitcoinMinuteRefresh = (function () {
         if (healthInterval) clearInterval(healthInterval);
         healthInterval = setInterval(fetchHealth, 10000);
 
+        // Restore hidden state across page loads
+        if (localStorage.getItem(STORAGE_KEYS.HIDDEN) === 'true') {
+            hideTerminal();
+        } else {
+            showTerminal();
+        }
+
         // Mark as initialized
         isInitialized = true;
 
@@ -1735,6 +1743,12 @@ const BitcoinMinuteRefresh = (function () {
         } else if (event.key === STORAGE_KEYS.THEME) {
             // Update theme when theme preference changes
             applyThemeColor();
+        } else if (event.key === STORAGE_KEYS.HIDDEN) {
+            if (event.newValue === 'true') {
+                hideTerminal();
+            } else {
+                showTerminal();
+            }
         }
     }
 
@@ -1862,6 +1876,9 @@ const BitcoinMinuteRefresh = (function () {
 
         terminalElement.style.display = 'none';
 
+        // Persist hidden state across pages
+        localStorage.setItem(STORAGE_KEYS.HIDDEN, 'true');
+
         // Create show button if it doesn't exist
         if (!document.getElementById(DOM_IDS.SHOW_BUTTON)) {
             const showButton = document.createElement('button');
@@ -1892,6 +1909,13 @@ const BitcoinMinuteRefresh = (function () {
         if (showButton) {
             showButton.style.display = 'none';
         }
+
+        // Recalculate position now that the terminal is visible
+        // Delay slightly so the browser can compute dimensions
+        setTimeout(restoreTerminalPosition, 50);
+
+        // Clear hidden state when shown
+        localStorage.setItem(STORAGE_KEYS.HIDDEN, 'false');
     }
 
     // Public API
