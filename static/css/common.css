@@ -862,6 +862,42 @@ html.deepsea-theme h1::after {
   border-top: 1px solid rgba(128, 128, 128, 0.2);
 }
 
+/* Footer links mimic btc_price hover behavior */
+.footer a {
+  cursor: pointer !important;
+  color: inherit !important;
+  text-decoration: none !important;
+  transition:
+    color 0.2s,
+    text-shadow 0.2s,
+    text-decoration 0.2s !important;
+}
+
+.footer a:hover {
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+  text-shadow:
+    0 0 8px var(--primary-color),
+    0 0 2px #fff !important;
+  color: var(--primary-color) !important;
+}
+
+html.deepsea-theme .footer a:hover {
+  color: #00dfff !important;
+  text-shadow:
+    0 0 10px #00dfff,
+    0 0 2px #fff !important;
+  text-decoration: underline wavy #00dfff !important;
+}
+
+html.bitcoin-theme .footer a:hover {
+  color: #ffd700 !important;
+  text-shadow:
+    0 0 10px #ffd700,
+    0 0 2px #fff !important;
+  text-decoration: underline wavy #ffd700 !important;
+}
+
 /* ----- PROGRESS BAR COMPONENTS ----- */
 .bitcoin-progress-container {
   width: 100%;
