@@ -482,22 +482,22 @@ body.deepsea-theme #skip-button:hover {
 }
 
 /* ----- MATRIX THEME ----- */
-body.matrix-theme #terminal,
-body.matrix-theme #output,
-body.matrix-theme #prompt-container,
-body.matrix-theme #prompt-text,
-body.matrix-theme #user-input,
-body.matrix-theme #loading-message {
+html.matrix-theme #terminal,
+html.matrix-theme #output,
+html.matrix-theme #prompt-container,
+html.matrix-theme #prompt-text,
+html.matrix-theme #user-input,
+html.matrix-theme #loading-message {
     color: var(--matrix-color);
 }
 
-body.matrix-theme .cursor,
-body.matrix-theme .prompt-cursor {
+html.matrix-theme .cursor,
+html.matrix-theme .prompt-cursor {
     background-color: var(--matrix-color);
     box-shadow: 0 0 5px rgba(var(--matrix-rgb), 0.8);
 }
 
-body.matrix-theme #bitcoin-logo {
+html.matrix-theme #bitcoin-logo {
     color: transparent;
     position: relative;
     text-shadow: none;
@@ -506,7 +506,7 @@ body.matrix-theme #bitcoin-logo {
     box-shadow: 0 0 15px rgba(var(--matrix-rgb), 0.5);
 }
 
-body.matrix-theme #bitcoin-logo::after {
+html.matrix-theme #bitcoin-logo::after {
     content: "WELCOME TO THE MATRIX";
     position: absolute;
     top: 50%;
@@ -524,7 +524,7 @@ body.matrix-theme #bitcoin-logo::after {
     padding: 10px 0;
 }
 
-body.matrix-theme #bitcoin-logo::before {
+html.matrix-theme #bitcoin-logo::before {
     content: "v.21";
     position: absolute;
     bottom: 0;
@@ -536,58 +536,58 @@ body.matrix-theme #bitcoin-logo::before {
     z-index: 2;
 }
 
-body.matrix-theme #config-form {
+html.matrix-theme #config-form {
     border: 1px solid var(--matrix-color);
     box-shadow: 0 0 10px rgba(var(--matrix-rgb), 0.5);
 }
 
-body.matrix-theme .config-title {
+html.matrix-theme .config-title {
     color: var(--matrix-color);
 }
 
-body.matrix-theme .form-group label {
+html.matrix-theme .form-group label {
     color: var(--matrix-color);
 }
 
-body.matrix-theme .form-group input,
-body.matrix-theme .form-group select {
+html.matrix-theme .form-group input,
+html.matrix-theme .form-group select {
     border: 1px solid var(--matrix-color);
 }
 
-body.matrix-theme .form-group input:focus,
-body.matrix-theme .form-group select:focus {
+html.matrix-theme .form-group input:focus,
+html.matrix-theme .form-group select:focus {
     box-shadow: 0 0 5px var(--matrix-color);
 }
 
-body.matrix-theme .btn {
+html.matrix-theme .btn {
     background-color: var(--matrix-color);
 }
 
-body.matrix-theme .btn:hover {
+html.matrix-theme .btn:hover {
     background-color: #66ff66;
 }
 
-body.matrix-theme .btn-secondary {
+html.matrix-theme .btn-secondary {
     background-color: #333;
     color: var(--matrix-color);
 }
 
-body.matrix-theme .tooltip .tooltip-text {
+html.matrix-theme .tooltip .tooltip-text {
     border: 1px solid var(--matrix-color);
 }
 
-body.matrix-theme .form-group select {
+html.matrix-theme .form-group select {
     background-image:
         linear-gradient(45deg, transparent 50%, var(--matrix-color) 50%),
         linear-gradient(135deg, var(--matrix-color) 50%, transparent 50%);
 }
 
-body.matrix-theme #skip-button {
+html.matrix-theme #skip-button {
     background-color: var(--matrix-color);
     box-shadow: 0 0 8px rgba(var(--matrix-rgb), 0.5);
 }
 
-body.matrix-theme #skip-button:hover {
+html.matrix-theme #skip-button:hover {
     background-color: #66ff66;
     box-shadow: 0 0 12px rgba(var(--matrix-rgb), 0.7);
 }

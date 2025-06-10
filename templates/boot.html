@@ -31,6 +31,7 @@
             const useDeepSea = !useMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
             const themeClass = useMatrix ? 'matrix-theme' : (useDeepSea ? 'deepsea-theme' : 'bitcoin-theme');
             document.documentElement.classList.add(themeClass);
+            document.body.classList.add(themeClass);
         })();
     </script>
 
@@ -106,6 +107,20 @@
 
         body.deepsea-theme .water-trail {
             background: linear-gradient(to bottom, transparent, rgba(0, 136, 204, 0.2) 20%, rgba(0, 136, 204, 0.1) 70%, transparent);
+        }
+
+        /* Droplets for Matrix Theme */
+        html.matrix-theme .water-droplet {
+            background-color: rgba(57, 255, 20, 0.3);
+            box-shadow: inset 5px 5px 10px rgba(255, 255, 255, 0.3), inset -5px -5px 10px rgba(0, 0, 0, 0.3), 0 0 5px rgba(57, 255, 20, 0.5);
+        }
+
+            html.matrix-theme .water-droplet::before {
+                background-color: rgba(255, 255, 255, 0.5);
+            }
+
+        html.matrix-theme .water-trail {
+            background: linear-gradient(to bottom, transparent, rgba(57, 255, 20, 0.2) 20%, rgba(57, 255, 20, 0.1) 70%, transparent);
         }
 
         /* Update dripping animation to work with the new fade-in */
@@ -230,7 +245,13 @@
             condensation.className = 'screen-condensation';
             document.body.appendChild(condensation);
 
-            document.body.classList.add('deepsea-theme');
+            const isMatrixTheme = localStorage.getItem('useMatrixTheme') === 'true';
+            const isDeepSeaTheme = !isMatrixTheme && localStorage.getItem('useDeepSeaTheme') === 'true';
+            if (isMatrixTheme) {
+                document.body.classList.add('matrix-theme');
+            } else if (isDeepSeaTheme) {
+                document.body.classList.add('deepsea-theme');
+            }
 
             // Check if we're on a mobile device
             const isMobile = window.innerWidth < 768;
@@ -775,6 +796,8 @@
                 const isDeepSea = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
 
                 if (isMatrix) {
+                    document.body.classList.add('matrix-theme');
+                    document.body.classList.remove('deepsea-theme');
                     themeToggle.style.borderColor = '#39ff14';
                     themeToggle.style.color = '#39ff14';
                     if (window.applyMatrixTheme) {
@@ -782,6 +805,7 @@
                     }
                 } else if (isDeepSea) {
                     document.body.classList.add('deepsea-theme');
+                    document.body.classList.remove('matrix-theme');
                     themeToggle.style.borderColor = '#0088cc';
                     themeToggle.style.color = '#0088cc';
                     if (window.applyDeepSeaTheme) {
@@ -789,6 +813,7 @@
                     }
                 } else {
                     document.body.classList.remove('deepsea-theme');
+                    document.body.classList.remove('matrix-theme');
                     themeToggle.style.borderColor = '#f2a900';
                     themeToggle.style.color = '#f2a900';
                 }
@@ -803,6 +828,7 @@
             function updateTerminalColors() {
                 const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
                 const isDeepSeaTheme = !isMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+                document.body.classList.toggle('matrix-theme', isMatrix);
                 document.body.classList.toggle('deepsea-theme', isDeepSeaTheme);
                 if (isMatrix && window.applyMatrixTheme) {
                     applyMatrixTheme();
