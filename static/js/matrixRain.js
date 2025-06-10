@@ -28,7 +28,11 @@
         }
 
         const charSet =
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ';
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()[]{}<>?/|~' +
+            'ΩβπΣΔΘΛΞΦΨαβγδεζηθικλμνξοπρστυφχψω' +
+            'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ';
+
+        const words = ['OCEAN', 'BITCOIN', 'MATRIX'];
         const fonts = [
             '16px "Courier New", monospace',
             '16px "Consolas", monospace',
@@ -42,7 +46,12 @@
             ctx.fillStyle = '#39ff14';
 
             for (let i = 0; i < drops.length; i++) {
-                const text = charSet[Math.floor(Math.random() * charSet.length)];
+                let text;
+                if (Math.random() < 0.0005) {
+                    text = words[Math.floor(Math.random() * words.length)];
+                } else {
+                    text = charSet[Math.floor(Math.random() * charSet.length)];
+                }
                 ctx.font = fonts[Math.floor(Math.random() * fonts.length)];
                 ctx.fillText(text, i * 20, drops[i] * 20);
                 if (drops[i] * 20 > height && Math.random() > 0.975) {
