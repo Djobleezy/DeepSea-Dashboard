@@ -4,10 +4,11 @@ import uuid
 import weakref
 import pytz
 import re
+import requests
 from datetime import datetime, timedelta, timezone, tzinfo
 from enum import Enum
 from typing import List, Dict, Any, Optional
-from config import get_timezone, load_config
+from config import get_timezone, load_config, get_exchange_rate_api_key
 
 from data_service import MiningDashboardService
 
@@ -75,27 +76,43 @@ def format_currency_value(value, currency, exchange_rates):
 
 
 def get_exchange_rates(dashboard_service: MiningDashboardService = None):
-    """Get exchange rates with caching.
+    """Return currency exchange rates using the configured API key.
 
-    If no service is provided, a temporary one is created and closed after use.
+    When a dashboard service instance is provided, its cached method is used.
+    Otherwise a lightweight request is performed directly to avoid creating a
+    temporary service (which spawns threads) and leaking resources.
     """
-    temp_service = None
-    try:
-        if dashboard_service is None:
-            temp_service = MiningDashboardService(0, 0, "", 0)
-            dashboard_service = temp_service
 
-        exchange_rates = dashboard_service.fetch_exchange_rates()
-        return exchange_rates
+    if dashboard_service is not None:
+        try:
+            return dashboard_service.fetch_exchange_rates()
+        except Exception as e:
+            logging.error(f"Error fetching exchange rates for notifications: {e}")
+            return {}
+
+    api_key = get_exchange_rate_api_key()
+    if not api_key:
+        logging.error("Exchange rate API key not configured")
+        return {}
+
+    url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/USD"
+    try:
+        with requests.Session() as session:
+            response = session.get(url, timeout=5)
+            if response.ok:
+                data = response.json()
+                if data.get("result") == "success":
+                    return data.get("conversion_rates", {})
+                logging.error(
+                    "Exchange rate API returned unsuccessful result: %s",
+                    data.get("error_type", "Unknown error"),
+                )
+            else:
+                logging.error("Failed to fetch exchange rates: %s", response.status_code)
     except Exception as e:
         logging.error(f"Error fetching exchange rates for notifications: {e}")
-        return {}  # Return empty dict if failed
-    finally:
-        if temp_service is not None:
-            try:
-                temp_service.close()
-            except Exception as e:
-                logging.error(f"Error closing temporary service: {e}")
+
+    return {}
 
 
 class NotificationService:

@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch
+import notification_service
 import sys
 import types
 
@@ -131,6 +132,30 @@ class NotificationCurrencyTest(unittest.TestCase):
         with patch("notification_service.pytz.timezone", side_effect=Exception("bad")):
             dt = svc._get_current_time()
         self.assertIsNotNone(dt.tzinfo)
+
+    def test_get_exchange_rates_without_service_uses_session(self):
+        class DummySession:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                pass
+
+            def get(self, url, timeout=5):
+                class R:
+                    ok = True
+
+                    def json(self):
+                        return {"result": "success", "conversion_rates": {"USD": 1}}
+
+                return R()
+
+        with patch("notification_service.requests.Session", lambda: DummySession()):
+            with patch("notification_service.get_exchange_rate_api_key", return_value="k"):
+                with patch("notification_service.MiningDashboardService", side_effect=AssertionError()):
+                    rates = notification_service.get_exchange_rates(None)
+
+        self.assertEqual(rates, {"USD": 1})
 
 
 if __name__ == "__main__":
