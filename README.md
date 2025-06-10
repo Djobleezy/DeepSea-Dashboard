@@ -95,6 +95,7 @@ informed with minimal fuss.
 ### Secret Matrix Theme
 - **Activation**: Enable the easter egg with the Konami code and then enter `MATRIX` to reveal a green Matrix-style look. Now includes an animated matrix rain background for extra immersion.
 - **Authentic Rain**: Characters fall from a mixed set of Katakana, letters, digits and symbols, with rare hidden words like `OCEAN`, `BITCOIN` and `MATRIX`, rendered in a variety of monospace fonts for a more cinematic feel.
+- **Random Rotation**: Each character now rotates slightly at random as it falls, creating a dynamic cascade.
 
 ## Documentation
 

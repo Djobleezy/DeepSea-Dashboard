@@ -70,7 +70,12 @@
                     char = charSet[Math.floor(Math.random() * charSet.length)];
                 }
                 ctx.font = fonts[Math.floor(Math.random() * fonts.length)];
-                ctx.fillText(char, i * 20, drop.y * 20);
+                ctx.save();
+                ctx.translate(i * 20, drop.y * 20);
+                const angle = (Math.random() - 0.5) * (Math.PI / 3);
+                ctx.rotate(angle);
+                ctx.fillText(char, 0, 0);
+                ctx.restore();
                 if (drop.y * 20 > height && Math.random() > 0.975) {
                     drop.y = 0;
                 }
