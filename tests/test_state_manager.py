@@ -206,6 +206,19 @@ def test_persist_critical_state_and_load():
     assert last_update == 300
 
 
+def test_load_critical_state_handles_str():
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+
+    state = {"last_successful_run": 1, "last_update_time": 2, "cached_metrics_timestamp": 3}
+    # Store raw string rather than bytes
+    mgr.redis_client.storage["critical_state"] = json.dumps(state)
+
+    last_run, last_update = mgr.load_critical_state()
+    assert last_run == 1
+    assert last_update == 2
+
+
 def test_prune_old_data():
     mgr = StateManager()
     mgr.redis_client = DummyRedis()

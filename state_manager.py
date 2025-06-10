@@ -403,7 +403,11 @@ class StateManager:
         try:
             state_json = self.redis_client.get("critical_state")
             if state_json:
-                state = json.loads(state_json.decode("utf-8"))
+                if isinstance(state_json, bytes):
+                    state_json = state_json.decode("utf-8")
+                else:
+                    state_json = str(state_json)
+                state = json.loads(state_json)
                 last_successful_run = state.get("last_successful_run")
                 last_update_time = state.get("last_update_time")
 
