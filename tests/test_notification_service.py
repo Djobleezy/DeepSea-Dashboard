@@ -77,7 +77,7 @@ class NotificationCurrencyTest(unittest.TestCase):
         ]
 
     def test_update_notification_currency(self):
-        with patch("notification_service.get_exchange_rates", return_value={"EUR": 0.5}):
+        with patch("notification_service.get_exchange_rates", return_value={"EUR": 0.5, "USD": 1.0}):
             updated = self.service.update_notification_currency("EUR")
 
         self.assertEqual(updated, 1)
@@ -117,6 +117,19 @@ class NotificationCurrencyTest(unittest.TestCase):
         notif = self.service.notifications[0]
         self.assertEqual(notif["data"]["currency"], "USD")
         self.assertAlmostEqual(notif["data"]["daily_profit"], 10.0)
+
+    def test_update_notification_currency_missing_old_rate(self):
+        """Skip update when existing currency has no exchange rate."""
+        self.service.notifications[0]["data"]["currency"] = "JPY"
+        self.service.notifications[0]["data"]["daily_profit"] = 1500.0
+
+        with patch("notification_service.get_exchange_rates", return_value={"USD": 1.0}):
+            updated = self.service.update_notification_currency("USD")
+
+        self.assertEqual(updated, 0)
+        notif = self.service.notifications[0]
+        self.assertEqual(notif["data"]["currency"], "JPY")
+        self.assertEqual(notif["data"]["daily_profit"], 1500.0)
 
     def test_parse_timestamp_with_z_suffix(self):
         with patch("notification_service.get_timezone", return_value="UTC"):

@@ -856,6 +856,11 @@ class NotificationService:
                         except (ValueError, TypeError):
                             profit_usd = profit_value
                     else:
+                        if old_currency not in exchange_rates:
+                            logging.warning(
+                                f"[NotificationService] Missing exchange rate for {old_currency}, skipping update"
+                            )
+                            continue
                         old_rate = exchange_rates.get(old_currency, 1.0)
                         try:
                             profit_usd = profit_value / old_rate
