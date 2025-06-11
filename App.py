@@ -1328,7 +1328,13 @@ def memory_history():
 
 @app.route("/api/force-gc", methods=["POST"])
 def force_gc():
-    """API endpoint to force garbage collection."""
+    """Force Python's garbage collector to run.
+
+    The optional JSON payload may include a ``generation`` key specifying
+    which GC generation to target (0-2). The endpoint returns statistics
+    about the collection including number of objects collected and the
+    duration of the run.
+    """
     try:
         generation = request.json.get("generation", 2) if request.is_json else 2
 
@@ -1493,7 +1499,13 @@ def reset_chart_data():
 
 @app.route("/api/payout-history", methods=["GET", "POST", "DELETE"])
 def payout_history():
-    """API endpoint to manage payout history."""
+    """Manage payout history through a simple REST style interface.
+
+    * ``GET`` returns the currently stored payout history.
+    * ``POST`` accepts either a full ``history`` list or a single ``record``
+      dictionary to prepend to the history.
+    * ``DELETE`` clears all stored payout data.
+    """
     try:
         if request.method == "GET":
             history = state_manager.get_payout_history()

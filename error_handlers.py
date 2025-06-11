@@ -1,7 +1,11 @@
+"""Flask error handling utilities used across the dashboard."""
+
 import logging
 from flask import Blueprint, render_template
 
-errors = Blueprint('errors', __name__)
+# Blueprint that holds the error handler routes. This object is imported by
+# the main application when registering blueprints.
+errors = Blueprint("errors", __name__)
 
 @errors.app_errorhandler(404)
 def page_not_found(error):

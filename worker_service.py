@@ -383,7 +383,9 @@ class WorkerService:
         Returns:
             dict: Generated worker data
         """
-        # If metrics aren't available yet, return default data
+        # If metrics aren't available yet, return default data. This ensures the
+        # frontend still renders something even if the initial network request
+        # fails or the pool is unreachable.
         if not cached_metrics:
             logging.warning("No cached metrics available for worker fallback data")
             return self.generate_default_workers_data()
@@ -404,7 +406,8 @@ class WorkerService:
             logging.warning("No workers reported in metrics, forcing 1 worker")
             workers_count = 1
 
-        # Get hashrate from cached metrics
+        # Pull the 3 hour hashrate from cached metrics. This is used as the base
+        # to evenly distribute hashrate across the simulated workers.
         original_hashrate_3hr = float(cached_metrics.get("hashrate_3hr", 0) or 0)
         hashrate_unit = cached_metrics.get("hashrate_3hr_unit", "TH/s")
 

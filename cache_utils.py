@@ -16,11 +16,17 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
     """
 
     def decorator(func):
+        # ``object_caches`` stores per-instance caches when decorating methods
+        # so that each object gets its own cache entries. ``cache`` holds
+        # results for regular functions.
         object_caches = weakref.WeakKeyDictionary()
         cache = {}
+        # ``lock`` guards access to both cache dictionaries to keep them thread
+        # safe when the decorated function is called concurrently.
         lock = threading.Lock()
 
         def _serialize(value):
+            """Convert non-hashable values to a stable, hashable representation."""
             try:
                 hash(value)
                 return value
@@ -33,12 +39,14 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
                     return str(value)
 
         def _purge_expired(cache_dict, now):
+            """Remove items older than ``ttl_seconds`` from the cache."""
             expired = [k for k, (_, ts) in cache_dict.items() if now - ts >= ttl_seconds]
             for k in expired:
                 del cache_dict[k]
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Return cached results when available or call the wrapped function."""
             if args and hasattr(args[0], "__dict__"):
                 obj = args[0]
                 key_args = args[1:]
@@ -70,11 +78,13 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
             return result
 
         def cache_clear():
+            """Remove all cached values for both functions and methods."""
             with lock:
                 cache.clear()
                 object_caches.clear()
 
         def cache_size():
+            """Return the current number of cached entries after removing expired items."""
             now = time.time()
             with lock:
                 _purge_expired(cache, now)
