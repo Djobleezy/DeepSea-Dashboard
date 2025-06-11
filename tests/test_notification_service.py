@@ -202,5 +202,18 @@ class NotificationCurrencyTest(unittest.TestCase):
         self.assertTrue(resp.closed)
 
 
+class RedisValueTest(unittest.TestCase):
+    def test_get_redis_value_zero(self):
+        class DummyRedis:
+            def get(self, key):
+                return b"0"
+
+        state = DummyStateManager()
+        state.redis_client = DummyRedis()
+        svc = NotificationService(state)
+        result = svc._get_redis_value("val", "default")
+        self.assertEqual(result, "0")
+
+
 if __name__ == "__main__":
     unittest.main()

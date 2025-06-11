@@ -204,7 +204,7 @@ class NotificationService:
         try:
             if hasattr(self.state_manager, "redis_client") and self.state_manager.redis_client:
                 value = self.state_manager.redis_client.get(key)
-                if value:
+                if value is not None:
                     return value.decode("utf-8")
             return default
         except Exception as e:
