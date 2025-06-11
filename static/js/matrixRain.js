@@ -64,7 +64,7 @@
         }
 
         function draw() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 1)';
             ctx.fillRect(0, 0, width, height);
             ctx.fillStyle = '#39ff14';
 
