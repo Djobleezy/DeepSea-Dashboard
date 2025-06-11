@@ -615,6 +615,23 @@ const BitcoinMinuteRefresh = (function () {
     }
 
     /**
+     * Clean up event listeners and timers to prevent memory leaks
+     */
+    function cleanup() {
+        detachDragBehavior();
+        window.removeEventListener('storage', handleStorageChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        if (uptimeInterval) {
+            clearInterval(uptimeInterval);
+            uptimeInterval = null;
+        }
+        if (healthInterval) {
+            clearInterval(healthInterval);
+            healthInterval = null;
+        }
+    }
+
+    /**
      * Add snapping functionality to the draggable terminal
      */
     function addSnappingBehavior() {
@@ -1962,7 +1979,8 @@ const BitcoinMinuteRefresh = (function () {
         toggleTerminal: toggleTerminal,
         hideTerminal: hideTerminal,
         showTerminal: showTerminal,
-        updateTheme: applyThemeColor
+        updateTheme: applyThemeColor,
+        cleanup: cleanup
     };
 })();
 
@@ -1977,4 +1995,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Update theme based on current setting
     setTimeout(() => BitcoinMinuteRefresh.updateTheme(), 100);
+});
+
+// Ensure resources are released when navigating away
+window.addEventListener('beforeunload', function () {
+    if (window.BitcoinMinuteRefresh && typeof BitcoinMinuteRefresh.cleanup === 'function') {
+        BitcoinMinuteRefresh.cleanup();
+    }
 });
