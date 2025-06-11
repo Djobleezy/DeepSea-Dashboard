@@ -1,4 +1,4 @@
-o# DeepSea Dashboard
+# DeepSea Dashboard
 
 ## A Retro Mining Monitoring Solution
 
