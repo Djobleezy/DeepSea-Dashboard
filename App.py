@@ -46,7 +46,7 @@ MEMORY_CONFIG = {
 }
 
 # Memory tracking global variables
-memory_usage_history = []
+memory_usage_history = deque(maxlen=MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"])
 memory_usage_lock = threading.Lock()
 last_leak_check_time = 0
 object_counts_history = {}
@@ -321,12 +321,18 @@ def record_memory_metrics():
         }
 
         with memory_usage_lock:
+
+            # Resize deque if configuration changed
+            desired_max = MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]
+            if memory_usage_history.maxlen != desired_max:
+                resized = deque(memory_usage_history, maxlen=desired_max)
+                memory_usage_history.clear()
+                memory_usage_history.extend(resized)
+                memory_usage_history = resized
+                globals()["memory_usage_history"] = memory_usage_history
+
             memory_usage_history.append(entry)
 
-            # Prune old entries in-place to avoid leaking the previous list
-            max_entries = MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]
-            if len(memory_usage_history) > max_entries:
-                del memory_usage_history[:-max_entries]
 
     except Exception as e:
         logging.error(f"Error recording memory metrics: {e}")

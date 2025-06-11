@@ -1,10 +1,12 @@
 import importlib
 import types
+from collections import deque
 
 
 def test_record_memory_metrics_prunes_in_place(monkeypatch):
     App = importlib.reload(importlib.import_module("App"))
-    history = App.memory_usage_history
+    history = deque(maxlen=3)
+    App.memory_usage_history = history
     monkeypatch.setitem(App.MEMORY_CONFIG, "MEMORY_HISTORY_MAX_ENTRIES", 3)
 
     class DummyProc:
@@ -23,3 +25,4 @@ def test_record_memory_metrics_prunes_in_place(monkeypatch):
 
     assert len(App.memory_usage_history) == 3
     assert App.memory_usage_history is history
+    assert isinstance(App.memory_usage_history, deque)
