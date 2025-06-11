@@ -33,6 +33,7 @@ jobs:
         node tests/js/normalizeHashrate.test.js
         node tests/js/arrowIndicator.test.js
         node tests/js/audioCrossfadeTheme.test.js
+        node tests/js/getBlockTimerClass.test.js
         node tests/js/blockProbability.test.js
         node tests/js/notificationsTimestamp.test.js
         node tests/js/workerUtils.test.js
