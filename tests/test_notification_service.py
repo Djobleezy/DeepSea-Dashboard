@@ -170,6 +170,37 @@ class NotificationCurrencyTest(unittest.TestCase):
 
         self.assertEqual(rates, {"USD": 1})
 
+    def test_get_exchange_rates_closes_response(self):
+        class DummyResponse:
+            def __init__(self):
+                self.closed = False
+                self.ok = True
+
+            def json(self):
+                return {"result": "success", "conversion_rates": {"USD": 1}}
+
+            def close(self):
+                self.closed = True
+
+        resp = DummyResponse()
+
+        class DummySession:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                pass
+
+            def get(self, url, timeout=5):
+                return resp
+
+        with patch("notification_service.requests.Session", lambda: DummySession()):
+            with patch("notification_service.get_exchange_rate_api_key", return_value="k"):
+                rates = notification_service.get_exchange_rates(None)
+
+        self.assertEqual(rates, {"USD": 1})
+        self.assertTrue(resp.closed)
+
 
 if __name__ == "__main__":
     unittest.main()

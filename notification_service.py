@@ -99,16 +99,22 @@ def get_exchange_rates(dashboard_service: MiningDashboardService = None):
     try:
         with requests.Session() as session:
             response = session.get(url, timeout=5)
-            if response.ok:
-                data = response.json()
-                if data.get("result") == "success":
-                    return data.get("conversion_rates", {})
-                logging.error(
-                    "Exchange rate API returned unsuccessful result: %s",
-                    data.get("error_type", "Unknown error"),
-                )
-            else:
-                logging.error("Failed to fetch exchange rates: %s", response.status_code)
+            try:
+                if response.ok:
+                    data = response.json()
+                    if data.get("result") == "success":
+                        return data.get("conversion_rates", {})
+                    logging.error(
+                        "Exchange rate API returned unsuccessful result: %s",
+                        data.get("error_type", "Unknown error"),
+                    )
+                else:
+                    logging.error("Failed to fetch exchange rates: %s", response.status_code)
+            finally:
+                try:
+                    response.close()
+                except Exception:
+                    pass
     except Exception as e:
         logging.error(f"Error fetching exchange rates for notifications: {e}")
 
