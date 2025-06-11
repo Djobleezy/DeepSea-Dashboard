@@ -69,6 +69,12 @@ const BitcoinMinuteRefresh = (function () {
     let dragListenersAdded = false;
     let resizeHandler = null;
 
+    // References to active drag handlers
+    let mouseMoveHandler = null;
+    let mouseUpHandler = null;
+    let touchMoveHandler = null;
+    let touchEndHandler = null;
+
     // Helper function to check if DeepSea theme is active
     function isDeepSea() {
         return localStorage.getItem('useDeepSeaTheme') === 'true';
@@ -351,7 +357,7 @@ const BitcoinMinuteRefresh = (function () {
         }
 
         // Function to handle mouse move (dragging) with debounce for better performance
-        const handleMouseMove = debounce(function (e) {
+        mouseMoveHandler = debounce(function (e) {
             if (!isDragging) return;
 
             // Calculate the movement
@@ -390,7 +396,7 @@ const BitcoinMinuteRefresh = (function () {
         }, 10);
 
         // Function to handle mouse up (drag end)
-        function handleMouseUp() {
+        mouseUpHandler = function handleMouseUp() {
             if (isDragging) {
                 isDragging = false;
                 terminal.classList.remove('dragging');
@@ -463,7 +469,7 @@ const BitcoinMinuteRefresh = (function () {
             e.preventDefault();
         }
 
-        function handleTouchMove(e) {
+        touchMoveHandler = function handleTouchMove(e) {
             if (!isDragging) return;
 
             const touch = e.touches[0];
@@ -499,7 +505,7 @@ const BitcoinMinuteRefresh = (function () {
             e.preventDefault();
         }
 
-        function handleTouchEnd() {
+        touchEndHandler = function handleTouchEnd() {
             if (isDragging) {
                 isDragging = false;
                 terminal.classList.remove('dragging');
@@ -537,12 +543,12 @@ const BitcoinMinuteRefresh = (function () {
         // Add event listeners only once to prevent memory leaks
         if (!dragListenersAdded) {
             // Add mousemove and mouseup listeners to document
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
 
             // Add touch event listeners
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd);
+            document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+            document.addEventListener('touchend', touchEndHandler);
 
             // Handle window resize
             resizeHandler = function () {
@@ -597,10 +603,10 @@ const BitcoinMinuteRefresh = (function () {
      */
     function detachDragBehavior() {
         if (!dragListenersAdded) return;
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.removeEventListener('touchmove', handleTouchMove, { passive: false });
-        document.removeEventListener('touchend', handleTouchEnd);
+        document.removeEventListener('mousemove', mouseMoveHandler);
+        document.removeEventListener('mouseup', mouseUpHandler);
+        document.removeEventListener('touchmove', touchMoveHandler, { passive: false });
+        document.removeEventListener('touchend', touchEndHandler);
         if (resizeHandler) {
             window.removeEventListener('resize', resizeHandler);
             resizeHandler = null;
