@@ -56,8 +56,22 @@ def test_get_currency_env(monkeypatch, tmp_path):
     assert mod.get_currency() == "EUR"
 
 
+def test_get_currency_env_lowercase(monkeypatch, tmp_path):
+    path = create_config(tmp_path, currency="GBP")
+    mod = reload_config(monkeypatch, path)
+    monkeypatch.setenv("CURRENCY", "eur")
+    assert mod.get_currency() == "EUR"
+
+
 def test_get_currency_config(monkeypatch, tmp_path):
     path = create_config(tmp_path, currency="AUD")
+    mod = reload_config(monkeypatch, path)
+    monkeypatch.delenv("CURRENCY", raising=False)
+    assert mod.get_currency() == "AUD"
+
+
+def test_get_currency_config_lowercase(monkeypatch, tmp_path):
+    path = create_config(tmp_path, currency="aud")
     mod = reload_config(monkeypatch, path)
     monkeypatch.delenv("CURRENCY", raising=False)
     assert mod.get_currency() == "AUD"

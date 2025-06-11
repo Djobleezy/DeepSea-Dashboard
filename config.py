@@ -169,13 +169,13 @@ def get_currency():
 
     env_currency = os.environ.get("CURRENCY")
     if env_currency:
-        return env_currency
+        return str(env_currency).upper()
 
     # Then check config file
     config = load_config()
     currency = config.get("currency")
     if currency:
-        return currency
+        return str(currency).upper()
 
     # Default to USD
     return "USD"
