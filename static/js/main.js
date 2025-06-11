@@ -1747,8 +1747,12 @@ function showConnectionIssue(message) {
     }
     $connectionStatus.html(`<i class="fas fa-exclamation-triangle"></i> ${message}`).show();
 
-    // Show manual refresh button with theme color
-    $("#refreshButton").css('background-color', theme.PRIMARY).show();
+    // Show manual refresh button with theme color and appropriate text color
+    const textColor = theme === THEME.DEEPSEA ? '#ffffff' : '#000000';
+    $("#refreshButton").css({
+        'background-color': theme.PRIMARY,
+        'color': textColor
+    }).show();
 }
 
 // Helper function to hide connection issue message
@@ -4733,8 +4737,15 @@ $(document).ready(function () {
     // Live block timer update every second
     blockTimerInterval = setInterval(updateBlockTimerValue, 1000);
 
-    // Update the manual refresh button color
-    $("body").append('<button id="refreshButton" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; background: #0088cc; color: white; border: none; padding: 8px 16px; display: none; cursor: pointer;">Refresh Data</button>');
+    // Add manual refresh button and style it based on theme
+    $("body").append('<button id="refreshButton" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000; border: none; padding: 8px 16px; display: none; cursor: pointer;">Refresh Data</button>');
+
+    const theme = getCurrentTheme();
+    const refreshTextColor = theme === THEME.DEEPSEA ? '#ffffff' : '#000000';
+    $("#refreshButton").css({
+        'background-color': theme.PRIMARY,
+        'color': refreshTextColor
+    });
 
     $("#refreshButton").on("click", function () {
         $(this).text("Refreshing...");

@@ -10,19 +10,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/error.css') }}">
     <!-- Add theme.js script for theme awareness -->
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-    <script>// Apply theme class on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      // Check if DeepSea theme is active
-      const useDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true';
-      if (useDeepSea) {
+    <script>
+    // Apply theme class on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      const useMatrix = localStorage.getItem('useMatrixTheme') === 'true';
+      const useDeepSea = !useMatrix && localStorage.getItem('useDeepSeaTheme') === 'true';
+
+      if (useMatrix) {
+        document.documentElement.classList.add('matrix-theme');
+      } else if (useDeepSea) {
         document.documentElement.classList.add('deepsea-theme');
 
         // Create underwater effects for DeepSea theme
         const rays = document.createElement('div');
         rays.className = 'underwater-rays';
         document.body.appendChild(rays);
+      } else {
+        document.documentElement.classList.add('bitcoin-theme');
       }
-    });</script>
+    });
+    </script>
 </head>
 <body>
     <div class="container">
