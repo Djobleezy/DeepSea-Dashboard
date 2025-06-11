@@ -692,11 +692,11 @@ class StateManager:
         return self.payout_history
 
     def save_payout_history(self, history):
-        """Save payout history to Redis and memory."""
+        """Save payout history to Redis and memory, keeping the newest entries."""
         try:
             # Trim to the most recent MAX_PAYOUT_HISTORY_ENTRIES records
             if len(history) > MAX_PAYOUT_HISTORY_ENTRIES:
-                history = history[:MAX_PAYOUT_HISTORY_ENTRIES]
+                history = history[-MAX_PAYOUT_HISTORY_ENTRIES:]
 
             self.payout_history = history
             if self.redis_client:
