@@ -36,3 +36,4 @@ jobs:
         node tests/js/blockProbability.test.js
         node tests/js/notificationsTimestamp.test.js
         node tests/js/workerUtils.test.js
+        node tests/js/themeToggle.test.js
