@@ -192,10 +192,15 @@ class ArrowIndicator {
                 const prevValue = this.previousMetrics[key];
 
                 if (newValue > prevValue * (1 + this.changeThreshold)) {
-                    this.arrowStates[key] = "<i class='arrow chevron fa-solid fa-angle-double-up bounce-up' style='color: green; display: inline-block !important;'></i>";
-                }
-                else if (newValue < prevValue * (1 - this.changeThreshold)) {
-                    this.arrowStates[key] = "<i class='arrow chevron fa-solid fa-angle-double-down bounce-down' style='color: red; position: relative; top: -2px; display: inline-block !important;'></i>";
+                    const upArrow =
+                        "<i class='arrow chevron fa-solid fa-angle-double-up bounce-up' " +
+                        "style='color: #00ff00; display: inline-block !important;'></i>";
+                    this.arrowStates[key] = upArrow;
+                } else if (newValue < prevValue * (1 - this.changeThreshold)) {
+                    const downArrow =
+                        "<i class='arrow chevron fa-solid fa-angle-double-down bounce-down' " +
+                        "style='color: #ff0000; position: relative; top: -2px; display: inline-block !important;'></i>";
+                    this.arrowStates[key] = downArrow;
                 }
             }
 
