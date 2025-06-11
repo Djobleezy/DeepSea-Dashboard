@@ -67,6 +67,7 @@ const BitcoinMinuteRefresh = (function () {
     let currentThemeColor = '';
     let currentThemeRGB = '';
     let dragListenersAdded = false;
+    let resizeHandler = null;
 
     // Helper function to check if DeepSea theme is active
     function isDeepSea() {
@@ -544,7 +545,7 @@ const BitcoinMinuteRefresh = (function () {
             document.addEventListener('touchend', handleTouchEnd);
 
             // Handle window resize
-            window.addEventListener('resize', function () {
+            resizeHandler = function () {
                 if (window.innerWidth < 768) {
                     // Reset position for mobile view
                     terminal.style.left = '50%';
@@ -583,11 +584,28 @@ const BitcoinMinuteRefresh = (function () {
                         terminal.style.top = maxTop + 'px';
                     }
                 }
-            });
+            };
+            window.addEventListener('resize', resizeHandler);
 
             // Mark listeners as added
             dragListenersAdded = true;
         }
+    }
+
+    /**
+     * Remove drag event listeners to free resources
+     */
+    function detachDragBehavior() {
+        if (!dragListenersAdded) return;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove, { passive: false });
+        document.removeEventListener('touchend', handleTouchEnd);
+        if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+            resizeHandler = null;
+        }
+        dragListenersAdded = false;
     }
 
     /**
@@ -1881,6 +1899,8 @@ const BitcoinMinuteRefresh = (function () {
     function hideTerminal() {
         if (!terminalElement) return;
 
+        detachDragBehavior();
+
         terminalElement.style.display = 'none';
 
         // Persist hidden state across pages
@@ -1916,6 +1936,9 @@ const BitcoinMinuteRefresh = (function () {
         if (showButton) {
             showButton.style.display = 'none';
         }
+
+        // Re-attach drag behavior when shown
+        addDraggingBehavior();
 
         // Recalculate position now that the terminal is visible
         // Delay slightly so the browser can compute dimensions
