@@ -47,6 +47,12 @@ class WorkerService:
             logging.info(f"Worker service updated with new wallet: {self.wallet}")
         logging.info("Dashboard service connected to worker service")
 
+    def close(self):
+        """Release cached data and drop service references."""
+        self.worker_data_cache = None
+        self.last_worker_data_update = None
+        self.dashboard_service = None
+
     def generate_default_workers_data(self):
         """
         Generate default worker data when no metrics are available.

@@ -252,3 +252,16 @@ def test_service_worker_cycle_collected(monkeypatch):
 
     assert ref_svc() is None
     assert ref_ws() is None
+
+
+def test_worker_service_close_clears_cache(monkeypatch):
+    """close() should clear cached data and drop dashboard reference."""
+    ws = WorkerService()
+    ws.worker_data_cache = {"dummy": True}
+    ws.last_worker_data_update = 1.0
+    svc = MiningDashboardService(0, 0, "w")
+    ws.set_dashboard_service(svc)
+    ws.close()
+    assert ws.worker_data_cache is None
+    assert ws.last_worker_data_update is None
+    assert ws.dashboard_service is None
