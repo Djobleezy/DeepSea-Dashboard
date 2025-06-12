@@ -122,7 +122,16 @@ class MiningDashboardService:
     def close(self):
         """Close any open network resources."""
         if getattr(self, "_closed", False):
-            logging.warning("Service already closed")
+            root_logger = logging.getLogger()
+            try:
+                # Only log if at least one handler has an open stream
+                if any(
+                    getattr(h, "stream", None) and not getattr(h.stream, "closed", False)
+                    for h in root_logger.handlers
+                ):
+                    logging.warning("Service already closed")
+            except Exception:
+                pass
             return
 
         self._closed = True
