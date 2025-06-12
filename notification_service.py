@@ -57,13 +57,18 @@ def get_currency_symbol(currency):
 
 
 def format_currency_value(value, currency, exchange_rates):
-    """Format a USD value in the selected currency"""
+    """Format a USD value in the selected currency."""
     if value is None or value == "N/A":
         return "N/A"
 
-    # Get exchange rate (default to 1.0 if not found)
+    try:
+        numeric_value = float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        logging.error("Invalid currency value: %s", value)
+        return "N/A"
+
     exchange_rate = exchange_rates.get(currency, 1.0)
-    converted_value = value * exchange_rate
+    converted_value = numeric_value * exchange_rate
 
     # Get currency symbol
     symbol = get_currency_symbol(currency)
