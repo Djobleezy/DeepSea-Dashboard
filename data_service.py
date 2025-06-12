@@ -172,7 +172,11 @@ class MiningDashboardService:
 
     def __del__(self):
         """Ensure resources are released when the service is garbage collected."""
-        self.close()
+        try:
+            if not getattr(self, "_closed", False):
+                self.close()
+        except Exception:
+            pass
 
     def fetch_metrics(self):
         """
