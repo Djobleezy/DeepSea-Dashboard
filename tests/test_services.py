@@ -736,6 +736,26 @@ def test_close_clears_resources(monkeypatch):
     assert svc.executor is None
 
 
+def test_close_handles_closed_logging_stream(monkeypatch):
+    """Calling close twice should not error even if logging streams are closed."""
+    svc = MiningDashboardService(0, 0, "w")
+    import logging
+    import io
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    logger = logging.getLogger()
+    logger.addHandler(handler)
+
+    svc.close()
+    stream.close()
+
+    # Should not raise even though the handler stream is closed
+    svc.close()
+
+    logger.removeHandler(handler)
+
+
 def test_fetch_metrics_cancels_futures(monkeypatch):
     """Futures should be cancelled when fetch_metrics times out."""
     svc = MiningDashboardService(0, 0, "w")
