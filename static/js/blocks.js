@@ -27,6 +27,8 @@ const mempoolLinkBaseUrl = MEMPOOL_GUIDE_BASE_URL; // links should still point t
 let blocksCache = {};
 let isLoading = false;
 let minerChart = null;
+let notificationIntervalId = null;  // interval for notification badge
+let refreshIntervalId = null;       // interval for block refresh
 
 // Determine legend position based on screen size
 function getLegendPosition() {
@@ -120,6 +122,15 @@ function prepareChartData(initialBlocks) {
 function cleanupEventHandlers() {
     $(window).off("click.blockModal");
     $(document).off("keydown.blockModal");
+    $(window).off('resize');
+    if (notificationIntervalId) {
+        clearInterval(notificationIntervalId);
+        notificationIntervalId = null;
+    }
+    if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
+        refreshIntervalId = null;
+    }
 }
 
 // Setup keyboard navigation for modal
@@ -253,7 +264,7 @@ function initNotificationBadge() {
     updateNotificationBadge();
 
     // Update every 60 seconds
-    setInterval(updateNotificationBadge, 60000);
+    notificationIntervalId = setInterval(updateNotificationBadge, 60000);
 }
 
 // Add keyboard event listener for Alt+W to reset wallet address
@@ -781,7 +792,7 @@ function loadLatestBlocks() {
 }
 
 // Refresh blocks page every 60 seconds if there are new blocks - with smart refresh
-setInterval(function () {
+refreshIntervalId = setInterval(function () {
     console.log("Checking for new blocks at " + new Date().toLocaleTimeString());
     loadLatestBlocks().then(latestHeight => {
         if (latestHeight && latestHeight > currentStartHeight) {
