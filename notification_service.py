@@ -619,7 +619,7 @@ class NotificationService:
             cleaned = value_str.replace(",", "")
             # Remove spaces between a sign and the digits (e.g. "- 1.2" -> "-1.2")
             cleaned = re.sub(r"([+-])\s+(?=\d)", r"\1", cleaned).strip()
-            match = re.search(r"[-+]?\d*\.?\d+", cleaned)
+            match = re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", cleaned)
             if match:
                 try:
                     return float(match.group(0))

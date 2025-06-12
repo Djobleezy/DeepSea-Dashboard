@@ -74,3 +74,9 @@ def test_parse_numeric_value_with_sign_and_space():
     """Negative values with spaces after the sign should parse correctly."""
     svc = NotificationService(DummyState())
     assert svc._parse_numeric_value("- 2,000.5 TH/s") == pytest.approx(-2000.5)
+
+
+def test_parse_numeric_value_with_exponent():
+    svc = NotificationService(DummyState())
+    assert svc._parse_numeric_value("1e2") == pytest.approx(100)
+    assert svc._parse_numeric_value("-3.5e3 TH/s") == pytest.approx(-3500)
