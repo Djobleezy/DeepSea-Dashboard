@@ -100,6 +100,9 @@ last_metrics_update_time = None
 scheduler_last_successful_run = None
 scheduler_recreate_lock = threading.Lock()
 
+# Event to notify SSE streams when metrics are updated
+metrics_update_event = threading.Event()
+
 # Track scheduler health
 _previous_scheduler = globals().get("scheduler")
 _previous_dashboard_service = globals().get("dashboard_service")
@@ -487,6 +490,7 @@ def update_metrics_job(force=False):
 
                 # Then update cached metrics after comparison
                 cached_metrics = metrics
+                metrics_update_event.set()
 
                 # Clear the config_reset flag after it's been used
                 if metrics.get("config_reset"):
@@ -708,6 +712,9 @@ def stream():
             # Main event loop with improved error handling
             while time.time() < end_time:
                 try:
+                    # Wait for new metrics or timeout to send periodic updates
+                    metrics_update_event.wait(timeout=5)
+                    metrics_update_event.clear()
                     # Send data only if it's changed
                     if cached_metrics and cached_metrics.get("server_timestamp") != last_timestamp:
                         # Create a slimmer version with essential fields for SSE updates
@@ -733,9 +740,6 @@ def stream():
                             f'data: {{"type": "ping", "time": {int(last_ping_time)}, '
                             f'"connections": {active_sse_connections}}}\n\n'
                         )
-
-                    # Sleep to reduce CPU usage
-                    time.sleep(1)
 
                     # Warn client 60 seconds before timeout so client can prepare to reconnect
                     remaining_time = end_time - time.time()
@@ -1229,6 +1233,7 @@ def force_refresh():
         if metrics:
             global cached_metrics, scheduler_last_successful_run
             cached_metrics = metrics
+            metrics_update_event.set()
             scheduler_last_successful_run = time.time()
             timestamp = metrics["server_timestamp"]
             logging.info(f"Force refresh successful, new timestamp: {timestamp}")

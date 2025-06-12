@@ -27,6 +27,8 @@ def sse_client(monkeypatch):
     monkeypatch.setattr(App, "update_metrics_job", lambda force=False: None)
     monkeypatch.setattr(App, "MiningDashboardService", lambda *a, **k: object())
     monkeypatch.setattr(App.worker_service, "set_dashboard_service", lambda *a, **k: None)
+    monkeypatch.setattr(App.metrics_update_event, "wait", lambda timeout=None: False)
+    monkeypatch.setattr(App.metrics_update_event, "clear", lambda: None)
 
     sample_cfg = {"wallet": "w"}
     monkeypatch.setattr(App, "load_config", lambda: sample_cfg)
