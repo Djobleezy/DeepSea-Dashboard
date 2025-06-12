@@ -325,7 +325,7 @@ For optimal performance:
 6. Use hotkey Shift+R to clear chart and Redis data (as needed, not required)
 7. Check the currency settings if financial calculations appear incorrect
 8. Verify timezone settings for accurate time displays
-9. Alt + W on Dashboard resets wallet configuration and redirects to Boot sequence
+9. Alt + W on Dashboard resets wallet configuration and clears all chart and sparkline history before redirecting to the Boot sequence
 10. If block event lines persist, run `window.clearBlockAnnotations()` in your
     browser console to remove them. Events now store full timestamps, so
     annotations should disappear once they fall outside the 3‑hour window.

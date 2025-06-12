@@ -1487,8 +1487,17 @@ class RobustMiddleware:
 def reset_chart_data():
     """API endpoint to reset chart data history."""
     try:
-        hashrate_keys = ["hashrate_60sec", "hashrate_3hr", "hashrate_10min", "hashrate_24hr"]
-        state_manager.clear_arrow_history(hashrate_keys)
+        clear_all = request.args.get("full") == "1"
+        if clear_all:
+            state_manager.clear_arrow_history()
+        else:
+            hashrate_keys = [
+                "hashrate_60sec",
+                "hashrate_3hr",
+                "hashrate_10min",
+                "hashrate_24hr",
+            ]
+            state_manager.clear_arrow_history(hashrate_keys)
 
         # Force an immediate save to Redis if available
         if state_manager and hasattr(state_manager, "redis_client") and state_manager.redis_client:

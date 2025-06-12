@@ -9,7 +9,7 @@ The dashboard supports a few quick keyboard commands to speed up navigation and 
 | **Alt+3** | Open the Earnings page |
 | **Alt+4** | Open the Blocks page |
 | **Alt+5** | Open the Notifications page |
-| **Alt+W** | Reset wallet address and chart data |
+| **Alt+W** | Reset wallet address, chart data, and sparkline history |
 | **Shift+R** | Reset the Dashboard chart |
 | **Esc** | Close any open block modal |
 

@@ -524,7 +524,7 @@ function resetWalletAddress() {
     if (confirm("Are you sure you want to reset your wallet address? This will also clear all chart data and redirect you to the configuration page.")) {
         // First clear chart data using the existing API endpoint
         $.ajax({
-            url: '/api/reset-chart-data',
+            url: '/api/reset-chart-data?full=1',
             method: 'POST',
             success: function () {
                 console.log("Chart data reset successfully");

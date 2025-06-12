@@ -427,3 +427,33 @@ def test_earnings_returns_generic_error(client, monkeypatch):
     data = resp.get_json()
     assert data["error"] == "internal server error"
 
+
+def test_reset_chart_data_hashrate_only(client):
+    import App
+    from collections import deque
+
+    App.state_manager.arrow_history = {
+        "hashrate_60sec": deque([{"time": "t", "value": 1}], maxlen=180),
+        "temp": deque([{"time": "t", "value": 2}], maxlen=180),
+    }
+
+    resp = client.post("/api/reset-chart-data")
+    assert resp.status_code == 200
+    history = App.state_manager.arrow_history
+    assert "hashrate_60sec" not in history or len(history["hashrate_60sec"]) == 0
+    assert "temp" in history and len(history["temp"]) > 0
+
+
+def test_reset_chart_data_full(client):
+    import App
+    from collections import deque
+
+    App.state_manager.arrow_history = {
+        "hashrate_60sec": deque([{"time": "t", "value": 1}], maxlen=180),
+        "temp": deque([{"time": "t", "value": 2}], maxlen=180),
+    }
+
+    resp = client.post("/api/reset-chart-data?full=1")
+    assert resp.status_code == 200
+    assert App.state_manager.arrow_history == {}
+
