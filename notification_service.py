@@ -210,7 +210,9 @@ class NotificationService:
             if hasattr(self.state_manager, "redis_client") and self.state_manager.redis_client:
                 value = self.state_manager.redis_client.get(key)
                 if value is not None:
-                    return value.decode("utf-8")
+                    if isinstance(value, (bytes, bytearray)):
+                        return value.decode("utf-8")
+                    return str(value)
             return default
         except Exception as e:
             logging.error(f"[NotificationService] Error retrieving {key} from Redis: {e}")

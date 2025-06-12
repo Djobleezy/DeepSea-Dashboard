@@ -214,6 +214,18 @@ class RedisValueTest(unittest.TestCase):
         result = svc._get_redis_value("val", "default")
         self.assertEqual(result, "0")
 
+    def test_get_redis_value_str(self):
+        class DummyRedis:
+            def get(self, key):
+                return "1"  # return a plain string instead of bytes
+
+        state = DummyStateManager()
+        state.redis_client = DummyRedis()
+        svc = NotificationService(state)
+
+        result = svc._get_redis_value("val", "default")
+        self.assertEqual(result, "1")
+
 
 if __name__ == "__main__":
     unittest.main()
