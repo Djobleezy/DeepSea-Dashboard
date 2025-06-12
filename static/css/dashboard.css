@@ -590,6 +590,21 @@ html.deepsea-theme .toggle-btn.active {
   opacity: 0.7;
 }
 
+/* ----- DATUM PLUG ICON ----- */
+.datum-plug {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.75rem;
+  position: relative;
+  top: -1px;
+}
+
+.datum-plug-offline {
+  color: #ff5555;
+  text-shadow: 0 0 3px #ff5555;
+  opacity: 0.7;
+}
+
 /* Theme-specific colors for the satellite dish */
 html.deepsea-theme .satellite-dish-connected {
   color: #32cd32; /* Use same green for consistency */
