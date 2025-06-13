@@ -98,4 +98,74 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
 
     return decorator
 
-__all__ = ["ttl_cache"]
+
+class TTLDict:
+    """Dictionary-like object that expires entries after a fixed TTL."""
+
+    def __init__(self, ttl_seconds=60, maxsize=None):
+        """Create a new ``TTLDict`` instance."""
+
+        self.ttl_seconds = ttl_seconds
+        self.maxsize = maxsize
+        self._store = {}
+        self._lock = threading.Lock()
+
+    def _purge_expired(self):
+        """Remove expired entries based on ``ttl_seconds``."""
+
+        now = time.time()
+        expired = [k for k, (_, ts) in self._store.items() if now - ts >= self.ttl_seconds]
+        for k in expired:
+            del self._store[k]
+
+    def __setitem__(self, key, value):
+        with self._lock:
+            self._purge_expired()
+            if self.maxsize is not None and len(self._store) >= self.maxsize:
+                oldest = min(self._store.items(), key=lambda item: item[1][1])[0]
+                del self._store[oldest]
+            self._store[key] = (value, time.time())
+
+    def __getitem__(self, key):
+        with self._lock:
+            self._purge_expired()
+            value, ts = self._store[key]
+            if time.time() - ts >= self.ttl_seconds:
+                del self._store[key]
+                raise KeyError(key)
+            return value
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key):
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
+
+    def __len__(self):
+        with self._lock:
+            self._purge_expired()
+            return len(self._store)
+
+    def pop(self, key, default=None):
+        with self._lock:
+            self._purge_expired()
+            return self._store.pop(key, (default, time.time()))[0]
+
+    def clear(self):
+        with self._lock:
+            self._store.clear()
+
+    def items(self):
+        with self._lock:
+            self._purge_expired()
+            return [(k, v[0]) for k, v in self._store.items()]
+
+
+__all__ = ["ttl_cache", "TTLDict"]
