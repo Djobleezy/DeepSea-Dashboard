@@ -673,7 +673,7 @@
             <span id="output"></span><span class="cursor"></span>
             <span id="prompt-container">
                 <span id="prompt-text">
-                    Initialize mining dashboard? [Y/N]:
+                    Initialize mining dashboard? [Y/N/M]:
                     <span class="prompt-cursor"></span>
                     <input type="text" id="user-input" maxlength="1" autocomplete="off" spellcheck="false" autofocus style="font-size: 16px; font-weight: bold;">
                 </span>
@@ -1116,8 +1116,17 @@
                 }
 
                 // Configuration form will be shown after boot sequence
-                if (response.toUpperCase() === 'Y') {
+                const upperResp = response.toUpperCase();
+                if (upperResp === 'Y' || upperResp === 'M') {
+                    if (upperResp === 'M') {
+                        localStorage.setItem('useMatrixTheme', 'true');
+                        localStorage.setItem('useDeepSeaTheme', 'false');
+                        if (window.applyMatrixTheme) {
+                            applyMatrixTheme();
+                        }
+                    }
                     const yesMessages = [
+                        ...(upperResp === 'M' ? [{ text: "ACTIVATING MATRIX MODE...\n", html: true, delay: 400 }] : []),
                         { text: "INITIALIZING DASHBOARD...\n", html: true, delay: 400 },
                         { text: "Connecting to real-time data feeds...", speed: 20, delay: 300 },
                         { text: "<span class='green'>CONNECTED</span>\n", html: true, delay: 400 },
@@ -1185,13 +1194,13 @@
             }
         }
 
-        // Handle Y/N prompt input
+        // Handle Y/N/M prompt input
         userInput.addEventListener('keydown', function (e) {
             if (waitingForUserInput && e.key === 'Enter') {
                 e.preventDefault();
                 const response = userInput.value.toUpperCase();
 
-                if (response === 'Y' || response === 'N') {
+                if (response === 'Y' || response === 'N' || response === 'M') {
                     promptContainer.style.display = 'none';
                     waitingForUserInput = false;
                     outputElement.innerHTML += response + "\n";
