@@ -239,6 +239,10 @@ def test_prune_old_data():
     assert len(mgr.arrow_history["hashrate_60sec"]) <= MAX_HISTORY_ENTRIES
     assert len(mgr.metrics_log) <= MAX_HISTORY_ENTRIES
 
+    # First entry should be averaged when compressed
+    first_entry = mgr.arrow_history["hashrate_60sec"][0]
+    assert first_entry["value"] == 0.5
+
 def test_hashrate_history_limit():
     mgr = StateManager()
     for i in range(MAX_HISTORY_ENTRIES + 10):

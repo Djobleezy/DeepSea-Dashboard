@@ -218,8 +218,9 @@ Built with a modern stack for reliability and performance:
 
 The dashboard stores a rolling window of historical metrics in memory. Each
 dataset (arrow history, metrics log and hashrate history) is capped at 180
-entries, equating to roughly three hours of data. Older points are pruned by the
-`StateManager` before saving to Redis, ensuring memory usage remains stable.
+entries, equating to roughly three hours of data. Older points are compressed by
+the `StateManager` before saving to Redis—values are averaged so long-term
+trends remain accurate while memory usage stays predictable.
 Short-term variance history for earnings metrics is also persisted so 3-hour
 variance values remain visible after restarts. Minor gaps of a few minutes are
 filled automatically using the last known metric so the variance progress can

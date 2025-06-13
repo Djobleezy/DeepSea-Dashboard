@@ -332,20 +332,45 @@ class StateManager:
             for key in self.arrow_history:
                 history_list = list(self.arrow_history[key])
                 if len(history_list) > max_history:
-                    # For most recent data (last hour) - keep every point
+                    # Keep the last hour of data at full resolution
                     recent_data = history_list[-60:]
 
-                    # For older data, reduce resolution by keeping fewer points when aggressive
+                    # Compress older data by averaging groups of entries
                     older_data = history_list[:-60]
                     if len(older_data) > 0:
                         step = 3 if aggressive else 2
-                        sparse_older_data = [older_data[i] for i in range(0, len(older_data), step)]
+                        sparse_older_data = []
+                        for i in range(0, len(older_data), step):
+                            group = older_data[i : i + step]
+                            if not group:
+                                continue
+
+                            # Start with the last entry in the group so we retain
+                            # time, arrow and unit fields
+                            combined = group[-1].copy()
+
+                            # Average numeric values if possible
+                            values = []
+                            for entry in group:
+                                try:
+                                    values.append(float(entry.get("value", 0)))
+                                except (ValueError, TypeError):
+                                    values = None
+                                    break
+
+                            if values:
+                                combined["value"] = sum(values) / len(values)
+
+                            sparse_older_data.append(combined)
+
                         history_list = sparse_older_data + recent_data
                     else:
                         history_list = recent_data
 
                     self.arrow_history[key] = deque(history_list, maxlen=MAX_HISTORY_ENTRIES)
-                    logging.info(f"Pruned {key} history from original state to {len(self.arrow_history[key])} entries")
+                    logging.info(
+                        f"Pruned {key} history from original state to {len(self.arrow_history[key])} entries"
+                    )
 
             # Prune metrics_log more aggressively
             if len(self.metrics_log) > max_history:
