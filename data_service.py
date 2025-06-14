@@ -35,7 +35,7 @@ class CachedResponse:
 class MiningDashboardService:
     """Service for fetching and processing mining dashboard data."""
 
-    def __init__(self, power_cost, power_usage, wallet, network_fee=0.0, worker_service=None):
+    def __init__(self, power_cost, power_usage, wallet, network_fee=0.0, worker_service=None, state_manager=None):
         """
         Initialize the mining dashboard service.
 
@@ -44,12 +44,14 @@ class MiningDashboardService:
             power_usage (float): Power usage in watts
             wallet (str): Bitcoin wallet address for Ocean.xyz
             network_fee (float): Additional network fee percentage
+            state_manager (StateManager, optional): Manager for caching payout history
         """
         self.power_cost = power_cost
         self.power_usage = power_usage
         self.wallet = wallet
         self.network_fee = network_fee
         self.worker_service = worker_service
+        self.state_manager = state_manager
         self.cache = {}
         self.sats_per_btc = 100_000_000
         self.previous_values = {}
@@ -69,6 +71,10 @@ class MiningDashboardService:
     def set_worker_service(self, worker_service):
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
+
+    def set_state_manager(self, state_manager):
+        """Associate a StateManager instance for payout caching."""
+        self.state_manager = state_manager
 
     def estimate_total_power(self, cached_metrics=None):
         """Estimate total power usage from worker data if available."""
@@ -1089,10 +1095,37 @@ class MiningDashboardService:
                 btc_price = 85000
 
             # Prefer the official API for payout history
-            payments = self.get_payment_history_api(days=360, btc_price=btc_price)
-            if not payments:
+            payments_api = self.get_payment_history_api(days=360, btc_price=btc_price)
+
+            cached_history = []
+            if self.state_manager and hasattr(self.state_manager, "get_payout_history"):
+                cached_history = self.state_manager.get_payout_history() or []
+
+            use_scrape = False
+            if payments_api:
+                if cached_history:
+                    last_api = payments_api[0]
+                    last_cached = cached_history[0]
+                    if (
+                        last_api.get("txid") == last_cached.get("txid")
+                        and last_api.get("lightning_txid") == last_cached.get("lightning_txid")
+                        and last_api.get("date_iso") == last_cached.get("date_iso")
+                    ):
+                        logging.info("API payout history unchanged - falling back to scraping")
+                        use_scrape = True
+                payments = payments_api
+            else:
+                use_scrape = True
+
+            if use_scrape:
                 logging.info("Falling back to scraping payout history")
-                payments = self.get_payment_history_scrape(btc_price=btc_price) or []
+                payments = self.get_payment_history_scrape(btc_price=btc_price) or payments_api or []
+
+            if self.state_manager and hasattr(self.state_manager, "save_payout_history"):
+                try:
+                    self.state_manager.save_payout_history(payments)
+                except Exception as e:
+                    logging.error(f"Error saving payout history: {e}")
 
             # Get basic Ocean data for summary metrics (with timeout handling)
             try:

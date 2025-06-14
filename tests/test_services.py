@@ -415,6 +415,53 @@ def test_get_earnings_data_fallback_to_scrape(monkeypatch):
     assert data["payments"][0]["txid"] == "abcd"
 
 
+def test_get_earnings_data_uses_scrape_when_api_has_no_new(monkeypatch):
+    class DummyState:
+        def __init__(self):
+            self.history = []
+
+        def get_payout_history(self):
+            return self.history
+
+        def save_payout_history(self, history):
+            self.history = history
+
+    state = DummyState()
+    svc = MiningDashboardService(0, 0, "w", state_manager=state)
+
+    existing = [{
+        "date": "2025-05-01 00:00",
+        "txid": "abcd",
+        "lightning_txid": "",
+        "amount_btc": 0.000001,
+        "amount_sats": 100,
+        "status": "confirmed",
+        "date_iso": "2025-05-01T00:00:00+00:00",
+    }]
+
+    state.save_payout_history(existing)
+
+    monkeypatch.setattr(svc, "get_payment_history_api", lambda days=360, btc_price=None: existing)
+    new_payments = [{
+        "date": "2025-05-02 00:00",
+        "txid": "xyz",
+        "lightning_txid": "",
+        "amount_btc": 0.000002,
+        "amount_sats": 200,
+        "status": "confirmed",
+        "date_iso": "2025-05-02T00:00:00+00:00",
+    }]
+    monkeypatch.setattr(svc, "get_payment_history_scrape", lambda btc_price=None: new_payments)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("config.get_currency", lambda: "USD")
+    monkeypatch.setattr(svc, "get_ocean_data", lambda: data_service.OceanData())
+    monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 0, 20000, 0))
+
+    data = svc.get_earnings_data()
+    assert len(data["payments"]) == 1
+    assert data["payments"][0]["txid"] == "xyz"
+
+
 def test_get_worker_data_api(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
