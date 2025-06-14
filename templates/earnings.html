@@ -156,6 +156,8 @@
 {% endblock %}
 
 {% block javascript %}
+{{ super() }}
 <script src="{{ url_for('static', filename='js/formatCurrency.js') }}"></script>
 <script src="{{ url_for('static', filename='js/earnings.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shortcuts.js') }}"></script>
 {% endblock %}
