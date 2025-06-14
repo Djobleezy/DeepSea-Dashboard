@@ -193,7 +193,7 @@ function updateEarningsUI(data) {
         document.getElementById('latest-payment').textContent = 'Latest: ' + formatDateToUserTimezone(data.payments[0].date);
     }
     updatePaymentHistoryTable(data.payments);
-    // Chart removed: monthly summaries table updates server-side
+    updateMonthlySummaryTable(data.monthly_summaries);
 }
 
 function updatePaymentHistoryTable(payments) {
@@ -232,6 +232,52 @@ function updatePaymentHistoryTable(payments) {
         const td = document.createElement('td');
         td.colSpan = 5;
         td.textContent = 'No payment history available';
+        row.appendChild(td);
+        tableBody.appendChild(row);
+    }
+}
+
+function updateMonthlySummaryTable(months) {
+    const tableBody = document.getElementById('monthly-summary-table');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = '';
+
+    if (months && months.length > 0) {
+        months.forEach(m => {
+            const row = document.createElement('tr');
+
+            const monthTd = document.createElement('td');
+            monthTd.textContent = m.month_name;
+            row.appendChild(monthTd);
+
+            const countTd = document.createElement('td');
+            countTd.textContent = formatCurrency(m.payments.length);
+            row.appendChild(countTd);
+
+            const btcTd = document.createElement('td');
+            btcTd.textContent = formatBTC(m.total_btc);
+            row.appendChild(btcTd);
+
+            const satsTd = document.createElement('td');
+            satsTd.textContent = formatSats(m.total_sats);
+            row.appendChild(satsTd);
+
+            const fiatTd = document.createElement('td');
+            const span = document.createElement('span');
+            span.className = 'currency-symbol';
+            span.textContent = currencySymbol;
+            fiatTd.appendChild(span);
+            fiatTd.append(formatCurrency(parseFloat(m.total_fiat).toFixed(2)));
+            row.appendChild(fiatTd);
+
+            tableBody.appendChild(row);
+        });
+    } else {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.textContent = 'No payment data available';
         row.appendChild(td);
         tableBody.appendChild(row);
     }
