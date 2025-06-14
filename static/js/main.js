@@ -1056,6 +1056,27 @@ function trackPayoutPerformance(data) {
     lastPayoutTracking.lastUnpaidEarnings = currentUnpaidEarnings;
 }
 
+// Calculate the average days between payouts in the history array
+function updateAvgDaysFromHistory() {
+    const history = lastPayoutTracking.payoutHistory;
+
+    if (!history || history.length < 2) {
+        lastPayoutTracking.avgDays = null;
+        return;
+    }
+
+    const dates = history
+        .map(p => new Date(p.timestamp))
+        .sort((a, b) => b - a);
+
+    let total = 0;
+    for (let i = 0; i < dates.length - 1; i++) {
+        total += (dates[i] - dates[i + 1]) / 86400000; // ms per day
+    }
+
+    lastPayoutTracking.avgDays = total / (dates.length - 1);
+}
+
 
 // Update the displayPayoutComparison function to use better formatting
 function displayPayoutComparison(comparison) {
@@ -1516,6 +1537,9 @@ function verifyPayoutsAgainstOfficial() {
             if (lastPayoutTracking.payoutHistory.length > 30) {
                 lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
             }
+
+            // Recalculate average days with official data included
+            updateAvgDaysFromHistory();
 
             // Update the display with enriched data if it's visible
             if ($("#payout-history-container").is(":visible")) {
