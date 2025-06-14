@@ -192,7 +192,49 @@ function updateEarningsUI(data) {
     if (data.payments && data.payments.length > 0) {
         document.getElementById('latest-payment').textContent = 'Latest: ' + formatDateToUserTimezone(data.payments[0].date);
     }
+    updatePaymentHistoryTable(data.payments);
     // Chart removed: monthly summaries table updates server-side
+}
+
+function updatePaymentHistoryTable(payments) {
+    const tableBody = document.getElementById('payment-history-table');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = '';
+
+    if (payments && payments.length > 0) {
+        payments.forEach(pay => {
+            const row = document.createElement('tr');
+
+            const dateTd = document.createElement('td');
+            dateTd.textContent = formatDateToUserTimezone(pay.date);
+            row.appendChild(dateTd);
+
+            const btcTd = document.createElement('td');
+            btcTd.textContent = formatBTC(pay.amount_btc);
+            row.appendChild(btcTd);
+
+            const satsTd = document.createElement('td');
+            satsTd.textContent = formatSats(pay.amount_sats);
+            row.appendChild(satsTd);
+
+            const statusTd = document.createElement('td');
+            const span = document.createElement('span');
+            span.className = 'status-label status-' + pay.status;
+            span.textContent = pay.status;
+            statusTd.appendChild(span);
+            row.appendChild(statusTd);
+
+            tableBody.appendChild(row);
+        });
+    } else {
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.textContent = 'No payment history available';
+        row.appendChild(td);
+        tableBody.appendChild(row);
+    }
 }
 
 function showErrorBanner(msg) {
