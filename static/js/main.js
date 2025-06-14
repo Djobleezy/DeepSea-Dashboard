@@ -1734,6 +1734,8 @@ function handleVisibilityChange() {
             setupEventSource();
         }
         manualRefresh(); // Always refresh data when page becomes visible
+        // Ensure payout history is up to date
+        verifyPayoutsAgainstOfficial();
     }
 }
 
@@ -1779,6 +1781,8 @@ function manualRefresh() {
             latestMetrics = data;
 
             updateUI();
+            // Refresh payout history from the earnings API
+            verifyPayoutsAgainstOfficial();
             hideConnectionIssue();
 
             // Notify BitcoinMinuteRefresh that we've refreshed the data
