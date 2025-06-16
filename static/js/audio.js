@@ -11,7 +11,7 @@
         const prevBtn = document.getElementById('audio-prev');
         const nextBtn = document.getElementById('audio-next');
         let progressBar = document.getElementById('audio-progress');
-        const timeDisplay = document.getElementById('audio-remaining');
+        let timeDisplay = document.getElementById('audio-remaining');
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
@@ -252,6 +252,9 @@
                         seekTo(parseFloat(this.value));
                     });
                 }
+            }
+            if (!timeDisplay) {
+                timeDisplay = document.getElementById('audio-remaining');
             }
             if (progressBar && audio.duration) {
                 progressBar.value = (audio.currentTime / audio.duration) * 100;
