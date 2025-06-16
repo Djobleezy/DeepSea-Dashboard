@@ -1142,6 +1142,61 @@ function loadLocalHistory() {
     }
 }
 
+// Fetch the latest payment from the earnings API
+function fetchLatestPayment() {
+    return fetch('/api/earnings')
+        .then(res => res.json())
+        .then(data => {
+            if (data && Array.isArray(data.payments) && data.payments.length > 0) {
+                return data.payments[0];
+            }
+            return null;
+        })
+        .catch(() => null);
+}
+
+// Update payout history using the latest earnings data then invoke callback
+function refreshPayoutHistoryFromEarnings(callback) {
+    fetchLatestPayment().then(payment => {
+        if (payment) {
+            const record = {
+                timestamp: new Date(payment.date_iso || payment.date),
+                amountBTC: payment.amount_btc,
+                verified: true,
+                officialId: payment.txid || '',
+                lightningId: payment.lightning_txid || '',
+                status: payment.status || 'confirmed'
+            };
+            if (payment.rate) {
+                record.rate = payment.rate;
+                record.fiat_value = payment.amount_btc * payment.rate;
+            }
+            const first = lastPayoutTracking.payoutHistory[0];
+            const newTime = record.timestamp.toISOString();
+            const firstTime = first ? new Date(first.timestamp).toISOString() : null;
+            if (!first || firstTime !== newTime || parseFloat(first.amountBTC) !== parseFloat(record.amountBTC)) {
+                lastPayoutTracking.payoutHistory.unshift(record);
+                if (lastPayoutTracking.payoutHistory.length > 30) {
+                    lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
+                }
+                updateAvgDaysFromHistory();
+                try {
+                    localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
+                    fetch('/api/payout-history', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ history: lastPayoutTracking.payoutHistory })
+                    });
+                } catch (e) {
+                    console.error('Error saving payout history from earnings:', e);
+                }
+            }
+        }
+    }).finally(() => {
+        if (typeof callback === 'function') callback();
+    });
+}
+
 // Update the init function to add the summary display
 function initPayoutTracking() {
     loadPayoutHistory();
@@ -1210,8 +1265,8 @@ function togglePayoutHistoryDisplay() {
         // Clear the container first
         container.empty();
 
-        // Display payout summary only - this now handles everything
-        displayPayoutSummary();
+        // Refresh history from earnings API then display summary
+        refreshPayoutHistoryFromEarnings(displayPayoutSummary);
 
         // Show the container and update button text
         container.slideDown();
