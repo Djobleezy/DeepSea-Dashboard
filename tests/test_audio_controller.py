@@ -26,3 +26,5 @@ def test_audio_controller_functions():
     assert "window.prevTrack" in content
     assert "window.togglePlay" in content
     assert "window.seekAudio" in content
+    assert "showRemaining" in content
+    assert "timeDisplay.addEventListener('click'" in content

@@ -12,6 +12,7 @@
         const nextBtn = document.getElementById('audio-next');
         let progressBar = document.getElementById('audio-progress');
         let timeDisplay = document.getElementById('audio-remaining');
+        let showRemaining = true;
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
@@ -260,8 +261,12 @@
                 progressBar.value = (audio.currentTime / audio.duration) * 100;
             }
             if (timeDisplay && audio.duration) {
-                const remaining = Math.max(0, audio.duration - audio.currentTime);
-                timeDisplay.textContent = '-' + formatTime(remaining);
+                if (showRemaining) {
+                    const remaining = Math.max(0, audio.duration - audio.currentTime);
+                    timeDisplay.textContent = '-' + formatTime(remaining);
+                } else {
+                    timeDisplay.textContent = formatTime(audio.currentTime);
+                }
             }
         }
 
@@ -318,6 +323,13 @@
         if (progressBar) {
             progressBar.addEventListener('input', function () {
                 seekTo(parseFloat(this.value));
+            });
+        }
+
+        if (timeDisplay) {
+            timeDisplay.addEventListener('click', function () {
+                showRemaining = !showRemaining;
+                updateProgress();
             });
         }
 
