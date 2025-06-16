@@ -79,3 +79,15 @@ def test_ttl_dict_iteration_purges(monkeypatch):
     assert list(d) == []
     assert len(d) == 0
 
+
+def test_ttl_dict_purge_method(monkeypatch):
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    d = TTLDict(ttl_seconds=10)
+    d["a"] = 1
+    fake_time[0] += 11
+    d.purge()
+
+    assert len(d) == 0
+

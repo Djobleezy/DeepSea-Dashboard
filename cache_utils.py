@@ -185,5 +185,10 @@ class TTLDict:
             self._purge_expired()
             return [v[0] for v in self._store.values()]
 
+    def purge(self):
+        """Public method to purge expired entries."""
+        with self._lock:
+            self._purge_expired()
+
 
 __all__ = ["ttl_cache", "TTLDict"]
