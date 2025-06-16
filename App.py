@@ -103,6 +103,7 @@ scheduler_recreate_lock = threading.Lock()
 # Track scheduler health
 _previous_scheduler = globals().get("scheduler")
 _previous_dashboard_service = globals().get("dashboard_service")
+_previous_state_manager = globals().get("state_manager")
 scheduler = None
 
 # Global start time
@@ -138,6 +139,15 @@ logger.addHandler(console_handler)
 # Initialize state manager with Redis URL from environment
 redis_url = os.environ.get("REDIS_URL")
 state_manager = StateManager(redis_url)
+
+# Close any previous state manager instance to prevent resource leaks
+if _previous_state_manager:
+    try:
+        _previous_state_manager.close()
+    except Exception as e:
+        logging.error(f"Error closing previous state manager: {e}")
+    finally:
+        _previous_state_manager = None
 
 # Initialize notification service after state_manager
 notification_service = NotificationService(state_manager)
