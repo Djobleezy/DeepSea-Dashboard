@@ -1215,6 +1215,7 @@ class MiningDashboardService:
                 "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
             }
 
+    @ttl_cache(ttl_seconds=60, maxsize=1)
     def get_bitcoin_stats(self):
         """
         Fetch Bitcoin network statistics with improved error handling and caching.
