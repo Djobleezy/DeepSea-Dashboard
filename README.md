@@ -98,6 +98,7 @@ informed with minimal fuss.
 - **Boot Shortcut**: At the boot sequence prompt, enter `M` to activate the Matrix theme immediately.
 - **Authentic Rain**: Characters fall from a mixed set of Katakana, letters, digits and symbols, with rare hidden words like `OCEAN`, `BITCOIN` and `MATRIX`, rendered in a variety of monospace fonts for a more cinematic feel.
 - **Random Rotation**: Each character now rotates slightly at random as it falls, creating a dynamic cascade.
+- **Themed Audio**: While in Matrix mode, `matrix.mp3`, `matrix1.mp3` and `matrix2.mp3` loop in the background.
 
 ## Documentation
 

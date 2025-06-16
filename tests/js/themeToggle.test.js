@@ -48,13 +48,13 @@ vm.runInContext(snippet, context);
 context.toggleTheme();
 assert.strictEqual(storage.getItem('useDeepSeaTheme'), 'true');
 assert.strictEqual(storage.getItem('useMatrixTheme'), 'false');
-assert.strictEqual(crossfadeCalls[0], true);
+assert.strictEqual(crossfadeCalls[0], 'deepsea');
 assert.ok(reloadCalled);
 
 reloadCalled = false;
 context.toggleTheme();
 assert.strictEqual(storage.getItem('useDeepSeaTheme'), 'false');
-assert.strictEqual(crossfadeCalls[1], false);
+assert.strictEqual(crossfadeCalls[1], 'bitcoin');
 assert.ok(reloadCalled);
 
 console.log('theme toggle tests passed');

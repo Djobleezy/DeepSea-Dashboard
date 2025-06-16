@@ -55,13 +55,17 @@ vm.runInContext(code, context);
 
 assert.strictEqual(typeof context.window.crossfadeToTheme, 'function');
 
-context.window.crossfadeToTheme(true);
+context.window.crossfadeToTheme('deepsea');
 for (let i = 0; i < 20; i++) { intervalFn(); }
-assert.strictEqual(audioElement.src, '/static/audio/ocean.mp3');
+assert.ok(audioElement.src.includes('/static/audio/ocean.mp3'));
 
-context.window.crossfadeToTheme(false);
+context.window.crossfadeToTheme('matrix');
 for (let i = 0; i < 20; i++) { intervalFn(); }
-assert.strictEqual(audioElement.src, '/static/audio/bitcoin.mp3');
+assert.ok(audioElement.src.includes('/static/audio/matrix'));
+
+context.window.crossfadeToTheme('bitcoin');
+for (let i = 0; i < 20; i++) { intervalFn(); }
+assert.ok(audioElement.src.includes('/static/audio/bitcoin'));
 
 assert.ok(intervalFn);
 console.log('audio crossfade theme tests passed');

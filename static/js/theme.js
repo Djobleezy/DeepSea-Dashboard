@@ -498,9 +498,9 @@ function applyMatrixTheme() {
             bubbles.remove();
         }
 
-        // Switch audio to bitcoin playlist
+        // Switch audio to Matrix playlist
         if (window.crossfadeToTheme) {
-            window.crossfadeToTheme(false);
+            window.crossfadeToTheme('matrix');
         }
 
         if (window.initMatrixRain) {
@@ -536,7 +536,7 @@ function toggleTheme() {
 
     // Crossfade background audio to the new theme
     if (window.crossfadeToTheme) {
-        window.crossfadeToTheme(useDeepSea);
+        window.crossfadeToTheme(useDeepSea ? 'deepsea' : 'bitcoin');
     }
 
     // Show a themed loading message

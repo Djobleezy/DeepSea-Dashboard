@@ -15,7 +15,16 @@
         const isMatrix = localStorage.getItem('useMatrixTheme') === 'true';
         const deepSeaTracks = ['/static/audio/ocean.mp3'];
         const bitcoinTracks = ['/static/audio/bitcoin.mp3', '/static/audio/bitcoin1.mp3', '/static/audio/bitcoin2.mp3'];
-        let playlist = (isDeepSea && !isMatrix) ? deepSeaTracks : bitcoinTracks;
+        const matrixTracks = ['/static/audio/matrix.mp3', '/static/audio/matrix1.mp3', '/static/audio/matrix2.mp3'];
+
+        let playlist;
+        if (isMatrix) {
+            playlist = matrixTracks;
+        } else if (isDeepSea) {
+            playlist = deepSeaTracks;
+        } else {
+            playlist = bitcoinTracks;
+        }
 
         let trackIndex = parseInt(localStorage.getItem('audioTrackIndex')) || 0;
         if (trackIndex >= playlist.length) {
@@ -111,9 +120,16 @@
             }, interval);
         };
 
-        const crossfadeToTheme = (useDeepSea) => {
+        const crossfadeToTheme = (theme) => {
             if (isCrossfading) { return; }
-            const newPlaylist = useDeepSea ? deepSeaTracks : bitcoinTracks;
+            if (typeof theme === 'boolean') {
+                theme = theme ? 'deepsea' : 'bitcoin';
+            }
+            const newPlaylist = theme === 'deepsea'
+                ? deepSeaTracks
+                : theme === 'matrix'
+                    ? matrixTracks
+                    : bitcoinTracks;
             if (playlist === newPlaylist) { return; }
             playlist = newPlaylist;
             trackIndex = 0;
