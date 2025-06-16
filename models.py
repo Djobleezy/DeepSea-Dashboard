@@ -171,7 +171,7 @@ def convert_to_ths(value, unit):
     try:
         if isinstance(value, str):
             cleaned = value.replace(",", "").strip()
-            match = re.match(r"[-+]?\d*\.?\d+", cleaned)
+            match = re.match(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", cleaned)
             value = float(match.group(0)) if match else 0
         value = float(value)
         if value <= 0:

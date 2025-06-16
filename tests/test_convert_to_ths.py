@@ -38,6 +38,8 @@ def test_negative_or_none_returns_zero():
         ("10", "TH/s", 10),
         ("1.5", "PH/s", 1500),
         ("2,000", "GH/s", 2.0),
+        ("1e2", "GH/s", 0.1),
+        ("2.5e3", "MH/s", 0.0025),
     ],
 )
 def test_string_values(value, unit, expected):
