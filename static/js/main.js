@@ -850,6 +850,14 @@ function showLoadingOverlay(elementId) {
     }, 2000);
 }
 
+// Display a loading message in the payout history container
+function showPayoutLoading() {
+    const container = $('#payout-history-container');
+    container.html(
+        "<div class='loading-message'>Loading payout summary<span class='terminal-cursor'></span></div>"
+    );
+}
+
 // Helper function to format hashrate values for display
 function formatHashrateForDisplay(value, unit) {
     if (isNaN(value) || value === null || value === undefined) return "N/A";
@@ -1335,15 +1343,15 @@ function togglePayoutHistoryDisplay() {
         container.slideUp();
         button.text("VIEW LAST PAYOUT");
     } else {
-        // Clear the container first
-        container.empty();
-
-        // Refresh history from earnings API then display summary
-        refreshPayoutHistoryFromEarnings(displayPayoutSummary);
+        // Show loading message while fetching data
+        showPayoutLoading();
 
         // Show the container and update button text
         container.slideDown();
         button.text("HIDE LAST PAYOUT");
+
+        // Refresh history from earnings API then display summary
+        refreshPayoutHistoryFromEarnings(displayPayoutSummary);
     }
 }
 
