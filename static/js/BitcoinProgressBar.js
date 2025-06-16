@@ -28,7 +28,11 @@ const BitcoinMinuteRefresh = (function () {
         SCHED_LAST: 'scheduler-last',
         DATA_AGE: 'data-age',
         PREV_BTN: 'monitor-prev',
-        NEXT_BTN: 'monitor-next'
+        NEXT_BTN: 'monitor-next',
+        AUDIO_PREV: 'audio-prev',
+        AUDIO_PLAY: 'audio-play',
+        AUDIO_NEXT: 'audio-next',
+        AUDIO_PROGRESS: 'audio-progress'
     };
     // Add these new keys to the STORAGE_KEYS constant
     const STORAGE_KEYS = {
@@ -976,6 +980,15 @@ const BitcoinMinuteRefresh = (function () {
               <div class="page-title">DATA AGE</div>
               <div id="${DOM_IDS.DATA_AGE}" class="data-age"></div>
             </div>
+            <div class="monitor-page" data-page="5" style="display:none">
+              <div class="page-title">AUDIO</div>
+              <div class="audio-widget">
+                <span id="${DOM_IDS.AUDIO_PREV}" class="audio-btn">&#9664;&#9664;</span>
+                <span id="${DOM_IDS.AUDIO_PLAY}" class="audio-btn">&#9654;</span>
+                <span id="${DOM_IDS.AUDIO_NEXT}" class="audio-btn">&#9654;&#9654;</span>
+              </div>
+              <input id="${DOM_IDS.AUDIO_PROGRESS}" class="audio-progress" type="range" min="0" max="100" value="0">
+            </div>
           </div>
           <div class="page-controls">
             <span id="${DOM_IDS.PREV_BTN}" class="page-btn">&#9664;</span>
@@ -1349,6 +1362,21 @@ const BitcoinMinuteRefresh = (function () {
         user-select: none;
         padding: 0 5px;
         font-weight: bold;
+      }
+
+      .audio-widget {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+
+      .audio-btn {
+        cursor: pointer;
+      }
+
+      .audio-progress {
+        width: 100%;
       }
 
       .memory-gauge {
@@ -1749,6 +1777,15 @@ const BitcoinMinuteRefresh = (function () {
         const nextBtn = document.getElementById(DOM_IDS.NEXT_BTN);
         if (prevBtn) prevBtn.addEventListener('click', prevPage);
         if (nextBtn) nextBtn.addEventListener('click', nextPage);
+
+        const audioPrev = document.getElementById(DOM_IDS.AUDIO_PREV);
+        const audioPlay = document.getElementById(DOM_IDS.AUDIO_PLAY);
+        const audioNext = document.getElementById(DOM_IDS.AUDIO_NEXT);
+        const audioProgress = document.getElementById(DOM_IDS.AUDIO_PROGRESS);
+        if (audioPrev) audioPrev.addEventListener('click', () => window.prevTrack && window.prevTrack());
+        if (audioNext) audioNext.addEventListener('click', () => window.nextTrack && window.nextTrack());
+        if (audioPlay) audioPlay.addEventListener('click', () => window.togglePlay && window.togglePlay());
+        if (audioProgress) audioProgress.addEventListener('input', (e) => window.seekAudio && window.seekAudio(parseFloat(e.target.value)));
 
         showPage(0);
         fetchHealth();

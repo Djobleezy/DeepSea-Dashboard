@@ -7,6 +7,10 @@
         const control = document.getElementById('audioControl');
         const icon = document.getElementById('audioIcon');
         const volumeSlider = document.getElementById('volumeSlider');
+        const playBtn = document.getElementById('audioPlay');
+        const prevBtn = document.getElementById('audioPrev');
+        const nextBtn = document.getElementById('audioNext');
+        const progressBar = document.getElementById('audioProgress');
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
@@ -75,6 +79,7 @@
                     play();
                 }
                 audio.removeEventListener('loadedmetadata', resume);
+                updateProgress();
             };
 
             if (audio.readyState > 0) {
@@ -84,11 +89,11 @@
             }
         };
 
-        const startCrossfade = () => {
+        const crossfadeToIndex = (index) => {
             if (isCrossfading) { return; }
             isCrossfading = true;
             audio.removeEventListener('ended', onTrackEnded);
-            const nextIndex = (trackIndex + 1) % playlist.length;
+            const nextIndex = index;
             loadTrack(nextAudio, nextIndex);
             nextAudio.volume = 0;
             nextAudio.muted = audio.muted;
@@ -115,9 +120,14 @@
                     audio.addEventListener('timeupdate', timeUpdateHandler);
                     audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
+                    updateProgress();
                     isCrossfading = false;
                 }
             }, interval);
+        };
+
+        const startCrossfade = () => {
+            crossfadeToIndex((trackIndex + 1) % playlist.length);
         };
 
         const crossfadeToTheme = (theme) => {
@@ -161,15 +171,54 @@
                     audio.addEventListener('timeupdate', timeUpdateHandler);
                     audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
+                    updateProgress();
                     isCrossfading = false;
                 }
             }, interval);
         };
 
+        const nextTrack = () => {
+            if (playlist.length > 1) {
+                crossfadeToIndex((trackIndex + 1) % playlist.length);
+            }
+        };
+
+        const prevTrack = () => {
+            if (playlist.length > 1) {
+                const prevIndex = (trackIndex - 1 + playlist.length) % playlist.length;
+                crossfadeToIndex(prevIndex);
+            }
+        };
+
+        const togglePlay = () => {
+            if (audio.paused) {
+                audio.muted = false;
+                play();
+                if (icon) {
+                    icon.classList.remove('fa-volume-mute');
+                    icon.classList.add('fa-volume-up');
+                }
+            } else {
+                audio.pause();
+            }
+            localStorage.setItem('audioPaused', audio.paused.toString());
+        };
+
+        const seekTo = (pct) => {
+            if (audio.duration) {
+                audio.currentTime = (pct / 100) * audio.duration;
+            }
+        };
+
         window.crossfadeToTheme = crossfadeToTheme;
         window.audioCrossfadeDuration = crossfadeDuration;
+        window.nextTrack = nextTrack;
+        window.prevTrack = prevTrack;
+        window.togglePlay = togglePlay;
+        window.seekAudio = seekTo;
 
         loadAndResume();
+        updateProgress();
 
         audio.muted = storedMuted;
         if (icon) {
@@ -177,8 +226,15 @@
             icon.classList.toggle('fa-volume-up', !storedMuted);
         }
         
+        const updateProgress = () => {
+            if (progressBar && audio.duration) {
+                progressBar.value = (audio.currentTime / audio.duration) * 100;
+            }
+        };
+
         const timeUpdateHandler = () => {
             localStorage.setItem('audioPlaybackTime', audio.currentTime);
+            updateProgress();
             if (
                 playlist.length > 1 &&
                 audio.duration &&
@@ -197,6 +253,7 @@
             loadTrack(nextAudio, (trackIndex + 1) % playlist.length);
             storedTime = 0;
             loadAndResume();
+            updateProgress();
         };
 
         if (playlist.length > 1) {
@@ -210,6 +267,24 @@
                 audio.volume = volume;
                 nextAudio.volume = volume;
                 localStorage.setItem('audioVolume', volume.toString());
+            });
+        }
+
+        if (playBtn) {
+            playBtn.addEventListener('click', togglePlay);
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', prevTrack);
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', nextTrack);
+        }
+
+        if (progressBar) {
+            progressBar.addEventListener('input', function () {
+                seekTo(parseFloat(this.value));
             });
         }
 

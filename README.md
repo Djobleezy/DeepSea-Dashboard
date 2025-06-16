@@ -172,6 +172,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 - Progress indicator for data refresh cycles
 - System uptime display
 - Real-time connection status
+- Optional audio controls with progress bar
 
 ## System Requirements
 
