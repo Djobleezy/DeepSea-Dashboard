@@ -2,6 +2,7 @@ import json
 import gzip
 import sys
 import types
+import gc
 
 if "redis" not in sys.modules:
     redis_mod = types.ModuleType("redis")
@@ -327,3 +328,32 @@ def test_close_clears_cached_data():
     assert mgr.load_graph_state.cache_size() == 0
     assert mgr.load_payout_history.cache_size() == 0
     assert mgr.load_last_earnings.cache_size() == 0
+
+
+def test_load_methods_cache_maxsize(monkeypatch):
+    """Repeated instances should not grow caches indefinitely."""
+
+    class DummyRedis:
+        def __init__(self):
+            self.storage = {}
+
+        def get(self, key):
+            return self.storage.get(key)
+
+        def set(self, key, value):
+            self.storage[key] = value
+
+    redis_client = DummyRedis()
+    for _ in range(3):
+        mgr = StateManager()
+        mgr.redis_client = redis_client
+        mgr.load_graph_state()
+        mgr.load_payout_history()
+        mgr.load_last_earnings()
+        mgr.close()
+        del mgr
+        gc.collect()
+
+    assert StateManager.load_graph_state.cache_size() <= 1
+    assert StateManager.load_payout_history.cache_size() <= 1
+    assert StateManager.load_last_earnings.cache_size() <= 1
