@@ -7,11 +7,11 @@
         const control = document.getElementById('audioControl');
         const icon = document.getElementById('audioIcon');
         const volumeSlider = document.getElementById('volumeSlider');
-        const playBtn = document.getElementById('audioPlay');
-        const prevBtn = document.getElementById('audioPrev');
-        const nextBtn = document.getElementById('audioNext');
-        const progressBar = document.getElementById('audioProgress');
-        const timeDisplay = document.getElementById('audioRemaining');
+        const playBtn = document.getElementById('audio-play');
+        const prevBtn = document.getElementById('audio-prev');
+        const nextBtn = document.getElementById('audio-next');
+        const progressBar = document.getElementById('audio-progress');
+        const timeDisplay = document.getElementById('audio-remaining');
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
