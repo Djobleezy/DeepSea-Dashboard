@@ -325,10 +325,9 @@ def record_memory_metrics():
             # Resize deque if configuration changed
             desired_max = MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]
             if memory_usage_history.maxlen != desired_max:
-                resized = deque(memory_usage_history, maxlen=desired_max)
-                memory_usage_history.clear()
-                memory_usage_history.extend(resized)
-                memory_usage_history = resized
+                # Replace the deque entirely so the old buffer can be
+                # garbage-collected instead of lingering with references.
+                memory_usage_history = deque(memory_usage_history, maxlen=desired_max)
                 globals()["memory_usage_history"] = memory_usage_history
 
             memory_usage_history.append(entry)
