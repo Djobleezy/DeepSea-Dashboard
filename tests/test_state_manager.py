@@ -304,3 +304,26 @@ def test_close_closes_redis_connection():
     assert dummy.closed
     assert mgr.redis_client is None
 
+
+def test_close_clears_cached_data():
+    from datetime import datetime
+
+    mgr = StateManager()
+    mgr.arrow_history = {"k": deque([{"time": "00:00:00", "value": 1}])}
+    mgr.hashrate_history.append(1)
+    mgr.metrics_log.append({"timestamp": "t", "metrics": {"a": 1}})
+    mgr.payout_history = [1]
+    mgr.variance_history = {"v": deque([{"time": datetime.now(), "value": 1}])}
+    mgr.last_earnings = {"v": 1}
+
+    mgr.close()
+
+    assert mgr.arrow_history == {}
+    assert len(mgr.hashrate_history) == 0
+    assert len(mgr.metrics_log) == 0
+    assert mgr.payout_history == []
+    assert mgr.variance_history == {}
+    assert mgr.last_earnings == {}
+    assert mgr.load_graph_state.cache_size() == 0
+    assert mgr.load_payout_history.cache_size() == 0
+    assert mgr.load_last_earnings.cache_size() == 0

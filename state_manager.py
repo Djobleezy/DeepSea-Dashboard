@@ -66,7 +66,7 @@ class StateManager:
         self.load_last_earnings()
 
     def close(self):
-        """Close Redis connection and release resources."""
+        """Close Redis connection and clear cached data."""
         if self.redis_client:
             try:
                 self.redis_client.close()
@@ -74,6 +74,26 @@ class StateManager:
                 logging.error(f"Error closing Redis connection: {e}")
             finally:
                 self.redis_client = None
+
+        # Clear in-memory history structures to free memory
+        self.arrow_history.clear()
+        self.hashrate_history.clear()
+        self.metrics_log.clear()
+        self.payout_history.clear()
+        self.variance_history.clear()
+        self.last_earnings.clear()
+
+        # Clear caches of ttl_cache decorated methods
+        for func in (
+            self.load_graph_state,
+            self.load_payout_history,
+            self.load_last_earnings,
+        ):
+            if hasattr(func, "cache_clear"):
+                try:
+                    func.cache_clear()
+                except Exception:
+                    pass
 
     def __del__(self):
         """Ensure Redis connection is closed on garbage collection."""
