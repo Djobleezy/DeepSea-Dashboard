@@ -1495,9 +1495,34 @@ async function verifyPayoutsAgainstOfficial() {
     }
 }
 
+// Cleanup the existing SSE connection and related timers
+function cleanupEventSource() {
+    if (window.eventSource) {
+        console.log("Closing existing EventSource connection");
+        try {
+            window.eventSource.close();
+        } catch (err) {
+            console.error("Error closing EventSource", err);
+        }
+        window.eventSource = null;
+    }
+
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+    }
+
+    if (connectionLostTimeout) {
+        clearTimeout(connectionLostTimeout);
+        connectionLostTimeout = null;
+    }
+}
+
 // SSE Connection with Error Handling and Reconnection Logic
 function setupEventSource() {
     console.log("Setting up EventSource connection...");
+
+    cleanupEventSource();
 
     if (window.eventSource) {
         console.log("Closing existing EventSource connection");
@@ -4754,5 +4779,8 @@ $(document).ready(function () {
     }, 30000); // Check every 30 seconds
 
     // Initialize notification badge
-    initNotificationBadge();
+initNotificationBadge();
 });
+
+// Ensure SSE connection is closed when navigating away
+window.addEventListener('beforeunload', cleanupEventSource);
