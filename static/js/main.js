@@ -1136,9 +1136,35 @@ function loadLocalHistory() {
         const savedHistory = localStorage.getItem('payoutHistory');
         if (savedHistory) {
             lastPayoutTracking.payoutHistory = JSON.parse(savedHistory);
+            sanitizePayoutHistory();
         }
     } catch (e) {
         console.error("Error loading payout history from localStorage:", e);
+    }
+}
+
+function sanitizePayoutHistory() {
+    if (!Array.isArray(lastPayoutTracking.payoutHistory)) {
+        lastPayoutTracking.payoutHistory = [];
+        return;
+    }
+    let changed = false;
+    lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.filter(entry => {
+        const date = new Date(entry.timestamp);
+        if (isNaN(date) || entry.amountBTC === undefined) {
+            changed = true;
+            return false;
+        }
+        entry.timestamp = date;
+        entry.amountBTC = parseFloat(entry.amountBTC);
+        return true;
+    });
+    if (changed) {
+        try {
+            localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
+        } catch (e) {
+            console.error('Error saving sanitized payout history:', e);
+        }
     }
 }
 
@@ -1496,6 +1522,7 @@ function formatBTC(btcValue) {
 
 // Enhanced function to verify and enrich payout history with data from earnings
 function verifyPayoutsAgainstOfficial() {
+    sanitizePayoutHistory();
     // Fetch the official payment history from the earnings endpoint
     $.ajax({
         url: '/api/earnings',
@@ -1510,7 +1537,7 @@ function verifyPayoutsAgainstOfficial() {
 
             // Get official payment records - newest first
             const officialPayments = data.payments.sort((a, b) =>
-                new Date(b.date) - new Date(a.date)
+                new Date(b.date_iso || b.date) - new Date(a.date_iso || a.date)
             );
 
             // Get our detected payouts
@@ -1521,7 +1548,7 @@ function verifyPayoutsAgainstOfficial() {
                 const payoutDate = new Date(detectedPayout.timestamp);
 
                 const matchingPayment = officialPayments.find(payment => {
-                    const paymentDate = new Date(payment.date);
+                    const paymentDate = new Date(payment.date_iso || payment.date);
                     return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
                         Math.abs(parseFloat(payment.amount_btc) - parseFloat(detectedPayout.amountBTC)) < 0.00001;
                 });
@@ -1547,7 +1574,7 @@ function verifyPayoutsAgainstOfficial() {
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
             officialPayments.forEach(payment => {
-                const paymentDate = new Date(payment.date);
+                const paymentDate = new Date(payment.date_iso || payment.date);
                 if (paymentDate < thirtyDaysAgo) return; // Skip older than 30 days
 
                 // Check if we already have this payment in our detected list
