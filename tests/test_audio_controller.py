@@ -8,6 +8,7 @@ def test_audio_controller_ids_present():
     assert "audio-prev" in content
     assert "audio-next" in content
     assert "audio-play" in content
+    assert "audio-remaining" in content
 
 
 def test_audio_controller_functions():

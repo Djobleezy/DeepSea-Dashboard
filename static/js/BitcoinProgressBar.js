@@ -32,7 +32,8 @@ const BitcoinMinuteRefresh = (function () {
         AUDIO_PREV: 'audio-prev',
         AUDIO_PLAY: 'audio-play',
         AUDIO_NEXT: 'audio-next',
-        AUDIO_PROGRESS: 'audio-progress'
+        AUDIO_PROGRESS: 'audio-progress',
+        AUDIO_REMAINING: 'audio-remaining'
     };
     // Add these new keys to the STORAGE_KEYS constant
     const STORAGE_KEYS = {
@@ -988,6 +989,7 @@ const BitcoinMinuteRefresh = (function () {
                 <span id="${DOM_IDS.AUDIO_NEXT}" class="audio-btn">&#9654;&#9654;</span>
               </div>
               <input id="${DOM_IDS.AUDIO_PROGRESS}" class="audio-progress" type="range" min="0" max="100" value="0">
+              <div id="${DOM_IDS.AUDIO_REMAINING}" class="audio-remaining">-0:00</div>
             </div>
           </div>
           <div class="page-controls">
@@ -1377,6 +1379,12 @@ const BitcoinMinuteRefresh = (function () {
 
       .audio-progress {
         width: 100%;
+      }
+
+      .audio-remaining {
+        text-align: center;
+        font-size: 12px;
+        margin-top: 2px;
       }
 
       .memory-gauge {

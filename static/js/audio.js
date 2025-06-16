@@ -11,6 +11,7 @@
         const prevBtn = document.getElementById('audioPrev');
         const nextBtn = document.getElementById('audioNext');
         const progressBar = document.getElementById('audioProgress');
+        const timeDisplay = document.getElementById('audioRemaining');
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
@@ -80,6 +81,7 @@
                 }
                 audio.removeEventListener('loadedmetadata', resume);
                 updateProgress();
+                updatePlayButton();
             };
 
             if (audio.readyState > 0) {
@@ -87,6 +89,13 @@
             } else {
                 audio.addEventListener('loadedmetadata', resume);
             }
+        };
+
+        const formatTime = (seconds) => {
+            if (Number.isNaN(seconds)) return '0:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
         };
 
         const crossfadeToIndex = (index) => {
@@ -121,6 +130,7 @@
                     audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
                     updateProgress();
+                    updatePlayButton();
                     isCrossfading = false;
                 }
             }, interval);
@@ -172,6 +182,7 @@
                     audio.addEventListener('ended', onTrackEnded);
                     storedTime = 0;
                     updateProgress();
+                    updatePlayButton();
                     isCrossfading = false;
                 }
             }, interval);
@@ -190,6 +201,12 @@
             }
         };
 
+        const updatePlayButton = () => {
+            if (playBtn) {
+                playBtn.textContent = audio.paused ? '\u25BA' : '\u275A\u275A';
+            }
+        };
+
         const togglePlay = () => {
             if (audio.paused) {
                 audio.muted = false;
@@ -202,6 +219,7 @@
                 audio.pause();
             }
             localStorage.setItem('audioPaused', audio.paused.toString());
+            updatePlayButton();
         };
 
         const seekTo = (pct) => {
@@ -229,6 +247,10 @@
         function updateProgress() {
             if (progressBar && audio.duration) {
                 progressBar.value = (audio.currentTime / audio.duration) * 100;
+            }
+            if (timeDisplay && audio.duration) {
+                const remaining = Math.max(0, audio.duration - audio.currentTime);
+                timeDisplay.textContent = '-' + formatTime(remaining);
             }
         }
 
