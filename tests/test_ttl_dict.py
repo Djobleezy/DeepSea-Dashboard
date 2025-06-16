@@ -67,3 +67,15 @@ def test_ttl_dict_thread_safety(monkeypatch):
 
     assert not errors
     assert len(d) == 250
+
+def test_ttl_dict_iteration_purges(monkeypatch):
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    d = TTLDict(ttl_seconds=10)
+    d["a"] = 1
+    fake_time[0] += 11
+
+    assert list(d) == []
+    assert len(d) == 0
+

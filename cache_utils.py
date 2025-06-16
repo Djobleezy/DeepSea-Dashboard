@@ -171,5 +171,19 @@ class TTLDict:
             self._purge_expired()
             return [(k, v[0]) for k, v in self._store.items()]
 
+    def __iter__(self):
+        """Iterate over keys while purging expired entries."""
+        with self._lock:
+            self._purge_expired()
+            keys = list(self._store.keys())
+        for key in keys:
+            yield key
+
+    def values(self):
+        """Return list of values after purging expired items."""
+        with self._lock:
+            self._purge_expired()
+            return [v[0] for v in self._store.values()]
+
 
 __all__ = ["ttl_cache", "TTLDict"]
