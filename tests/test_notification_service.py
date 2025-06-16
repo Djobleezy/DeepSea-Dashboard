@@ -226,6 +226,16 @@ class RedisValueTest(unittest.TestCase):
         result = svc._get_redis_value("val", "default")
         self.assertEqual(result, "1")
 
+    def test_close_clears_state(self):
+        svc = NotificationService(DummyStateManager())
+        svc.notifications = [{"id": "1"}]
+        svc.dashboard_service = object()
+        svc.close()
+
+        self.assertEqual(svc.notifications, [])
+        self.assertIsNone(svc.dashboard_service)
+        self.assertIsNone(svc.state_manager)
+
 
 if __name__ == "__main__":
     unittest.main()

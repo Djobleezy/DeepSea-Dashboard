@@ -159,6 +159,21 @@ class NotificationService:
         # Load last block height from state
         self._load_last_block_height()
 
+    def close(self):
+        """Release references and clear cached data."""
+        try:
+            self.notifications.clear()
+            self.dashboard_service = None
+            self.state_manager = None
+        except Exception:
+            pass
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     @property
     def dashboard_service(self):
         """Return the dashboard service if it is still alive."""

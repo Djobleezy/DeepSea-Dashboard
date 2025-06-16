@@ -104,6 +104,7 @@ scheduler_recreate_lock = threading.Lock()
 _previous_scheduler = globals().get("scheduler")
 _previous_dashboard_service = globals().get("dashboard_service")
 _previous_state_manager = globals().get("state_manager")
+_previous_notification_service = globals().get("notification_service")
 scheduler = None
 
 # Global start time
@@ -151,6 +152,16 @@ if _previous_state_manager:
 
 # Initialize notification service after state_manager
 notification_service = NotificationService(state_manager)
+
+# Close any previous notification service instance to prevent leaks
+if _previous_notification_service:
+    try:
+        if hasattr(_previous_notification_service, "close"):
+            _previous_notification_service.close()
+    except Exception as e:
+        logging.error(f"Error closing previous notification service: {e}")
+    finally:
+        _previous_notification_service = None
 
 
 # --- Disable Client Caching for All Responses ---
@@ -1913,6 +1924,14 @@ def graceful_shutdown(signum, frame):
             worker_service.close()
         except Exception as e:
             logging.error(f"Error closing worker service: {e}")
+
+    # Close notification service
+    if notification_service:
+        try:
+            if hasattr(notification_service, "close"):
+                notification_service.close()
+        except Exception as e:
+            logging.error(f"Error closing notification service: {e}")
 
     # Close state manager resources
     if state_manager:
