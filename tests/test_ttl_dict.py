@@ -37,6 +37,14 @@ def test_ttl_dict_maxsize(monkeypatch):
     assert "a" not in d
 
 
+def test_ttl_dict_maxsize_zero(monkeypatch):
+    d = TTLDict(ttl_seconds=10, maxsize=0)
+    d["a"] = 1
+    assert len(d) == 0
+    with pytest.raises(KeyError):
+        _ = d["a"]
+
+
 def test_ttl_dict_thread_safety(monkeypatch):
     monkeypatch.setattr(time, "time", lambda: 0)
     d = TTLDict(ttl_seconds=10)

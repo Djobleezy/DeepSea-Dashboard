@@ -47,6 +47,8 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             """Return cached results when available or call the wrapped function."""
+            if maxsize == 0:
+                return func(*args, **kwargs)
             if args and hasattr(args[0], "__dict__"):
                 obj = args[0]
                 key_args = args[1:]
@@ -121,6 +123,8 @@ class TTLDict:
     def __setitem__(self, key, value):
         with self._lock:
             self._purge_expired()
+            if self.maxsize == 0:
+                return
             if self.maxsize is not None and len(self._store) >= self.maxsize:
                 oldest = min(self._store.items(), key=lambda item: item[1][1])[0]
                 del self._store[oldest]

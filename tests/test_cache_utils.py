@@ -120,6 +120,26 @@ def test_ttl_cache_maxsize(monkeypatch):
     assert identity.cache_size() == 2
 
 
+def test_ttl_cache_maxsize_zero(monkeypatch):
+    """maxsize=0 disables caching entirely."""
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    call_count = {"count": 0}
+
+    @ttl_cache(ttl_seconds=10, maxsize=0)
+    def identity(x):
+        call_count["count"] += 1
+        return x
+
+    assert identity(1) == 1
+    assert call_count["count"] == 1
+    assert identity.cache_size() == 0
+    assert identity(1) == 1
+    assert call_count["count"] == 2
+    assert identity.cache_size() == 0
+
+
 def test_ttl_cache_releases_object_cache(monkeypatch):
     """Cache entries for object methods should be removed when the object is garbage collected."""
     fake_time = [0]
