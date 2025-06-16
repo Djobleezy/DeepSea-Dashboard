@@ -226,11 +226,11 @@
             icon.classList.toggle('fa-volume-up', !storedMuted);
         }
         
-        const updateProgress = () => {
+        function updateProgress() {
             if (progressBar && audio.duration) {
                 progressBar.value = (audio.currentTime / audio.duration) * 100;
             }
-        };
+        }
 
         const timeUpdateHandler = () => {
             localStorage.setItem('audioPlaybackTime', audio.currentTime);
