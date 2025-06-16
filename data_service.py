@@ -17,6 +17,7 @@ from models import OceanData, convert_to_ths
 from config import get_timezone
 from cache_utils import ttl_cache
 from miner_specs import parse_worker_name
+from state_manager import MAX_PAYOUT_HISTORY_ENTRIES
 
 
 @dataclass
@@ -970,7 +971,12 @@ class MiningDashboardService:
 
                 payments.append(payment)
 
-            return payments
+                # Trim to avoid unbounded memory growth
+                if len(payments) >= MAX_PAYOUT_HISTORY_ENTRIES:
+                    break
+
+            # Limit result size to prevent excessive memory usage
+            return payments[:MAX_PAYOUT_HISTORY_ENTRIES]
 
         except Exception as e:
             logging.error(f"Error fetching payment history from API: {e}")
@@ -1064,6 +1070,9 @@ class MiningDashboardService:
                             payment["fiat_value"] = amount_btc * btc_price
                         payments.append(payment)
 
+                        if len(payments) >= MAX_PAYOUT_HISTORY_ENTRIES:
+                            break
+
                     page += 1
                 finally:
                     if soup:
@@ -1074,7 +1083,7 @@ class MiningDashboardService:
                         except Exception:
                             pass
 
-            return payments
+            return payments[:MAX_PAYOUT_HISTORY_ENTRIES]
         except Exception as e:
             logging.error(f"Error scraping payment history: {e}")
             return None

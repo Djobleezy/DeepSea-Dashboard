@@ -50,6 +50,7 @@ from worker_service import WorkerService
 from data_service import MiningDashboardService
 from notification_service import NotificationService
 import data_service
+import state_manager
 
 
 def test_generate_default_workers_data(monkeypatch):
@@ -352,6 +353,60 @@ def test_get_payment_history_scrape_pagination(monkeypatch):
     assert len(payments) == 2
     assert payments[0]["txid"] == "tx1"
     assert payments[1]["txid"] == "tx2"
+
+
+def test_get_payment_history_api_limits_results(monkeypatch):
+    svc = MiningDashboardService(0, 0, "w")
+
+    # Create more payouts than the maximum allowed
+    sample = {
+        "result": {
+            "payouts": [
+                {"ts": 1700000000 + i, "on_chain_txid": str(i), "lightning_txid": "", "total_satoshis_net_paid": 1}
+                for i in range(state_manager.MAX_PAYOUT_HISTORY_ENTRIES + 5)
+            ]
+        }
+    }
+
+    def fake_get(url, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = sample
+        return resp
+
+    monkeypatch.setattr(svc.session, "get", fake_get)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+
+    payments = svc.get_payment_history_api()
+    assert len(payments) == state_manager.MAX_PAYOUT_HISTORY_ENTRIES
+
+
+def test_get_payment_history_scrape_limits_results(monkeypatch):
+    svc = MiningDashboardService(0, 0, "w")
+
+    row_template = "<tr class='table-row'><td class='table-cell'>2025-05-01 00:00</td><td class='table-cell'>{}</td><td class='table-cell'>0.00000100 BTC</td></tr>"
+    rows = "".join(row_template.format(f"tx{i}") for i in range(state_manager.MAX_PAYOUT_HISTORY_ENTRIES + 5))
+    html = f"<table><tbody id='payouts-tablerows'>{rows}</tbody></table>"
+    html_empty = "<table><tbody id='payouts-tablerows'></tbody></table>"
+
+    def fake_get(url, headers=None, timeout=10):
+        resp = MagicMock()
+        resp.ok = True
+        if "ppage=0" in url:
+            resp.text = html
+        else:
+            resp.text = html_empty
+        return resp
+
+    monkeypatch.setattr(svc.session, "get", fake_get)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    import importlib
+    sys.modules.pop("bs4", None)
+    real_bs4 = importlib.import_module("bs4")
+    monkeypatch.setattr(data_service, "BeautifulSoup", real_bs4.BeautifulSoup)
+
+    payments = svc.get_payment_history_scrape()
+    assert len(payments) == state_manager.MAX_PAYOUT_HISTORY_ENTRIES
 
 
 def test_get_payment_history_scrape_closes_on_error(monkeypatch):
