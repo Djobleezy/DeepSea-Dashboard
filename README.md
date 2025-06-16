@@ -173,6 +173,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 - System uptime display
 - Real-time connection status
 - Optional audio controls with progress bar
+- Remembers the last monitor page you viewed, including audio controls
 
 ## System Requirements
 

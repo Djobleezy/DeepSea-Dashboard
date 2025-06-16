@@ -9,6 +9,14 @@ def test_audio_controller_ids_present():
     assert "audio-next" in content
     assert "audio-play" in content
     assert "audio-remaining" in content
+    assert "bitcoin_monitor_last_page" in content
+
+
+def test_audio_controller_persistence():
+    js_path = Path("static/js/BitcoinProgressBar.js")
+    content = js_path.read_text()
+    assert "STORAGE_KEYS.LAST_PAGE" in content
+    assert "localStorage.setItem" in content
 
 
 def test_audio_controller_functions():

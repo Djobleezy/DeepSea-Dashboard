@@ -46,7 +46,8 @@ const BitcoinMinuteRefresh = (function () {
         POSITION_TOP: 'bitcoin_terminal_top',
         SNAP_POINT: 'bitcoin_terminal_snap_point',
         COLLAPSED_SNAP_POINT: 'bitcoin_terminal_collapsed_snap_point',
-        HIDDEN: 'bitcoin_terminal_hidden'
+        HIDDEN: 'bitcoin_terminal_hidden',
+        LAST_PAGE: 'bitcoin_monitor_last_page'
     };
     const SELECTORS = {
         HEADER: '.terminal-header',
@@ -1669,6 +1670,11 @@ const BitcoinMinuteRefresh = (function () {
         pages.forEach((p, i) => {
             p.style.display = i === currentPage ? 'block' : 'none';
         });
+        try {
+            localStorage.setItem(STORAGE_KEYS.LAST_PAGE, currentPage.toString());
+        } catch (e) {
+            log('Failed to store current page: ' + e.message, 'error');
+        }
     }
 
     function nextPage() { showPage(currentPage + 1); }
@@ -1795,7 +1801,14 @@ const BitcoinMinuteRefresh = (function () {
         if (audioPlay) audioPlay.addEventListener('click', () => window.togglePlay && window.togglePlay());
         if (audioProgress) audioProgress.addEventListener('input', (e) => window.seekAudio && window.seekAudio(parseFloat(e.target.value)));
 
-        showPage(0);
+        let savedPage = 0;
+        try {
+            const stored = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_PAGE) || '0');
+            if (!isNaN(stored)) savedPage = stored;
+        } catch (e) {
+            log('Failed to read last page: ' + e.message, 'error');
+        }
+        showPage(savedPage);
         fetchHealth();
         if (healthInterval) clearInterval(healthInterval);
         healthInterval = setInterval(fetchHealth, 10000);
