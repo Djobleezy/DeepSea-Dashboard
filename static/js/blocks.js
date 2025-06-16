@@ -131,6 +131,12 @@ function cleanupEventHandlers() {
         clearInterval(refreshIntervalId);
         refreshIntervalId = null;
     }
+    if (minerChart) {
+        if (typeof minerChart.destroy === 'function') {
+            minerChart.destroy();
+        }
+        minerChart = null;
+    }
 }
 
 // Setup keyboard navigation for modal
