@@ -145,6 +145,14 @@ class MiningDashboardService:
                     except Exception:
                         pass
 
+            # Close associated worker service to prevent memory leaks
+            if self.worker_service and hasattr(self.worker_service, "close"):
+                try:
+                    self.worker_service.close()
+                except Exception:
+                    pass
+            self.worker_service = None
+
             # Cancel any pending futures and shutdown executor
             try:
                 from inspect import signature
