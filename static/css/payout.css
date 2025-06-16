@@ -1,0 +1,49 @@
+# Styles for payout summary
+
+#payout-history-container {
+    background-color: var(--bg-color);
+    padding: 0.5rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--primary-color);
+    box-shadow: 0 0 10px rgba(var(--primary-color-rgb), 0.2);
+    position: relative;
+}
+
+#payout-history-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1) 1px, transparent 1px, transparent 2px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+#payout-summary {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 0.75rem;
+}
+
+.deepsea-theme #payout-history-container {
+    position: relative;
+    z-index: 1;
+}
+
+.deepsea-theme #payout-history-container .btn {
+    color: white !important;
+}
+
+.bitcoin-theme #payout-history-container .btn,
+html:not(.deepsea-theme) #payout-history-container .btn {
+    color: black !important;
+}
+
+.deepsea-theme #payout-history-container .metric-value {
+    position: relative;
+    z-index: 1;
+    opacity: 0.85;
+}

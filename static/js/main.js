@@ -1032,24 +1032,7 @@ function trackPayoutPerformance(data) {
             lightningId: ''
         };
 
-        lastPayoutTracking.payoutHistory.unshift(payoutRecord);
-        if (lastPayoutTracking.payoutHistory.length > 10) {
-            lastPayoutTracking.payoutHistory.pop();
-        }
-
-        updateAvgDaysFromHistory();
-
-        try {
-            localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
-            fetch('/api/payout-history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ record: payoutRecord })
-            });
-        } catch (e) {
-            console.error("Error saving payout history to localStorage:", e);
-        }
-
+        add_payout_record(payoutRecord);
         displayPayoutComparison(payoutRecord);
     }
 
@@ -1168,22 +1151,100 @@ function sanitizePayoutHistory() {
     }
 }
 
+function save_payout_history() {
+    try {
+        localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
+        fetch('/api/payout-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ history: lastPayoutTracking.payoutHistory })
+        });
+    } catch (e) {
+        console.error('Error saving payout history:', e);
+    }
+}
+
+function add_payout_record(record) {
+    lastPayoutTracking.payoutHistory.unshift(record);
+    if (lastPayoutTracking.payoutHistory.length > 30) {
+        lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
+    }
+    updateAvgDaysFromHistory();
+    save_payout_history();
+}
+
+function get_latest_payout() {
+    return lastPayoutTracking.payoutHistory && lastPayoutTracking.payoutHistory[0] ?
+        lastPayoutTracking.payoutHistory[0] : null;
+}
+
+function format_payout_html(payout) {
+    if (!payout) {
+        return '<p class="text-muted">No payout information available.</p>';
+    }
+
+    const theme = getCurrentTheme();
+    const payoutDate = formatPayoutDate(payout.timestamp);
+    const btcAmount = formatBTC(payout.amountBTC);
+
+    let fiatValueStr = 'N/A';
+    if (payout.amountBTC !== undefined) {
+        const currency = latestMetrics?.currency || 'USD';
+        const btcPrice = latestMetrics?.btc_price || 0;
+        if (btcPrice > 0) {
+            const fiatValue = parseFloat(payout.amountBTC) * btcPrice;
+            const symbol = getCurrencySymbol(currency);
+            fiatValueStr = `${symbol}${numberWithCommas(fiatValue.toFixed(2))}`;
+        } else if (payout.fiat_value !== undefined && payout.rate !== undefined) {
+            const symbol = getCurrencySymbol(currency);
+            fiatValueStr = `${symbol}${numberWithCommas(payout.fiat_value.toFixed(2))}`;
+        }
+    }
+
+    let txLink = '';
+    if (payout.officialId) {
+        txLink += `<a href="https://mempool.guide/tx/${payout.officialId}" target="_blank" class="btn btn-sm btn-secondary ms-2" style="font-size: 12px; width: 90px;" title="View transaction on mempool.guide"><i class="fa-solid fa-external-link-alt"></i> View TX</a>`;
+    }
+    if (payout.lightningId) {
+        txLink += `<a href="https://ocean.xyz/info/tx/lightning/${payout.lightningId}" target="_blank" class="btn btn-sm btn-secondary ms-2" style="font-size: 12px; width: 90px;" title="View Lightning transaction"><i class="fa-solid fa-bolt"></i> LN TX</a>`;
+    }
+
+    const interval = lastPayoutTracking.avgDays ? `${lastPayoutTracking.avgDays.toFixed(2)} days` : 'N/A';
+    const statusDisplay = payout.status || 'pending';
+    const statusClass = payout.verified ? 'green' : 'yellow';
+
+    return `
+        <div style="font-size: 14px;">
+            <div style="display: flex; justify-content: center;">
+                <div style="width: 100%; max-width: 200px;">
+                    <p><strong>Date:</strong> <span class="metric-value white">${payoutDate}</span></p>
+                    <p><strong>Amount:</strong> <span class="metric-value yellow">${btcAmount} BTC</span></p>
+                    <p><strong>Fiat Value:</strong> <span class="metric-value green">${fiatValueStr}</span></p>
+                    <p><strong>Last Payout Interval:</strong> <span class="metric-value yellow">${interval}</span></p>
+                    <p><strong>Status:</strong> <span class="metric-value ${statusClass}">${statusDisplay}</span> ${txLink}</p>
+                </div>
+            </div>
+        </div>`;
+}
+
 // Fetch the latest payment from the earnings API
-function fetchLatestPayment() {
-    return fetch('/api/earnings')
-        .then(res => res.json())
-        .then(data => {
-            if (data && Array.isArray(data.payments) && data.payments.length > 0) {
-                return data.payments[0];
-            }
-            return null;
-        })
-        .catch(() => null);
+async function fetchLatestPayment() {
+    try {
+        const res = await fetch('/api/earnings');
+        const data = await res.json();
+        if (data && Array.isArray(data.payments) && data.payments.length > 0) {
+            return data.payments[0];
+        }
+    } catch (e) {
+        console.error('Failed to fetch latest payment:', e);
+    }
+    return null;
 }
 
 // Update payout history using the latest earnings data then invoke callback
-function refreshPayoutHistoryFromEarnings(callback) {
-    fetchLatestPayment().then(payment => {
+async function refreshPayoutHistoryFromEarnings(callback) {
+    try {
+        const payment = await fetchLatestPayment();
         if (payment) {
             const record = {
                 timestamp: new Date(payment.date_iso || payment.date),
@@ -1197,30 +1258,16 @@ function refreshPayoutHistoryFromEarnings(callback) {
                 record.rate = payment.rate;
                 record.fiat_value = payment.amount_btc * payment.rate;
             }
-            const first = lastPayoutTracking.payoutHistory[0];
+            const first = get_latest_payout();
             const newTime = record.timestamp.toISOString();
             const firstTime = first ? new Date(first.timestamp).toISOString() : null;
             if (!first || firstTime !== newTime || parseFloat(first.amountBTC) !== parseFloat(record.amountBTC)) {
-                lastPayoutTracking.payoutHistory.unshift(record);
-                if (lastPayoutTracking.payoutHistory.length > 30) {
-                    lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
-                }
-                updateAvgDaysFromHistory();
-                try {
-                    localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
-                    fetch('/api/payout-history', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ history: lastPayoutTracking.payoutHistory })
-                    });
-                } catch (e) {
-                    console.error('Error saving payout history from earnings:', e);
-                }
+                add_payout_record(record);
             }
         }
-    }).finally(() => {
+    } finally {
         if (typeof callback === 'function') callback();
-    });
+    }
 }
 
 // Update the init function to add the summary display
@@ -1302,201 +1349,32 @@ function togglePayoutHistoryDisplay() {
 
 // Enhanced function to display complete payout summary information
 function displayPayoutSummary() {
-    // Get the container
     const container = $("#payout-history-container");
-
-    // Get current theme for styling
     const theme = getCurrentTheme();
-
-    // Clear the container first
     container.empty();
 
-    // Create a base container for the summary
-    const summaryElement = $(`
-        <div id="payout-summary" class="mb-3 p-2">
+    const summaryElement = $(
+        `<div id="payout-summary" class="mb-3 p-2">
             <h6 style="color:${theme.PRIMARY};margin-bottom:8px; font-weight: bold; font-size: 18px; text-align: center;">Last Payout Summary</h6>
             <div id="summary-content"></div>
-        </div>
-    `);
+        </div>`
+    );
 
-    // Prepare the content area
-    const contentArea = summaryElement.find("#summary-content");
+    const contentArea = summaryElement.find('#summary-content');
+    const latest = get_latest_payout();
+    contentArea.html(format_payout_html(latest));
 
-    // Check if we have any payout history
-    if (!lastPayoutTracking.payoutHistory || lastPayoutTracking.payoutHistory.length === 0) {
-        contentArea.html('<p class="text-muted">No payout history available yet.</p>');
-
-        // Add to container
-        container.append(summaryElement);
-        return;
-    }
-
-    // Get the most recent payout (which is the first one in the array since it's sorted newest first)
-    const lastPayout = lastPayoutTracking.payoutHistory[0];
-
-    // If no payout found (shouldn't happen but just in case), show a message
-    if (!lastPayout) {
-        contentArea.html('<p class="text-muted">No payout information available.</p>');
-        container.append(summaryElement);
-        return;
-    }
-
-    // Format date for better display
-    const payoutDate = formatPayoutDate(lastPayout.timestamp);
-
-    // Format the BTC amount
-    const btcAmount = formatBTC(lastPayout.amountBTC);
-
-    // Format fiat value using current currency and exchange rate
-    let fiatValueStr = "N/A";
-    if (lastPayout.amountBTC !== undefined) {
-        // Get current user currency and exchange rate from latestMetrics
-        const currency = latestMetrics?.currency || 'USD';
-        const exchangeRate = (latestMetrics?.exchange_rates && latestMetrics.exchange_rates[currency])
-            ? latestMetrics.exchange_rates[currency]
-            : 1.0;
-
-        // Calculate fiat value using current BTC price
-        const btcPrice = latestMetrics?.btc_price || 0;
-        if (btcPrice > 0) {
-            const fiatValue = parseFloat(lastPayout.amountBTC) * btcPrice;
-            const symbol = getCurrencySymbol(currency);
-            fiatValueStr = `${symbol}${numberWithCommas(fiatValue.toFixed(2))}`;
-        }
-        // Fallback to stored fiat value if available
-        else if (lastPayout.fiat_value !== undefined && lastPayout.rate !== undefined) {
-            const fiatValue = lastPayout.fiat_value;
-            const symbol = getCurrencySymbol(currency);
-            fiatValueStr = `${symbol}${numberWithCommas(fiatValue.toFixed(2))}`;
-        }
-    }
-
-
-    // Format transaction status and link if available
-    let statusDisplay = lastPayout.status || "pending";
-    const statusClass = lastPayout.verified ? "text-success" : "text-warning";
-
-    // Build HTML for the transaction links
-    let txLink = '';
-    if (lastPayout.officialId) {
-        txLink += `
-            <a href="https://mempool.guide/tx/${lastPayout.officialId}"
-               target="_blank"
-               class="btn btn-sm btn-secondary ms-2"
-               style="font-size: 12px; width: 90px;"
-               title="View transaction on mempool.guide">
-                <i class="fa-solid fa-external-link-alt"></i> View TX
-            </a>`;
-    }
-
-    if (lastPayout.lightningId) {
-        txLink += `
-            <a href="https://ocean.xyz/info/tx/lightning/${lastPayout.lightningId}"
-               target="_blank"
-               class="btn btn-sm btn-secondary ms-2"
-               style="font-size: 12px; width: 90px;"
-               title="View Lightning transaction">
-                <i class="fa-solid fa-bolt"></i> LN TX
-            </a>`;
-    }
-
-    // Update the inner content area of the summary with dashboard-consistent styling
-    contentArea.html(`
-        <div style="font-size: 14px;">
-            <div style="display: flex; justify-content: center;">
-                <div style="width: 100%; max-width: 200px;">
-                    <p>
-                        <strong>Date:</strong>
-                        <span class="metric-value white">${payoutDate}</span>
-                    </p>
-                    <p>
-                        <strong>Amount:</strong>
-                        <span class="metric-value yellow">${btcAmount} BTC</span>
-                    </p>
-                    <p>
-                        <strong>Fiat Value:</strong>
-                        <span class="metric-value green">${fiatValueStr}</span>
-                    </p>
-                    <p>
-                        <strong>Last Payout Interval:</strong>
-                        <span class="metric-value yellow">${lastPayoutTracking.avgDays ? lastPayoutTracking.avgDays.toFixed(2) + ' days' : 'N/A'}</span>
-                    </p>
-                    <p>
-                        <strong>Status:</strong>
-                        <span class="metric-value ${lastPayout.verified ? 'green' : 'yellow'}">${statusDisplay}</span>
-                        ${txLink}
-                    </p>
-                </div>
-            </div>
-        </div>
-    `);
-
-    // Add to container
     container.append(summaryElement);
 
-    // Add view more link to the earnings page
     const viewMoreLink = $("<div class='text-center'></div>");
     const matrixActive = localStorage.getItem('useMatrixTheme') === 'true';
     const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true' && !matrixActive;
-    viewMoreLink.html(`
-        <a href='/earnings' class='btn btn-sm' style='background-color:${theme.PRIMARY};color:${isDeepSea ? 'white' : 'black'};'>
+    viewMoreLink.html(
+        `<a href='/earnings' class='btn btn-sm' style='background-color:${theme.PRIMARY};color:${isDeepSea ? 'white' : 'black'};'>
             Complete Payout History
-        </a>
-    `);
+        </a>`
+    );
     container.append(viewMoreLink);
-
-    // Add CSS styling for the container
-    $("<style>").text(`
-    #payout-history-container {
-        background-color: var(--bg-color);
-        padding: 0.5rem;
-        margin-top: 1rem;
-        margin-bottom: 1rem;
-        border: 1px solid var(--primary-color);
-        box-shadow: 0 0 10px rgba(var(--primary-color-rgb), 0.2);
-        position: relative;
-    }
-
-    #payout-history-container::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1) 1px, transparent 1px, transparent 2px);
-        pointer-events: none;
-        z-index: 1;
-    }
-
-    #payout-summary {
-        position: relative;
-        z-index: 1;
-        margin-bottom: 0.75rem;
-    }
-
-    /* DeepSea specific styling for payout content */
-    .deepsea-theme #payout-history-container {
-        position: relative;
-        z-index: 1;
-    }
-
-    /* Theme-specific styling for the "Complete Payout History" button */
-    .deepsea-theme #payout-history-container .btn {
-        color: white !important;
-    }
-    .bitcoin-theme #payout-history-container .btn, 
-    html:not(.deepsea-theme) #payout-history-container .btn {
-        color: black !important;
-    }
-
-    /* Make payout text respect the DeepSea overlay opacity */  
-    .deepsea-theme #payout-history-container .metric-value {
-        position: relative;
-        z-index: 1;
-        opacity: 0.85;
-    }
-    `).appendTo("head");
 }
 
 // Add these utility functions from earnings.js for better date formatting
@@ -1521,129 +1399,100 @@ function formatBTC(btcValue) {
 }
 
 // Enhanced function to verify and enrich payout history with data from earnings
-function verifyPayoutsAgainstOfficial() {
+async function verifyPayoutsAgainstOfficial() {
     sanitizePayoutHistory();
-    // Fetch the official payment history from the earnings endpoint
-    $.ajax({
-        url: '/api/earnings',
-        method: 'GET',
-        success: function (data) {
-            if (!data || !data.payments || !data.payments.length) return;
+    try {
+        const res = await fetch('/api/earnings');
+        const data = await res.json();
+        if (!data || !data.payments || !data.payments.length) return;
 
-            // Store average days between payouts if available
-            if (data.avg_days_between_payouts !== undefined && data.avg_days_between_payouts !== null) {
-                lastPayoutTracking.avgDays = data.avg_days_between_payouts;
-            }
-
-            // Get official payment records - newest first
-            const officialPayments = data.payments.sort((a, b) =>
-                new Date(b.date_iso || b.date) - new Date(a.date_iso || a.date)
-            );
-
-            // Get our detected payouts
-            const detectedPayouts = lastPayoutTracking.payoutHistory;
-
-            // 1. First match detected payouts with official records
-            detectedPayouts.forEach(detectedPayout => {
-                const payoutDate = new Date(detectedPayout.timestamp);
-
-                const matchingPayment = officialPayments.find(payment => {
-                    const paymentDate = new Date(payment.date_iso || payment.date);
-                    return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
-                        Math.abs(parseFloat(payment.amount_btc) - parseFloat(detectedPayout.amountBTC)) < 0.00001;
-                });
-
-                if (matchingPayment) {
-                    detectedPayout.verified = true;
-                    detectedPayout.officialId = matchingPayment.txid || '';
-                    detectedPayout.lightningId = matchingPayment.lightning_txid || '';
-                    detectedPayout.status = matchingPayment.status || 'confirmed';
-
-                    if (matchingPayment.rate) {
-                        detectedPayout.rate = matchingPayment.rate;
-                        detectedPayout.fiat_value = parseFloat(detectedPayout.amountBTC) * matchingPayment.rate;
-                    }
-                } else {
-                    detectedPayout.verified = false;
-                }
-            });
-
-            // 2. Add any official records that weren't detected
-            // Find records from past 30 days that don't have matching detected payouts
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-            officialPayments.forEach(payment => {
-                const paymentDate = new Date(payment.date_iso || payment.date);
-                if (paymentDate < thirtyDaysAgo) return; // Skip older than 30 days
-
-                // Check if we already have this payment in our detected list
-                const exists = detectedPayouts.some(payout => {
-                    if (payout.officialId && payment.txid) {
-                        return payout.officialId === payment.txid;
-                    }
-
-                    const payoutDate = new Date(payout.timestamp);
-                    return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
-                        Math.abs(parseFloat(payment.amount_btc) - parseFloat(payout.amountBTC)) < 0.00001;
-                });
-
-                if (!exists) {
-                    const syntheticPayout = {
-                        timestamp: paymentDate,
-                        amountBTC: payment.amount_btc,
-                        verified: true,
-                        officialId: payment.txid || '',
-                        lightningId: payment.lightning_txid || '',
-                        status: payment.status || 'confirmed',
-                        officialRecordOnly: true
-                    };
-
-                    // Add exchange rate data if available
-                    if (payment.rate) {
-                        syntheticPayout.rate = payment.rate;
-                        syntheticPayout.fiat_value = parseFloat(payment.amount_btc) * payment.rate;
-                    }
-
-                    // Add to our history
-                    lastPayoutTracking.payoutHistory.push(syntheticPayout);
-                }
-            });
-
-            // Sort the combined list by date (newest first)
-            lastPayoutTracking.payoutHistory.sort((a, b) =>
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
-
-            // Limit to most recent 30 entries to prevent unbounded growth
-            if (lastPayoutTracking.payoutHistory.length > 30) {
-                lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
-            }
-
-            // Recalculate average days with official data included
-            updateAvgDaysFromHistory();
-
-            // Update the display with enriched data if it's visible
-            if ($("#payout-history-container").is(":visible")) {
-                displayPayoutSummary();
-            }
-
-            // Save the updated history
-            try {
-                localStorage.setItem('payoutHistory', JSON.stringify(lastPayoutTracking.payoutHistory));
-                fetch('/api/payout-history', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ history: lastPayoutTracking.payoutHistory })
-                });
-            } catch (e) {
-                console.error("Error saving enriched payout history to localStorage:", e);
-            }
-        },
-        error: function (error) {
-            console.error("Failed to fetch earnings data:", error);
+        if (data.avg_days_between_payouts !== undefined && data.avg_days_between_payouts !== null) {
+            lastPayoutTracking.avgDays = data.avg_days_between_payouts;
         }
-    });
+
+        const officialPayments = data.payments.sort((a, b) =>
+            new Date(b.date_iso || b.date) - new Date(a.date_iso || a.date)
+        );
+
+        const detectedPayouts = lastPayoutTracking.payoutHistory;
+
+        detectedPayouts.forEach(detectedPayout => {
+            const payoutDate = new Date(detectedPayout.timestamp);
+
+            const matchingPayment = officialPayments.find(payment => {
+                const paymentDate = new Date(payment.date_iso || payment.date);
+                return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
+                    Math.abs(parseFloat(payment.amount_btc) - parseFloat(detectedPayout.amountBTC)) < 0.00001;
+            });
+
+            if (matchingPayment) {
+                detectedPayout.verified = true;
+                detectedPayout.officialId = matchingPayment.txid || '';
+                detectedPayout.lightningId = matchingPayment.lightning_txid || '';
+                detectedPayout.status = matchingPayment.status || 'confirmed';
+
+                if (matchingPayment.rate) {
+                    detectedPayout.rate = matchingPayment.rate;
+                    detectedPayout.fiat_value = parseFloat(detectedPayout.amountBTC) * matchingPayment.rate;
+                }
+            } else {
+                detectedPayout.verified = false;
+            }
+        });
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        officialPayments.forEach(payment => {
+            const paymentDate = new Date(payment.date_iso || payment.date);
+            if (paymentDate < thirtyDaysAgo) return;
+
+            const exists = detectedPayouts.some(payout => {
+                if (payout.officialId && payment.txid) {
+                    return payout.officialId === payment.txid;
+                }
+
+                const payoutDate = new Date(payout.timestamp);
+                return Math.abs(paymentDate - payoutDate) < (2 * 60 * 60 * 1000) &&
+                    Math.abs(parseFloat(payment.amount_btc) - parseFloat(payout.amountBTC)) < 0.00001;
+            });
+
+            if (!exists) {
+                const syntheticPayout = {
+                    timestamp: paymentDate,
+                    amountBTC: payment.amount_btc,
+                    verified: true,
+                    officialId: payment.txid || '',
+                    lightningId: payment.lightning_txid || '',
+                    status: payment.status || 'confirmed',
+                    officialRecordOnly: true
+                };
+
+                if (payment.rate) {
+                    syntheticPayout.rate = payment.rate;
+                    syntheticPayout.fiat_value = parseFloat(payment.amount_btc) * payment.rate;
+                }
+
+                lastPayoutTracking.payoutHistory.push(syntheticPayout);
+            }
+        });
+
+        lastPayoutTracking.payoutHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (lastPayoutTracking.payoutHistory.length > 30) {
+            lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
+        }
+
+        updateAvgDaysFromHistory();
+
+        if ($("#payout-history-container").is(":visible")) {
+            displayPayoutSummary();
+        }
+
+        save_payout_history();
+    } catch (error) {
+        console.error("Failed to fetch earnings data:", error);
+    }
 }
 
 // SSE Connection with Error Handling and Reconnection Logic
