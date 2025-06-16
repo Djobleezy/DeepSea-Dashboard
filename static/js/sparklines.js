@@ -31,7 +31,7 @@
             'pool_fees_percentage',
             'last_block',
             'est_time_to_payout',
-            'daily_mined_sats',
+            'daily_revenue',
             'monthly_mined_sats',
             'estimated_earnings_per_day_sats',
             'estimated_earnings_next_block_sats',
