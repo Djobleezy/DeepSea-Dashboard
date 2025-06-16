@@ -22,7 +22,7 @@ informed with minimal fuss.
 ## Key Features
 
 
--### Real-Time Mining Metrics
+### Real-Time Mining Metrics
 - **Live Hashrate Tracking**: Monitor 60-second, 10-minute, 3-hour, and 24-hour average hashrates
 - **Profitability Analysis**: View daily and monthly earnings in both BTC and USD using your 24-hour hashrate
 - **Financial Calculations**: Automatically calculate revenue, power costs, and net profit
