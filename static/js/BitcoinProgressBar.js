@@ -1376,6 +1376,17 @@ const BitcoinMinuteRefresh = (function () {
 
       .audio-btn {
         cursor: pointer;
+        display: inline-block;
+        width: 1.5em;
+        text-align: center;
+      }
+
+      #audio-prev {
+        margin-right: 10px;
+      }
+
+      #audio-next {
+        margin-left: 10px;
       }
 
       .audio-progress {
