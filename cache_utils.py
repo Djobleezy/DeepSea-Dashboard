@@ -49,7 +49,7 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
             """Return cached results when available or call the wrapped function."""
             if maxsize == 0:
                 return func(*args, **kwargs)
-            if args and hasattr(args[0], "__dict__"):
+            if args and (hasattr(args[0], "__dict__") or hasattr(args[0].__class__, "__slots__")):
                 obj = args[0]
                 key_args = args[1:]
                 with lock:

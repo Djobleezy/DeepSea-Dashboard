@@ -50,3 +50,19 @@ def test_workerdata_validation_and_normalized_hashrate():
     assert worker2.hashrate_60sec == 0
     assert worker2.get_normalized_hashrate("3hr") == pytest.approx(1)
     assert worker2.get_normalized_hashrate("60sec") == 0
+
+
+def test_model_to_from_dict():
+    """Ensure dataclasses with slots still convert to and from dicts."""
+
+    ocean = OceanData(hashrate_24hr=2, hashrate_24hr_unit="EH/s")
+    d = ocean.to_dict()
+    new_ocean = OceanData.from_dict(d)
+    assert new_ocean.hashrate_24hr == ocean.hashrate_24hr
+    assert new_ocean.hashrate_24hr_unit == ocean.hashrate_24hr_unit
+
+    worker = WorkerData(name="w1", status="online")
+    d = worker.to_dict()
+    new_worker = WorkerData.from_dict(d)
+    assert new_worker.name == worker.name
+    assert new_worker.status == worker.status

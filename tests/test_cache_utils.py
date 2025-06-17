@@ -162,6 +162,34 @@ def test_ttl_cache_releases_object_cache(monkeypatch):
     assert Foo.bar.cache_size() == 0
 
 
+def test_ttl_cache_slots_class(monkeypatch):
+    """Ensure caching works for objects using __slots__."""
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    class Bar:
+        __slots__ = ("x", "__weakref__")
+
+        def __init__(self):
+            self.x = 0
+
+        @ttl_cache(ttl_seconds=60)
+        def foo(self, y):
+            return self.x + y
+
+    obj = Bar()
+    obj.x = 1
+    assert obj.foo(2) == 3
+    assert Bar.foo.cache_size() == 1
+
+    ref = weakref.ref(obj)
+    del obj
+    gc.collect()
+
+    assert ref() is None
+    assert Bar.foo.cache_size() == 0
+
+
 def test_ttl_cache_with_sets(monkeypatch):
     fake_time = [0]
     monkeypatch.setattr(time, "time", lambda: fake_time[0])

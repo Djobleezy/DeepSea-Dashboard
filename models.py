@@ -2,14 +2,14 @@
 Data models for the Bitcoin Mining Dashboard.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, Any
 from functools import lru_cache
 import logging
 import re
 
 
-@dataclass
+@dataclass(slots=True)
 class OceanData:
     """Data structure for Ocean.xyz pool mining data."""
 
@@ -64,7 +64,7 @@ class OceanData:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the OceanData object to a dictionary."""
-        return {k: v for k, v in self.__dict__.items()}
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OceanData":
@@ -76,7 +76,7 @@ class OceanData:
         return cls(**filtered_data)
 
 
-@dataclass
+@dataclass(slots=True)
 class WorkerData:
     """Data structure for individual worker information."""
 
@@ -135,7 +135,7 @@ class WorkerData:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the WorkerData object to a dictionary."""
-        return {k: v for k, v in self.__dict__.items()}
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorkerData":
