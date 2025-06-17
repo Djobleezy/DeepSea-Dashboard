@@ -284,6 +284,18 @@ def test_metrics_log_snapshot_omits_history(monkeypatch):
     assert "history" not in latest
 
 
+def test_metrics_log_snapshot_omits_workers(monkeypatch):
+    """metrics_log should not store workers field."""
+    mgr = StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    metrics = {"workers": [{"id": 1}, {"id": 2}]}
+    mgr.update_metrics_history(metrics)
+
+    latest = mgr.metrics_log[-1]["metrics"]
+    assert "workers" not in latest
+
+
 def test_close_closes_redis_connection():
     mgr = StateManager()
 

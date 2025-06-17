@@ -670,6 +670,7 @@ class StateManager:
             snapshot = metrics.copy()
             snapshot.pop("arrow_history", None)
             snapshot.pop("history", None)
+            snapshot.pop("workers", None)
 
             entry = {"timestamp": datetime.now().isoformat(), "metrics": snapshot}
             self.metrics_log.append(entry)
