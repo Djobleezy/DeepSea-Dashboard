@@ -74,6 +74,15 @@
                 volumeSlider.style.setProperty('--volume-progress-value', pct + '%');
             }
         };
+        const refreshAudioThemeColors = () => {
+            if (typeof getComputedStyle === 'function') {
+                rootStyle = getComputedStyle(document.documentElement);
+                primaryColor = rootStyle.getPropertyValue('--primary-color').trim();
+                primaryRgb = rootStyle.getPropertyValue('--primary-color-rgb').trim();
+            }
+            updateVolumeSliderStyle();
+            updateProgress();
+        };
         updateVolumeSliderStyle();
 
         let storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
@@ -250,6 +259,7 @@
         window.prevTrack = prevTrack;
         window.togglePlay = togglePlay;
         window.seekAudio = seekTo;
+        window.refreshAudioThemeColors = refreshAudioThemeColors;
 
         loadAndResume();
         updateProgress();

@@ -440,6 +440,10 @@ function applyDeepSeaTheme() {
             themeToggle.style.color = '#0088cc';
         }
 
+        if (window.refreshAudioThemeColors) {
+            window.refreshAudioThemeColors();
+        }
+
         console.log("DeepSea theme applied with color adjustments");
     } finally {
         // Reset the guard flag when done, even if there's an error
@@ -509,6 +513,10 @@ function applyMatrixTheme() {
 
         updateMatrixHeaderText();
         updateChartControlsLabel(true);
+
+        if (window.refreshAudioThemeColors) {
+            window.refreshAudioThemeColors();
+        }
 
         console.log('Matrix theme applied');
     } finally {
