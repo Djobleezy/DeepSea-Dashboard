@@ -6,6 +6,7 @@ import logging
 import re
 import time
 import json
+import gc
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
@@ -31,6 +32,16 @@ class CachedResponse:
     def json(self):
         """Parse JSON from the stored text."""
         return json.loads(self.text)
+
+
+def cleanup_soup(soup):
+    """Decompose a BeautifulSoup object and force garbage collection."""
+    if soup is not None:
+        try:
+            soup.decompose()
+        except Exception:
+            pass
+    gc.collect()
 
 
 class MiningDashboardService:
@@ -795,11 +806,7 @@ class MiningDashboardService:
                     response.close()
                 except Exception:
                     pass
-            if soup is not None:
-                try:
-                    soup.decompose()
-                except Exception:
-                    pass
+            cleanup_soup(soup)
 
     def debug_dump_table(self, table_element, max_rows=3):
         """
@@ -1089,8 +1096,7 @@ class MiningDashboardService:
                         break
                     page += 1
                 finally:
-                    if soup:
-                        soup.decompose()
+                    cleanup_soup(soup)
                     if resp:
                         try:
                             resp.close()
@@ -1463,7 +1469,7 @@ class MiningDashboardService:
                         all_rows.append(row_dict)
                     page_num += 1
                 finally:
-                    soup.decompose()
+                    cleanup_soup(soup)
             except Exception as e:
                 logging.error(f"Error fetching worker page {page_num}: {e}")
                 break
@@ -1844,11 +1850,7 @@ class MiningDashboardService:
                     response.close()
                 except Exception:
                     pass
-            if soup is not None:
-                try:
-                    soup.decompose()
-                except Exception:
-                    pass
+            cleanup_soup(soup)
 
     def get_worker_data_alternative(self):
         """

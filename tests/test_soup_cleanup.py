@@ -32,8 +32,11 @@ def test_soup_decomposed(monkeypatch):
             super().decompose()
 
     monkeypatch.setattr(data_service, "BeautifulSoup", TrackingSoup)
+    gc_called = {"flag": False}
+    monkeypatch.setattr(data_service.gc, "collect", lambda: gc_called.update(flag=True))
 
     svc.get_payment_history_scrape()
 
     assert created
     assert decomposed and len(decomposed) == len(created)
+    assert gc_called["flag"]
