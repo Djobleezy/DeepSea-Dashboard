@@ -1001,6 +1001,7 @@ class MiningDashboardService:
         soup = None
         try:
             page = 0
+            reached_limit = False
             while True:
                 url = f"{base_url}/stats/{self.wallet}?ppage={page}#payouts-fulltable"
                 resp = self.session.get(url, headers=headers, timeout=10)
@@ -1071,8 +1072,11 @@ class MiningDashboardService:
                         payments.append(payment)
 
                         if len(payments) >= MAX_PAYOUT_HISTORY_ENTRIES:
+                            reached_limit = True
                             break
 
+                    if reached_limit:
+                        break
                     page += 1
                 finally:
                     if soup:
@@ -1082,7 +1086,6 @@ class MiningDashboardService:
                             resp.close()
                         except Exception:
                             pass
-
             return payments[:MAX_PAYOUT_HISTORY_ENTRIES]
         except Exception as e:
             logging.error(f"Error scraping payment history: {e}")
