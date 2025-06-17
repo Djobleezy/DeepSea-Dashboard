@@ -34,3 +34,23 @@ def test_service_close_closes_worker(monkeypatch):
 
     assert worker.closed
 
+
+def test_service_purge_caches(monkeypatch):
+    """purge_caches should clear ttl_cache decorated methods."""
+    svc = MiningDashboardService(0, 0, "w")
+
+    called = {"cleared": False}
+
+    def dummy_cache_clear():
+        called["cleared"] = True
+
+    def dummy_func(self):
+        return "x"
+
+    dummy_func.cache_clear = dummy_cache_clear
+    setattr(svc, "dummy", dummy_func.__get__(svc, type(svc)))
+
+    svc.purge_caches()
+
+    assert called["cleared"]
+

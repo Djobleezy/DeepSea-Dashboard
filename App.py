@@ -387,13 +387,20 @@ def memory_watchdog():
 
             # 3. Clear any non-critical caches
             ds = globals().get("dashboard_service")
-            if ds and hasattr(ds, "cache"):
-                cache_obj = ds.cache
-                if hasattr(cache_obj, "purge"):
-                    cache_obj.purge()
-                elif hasattr(cache_obj, "clear"):
-                    cache_obj.clear()
-                logging.info("Cleared dashboard service cache")
+            if ds:
+                if hasattr(ds, "cache"):
+                    cache_obj = ds.cache
+                    if hasattr(cache_obj, "purge"):
+                        cache_obj.purge()
+                    elif hasattr(cache_obj, "clear"):
+                        cache_obj.clear()
+                    logging.info("Cleared dashboard service cache")
+                if hasattr(ds, "purge_caches"):
+                    try:
+                        ds.purge_caches()
+                        logging.info("Purged dashboard service caches")
+                    except Exception as e:
+                        logging.error(f"Error purging dashboard caches: {e}")
 
             # 4. Notify about the memory issue
             notification_service.add_notification(

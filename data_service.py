@@ -71,6 +71,16 @@ class MiningDashboardService:
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
 
+    def purge_caches(self):
+        """Clear any ttl_cache caches to free memory."""
+        for attr_name in dir(self):
+            attr = getattr(self, attr_name)
+            if hasattr(attr, "cache_clear"):
+                try:
+                    attr.cache_clear()
+                except Exception:
+                    pass
+
     def estimate_total_power(self, cached_metrics=None):
         """Estimate total power usage from worker data if available."""
         if not self.worker_service:
