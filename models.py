@@ -177,7 +177,29 @@ def convert_to_ths(value, unit):
         if value <= 0:
             return 0
 
-        unit = unit.lower() if unit else "th/s"
+        unit = unit.lower().strip() if unit else "th/s"
+        unit = unit.replace(" ", "")
+        unit = unit.replace("persecond", "/s").replace("persec", "/s")
+        if not unit.endswith("/s"):
+            replacements = {
+                "phs": "ph/s",
+                "ph": "ph/s",
+                "ehs": "eh/s",
+                "eh": "eh/s",
+                "ths": "th/s",
+                "th": "th/s",
+                "ghs": "gh/s",
+                "gh": "gh/s",
+                "mhs": "mh/s",
+                "mh": "mh/s",
+                "khs": "kh/s",
+                "kh": "kh/s",
+                "hs": "h/s",
+            }
+            for suffix, normalized in replacements.items():
+                if unit.endswith(suffix):
+                    unit = normalized
+                    break
 
         if "ph/s" in unit:
             return value * 1000  # 1 PH/s = 1000 TH/s

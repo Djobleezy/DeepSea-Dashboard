@@ -44,3 +44,16 @@ def test_negative_or_none_returns_zero():
 )
 def test_string_values(value, unit, expected):
     assert convert_to_ths(value, unit) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "value, unit, expected",
+    [
+        (1, "TH", 1),
+        (2, "PH", 2000),
+        (3, "GHs", 0.003),
+        (4, "mh", 0.000004),
+    ],
+)
+def test_unit_variants_without_slash(value, unit, expected):
+    assert convert_to_ths(value, unit) == pytest.approx(expected)
