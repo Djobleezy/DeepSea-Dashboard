@@ -204,7 +204,7 @@
 
         const updatePlayButton = () => {
             if (playBtn) {
-                playBtn.textContent = audio.paused ? '\u25BA' : '\u275A\u275A';
+                playBtn.textContent = audio.paused ? '\u25B6' : '\u275A\u275A';
             }
         };
 
