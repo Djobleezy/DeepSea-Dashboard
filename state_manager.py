@@ -651,7 +651,8 @@ class StateManager:
                 minute_groups = {}
                 for entry in entries:
                     minute = entry["time"][:5]  # extract HH:MM
-                    minute_groups[minute] = entry  # take last entry for that minute
+                    # Store a copy so pruned entries can be freed
+                    minute_groups[minute] = entry.copy()  # take last entry for that minute
 
                 # Sort by time to ensure chronological order
                 aggregated_history[key] = sorted(list(minute_groups.values()), key=lambda x: x["time"])

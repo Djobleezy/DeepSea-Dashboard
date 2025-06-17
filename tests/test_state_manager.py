@@ -357,3 +357,17 @@ def test_load_methods_cache_maxsize(monkeypatch):
     assert StateManager.load_graph_state.cache_size() <= 1
     assert StateManager.load_payout_history.cache_size() <= 1
     assert StateManager.load_last_earnings.cache_size() <= 1
+
+
+def test_update_metrics_history_copies_entries(monkeypatch):
+    """arrow_history in metrics should not reference internal state objects."""
+    mgr = StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    metrics = {"hashrate_60sec": 1, "hashrate_60sec_unit": "th/s"}
+    mgr.update_metrics_history(metrics)
+
+    state_entry = mgr.arrow_history["hashrate_60sec"][-1]
+    metrics_entry = metrics["arrow_history"]["hashrate_60sec"][-1]
+
+    assert metrics_entry is not state_entry
