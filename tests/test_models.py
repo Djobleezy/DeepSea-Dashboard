@@ -66,3 +66,9 @@ def test_model_to_from_dict():
     new_worker = WorkerData.from_dict(d)
     assert new_worker.name == worker.name
     assert new_worker.status == worker.status
+
+
+def test_dataclasses_use_slots():
+    """Verify that dataclasses define __slots__ for memory efficiency."""
+    assert hasattr(OceanData, "__slots__")
+    assert hasattr(WorkerData, "__slots__")
