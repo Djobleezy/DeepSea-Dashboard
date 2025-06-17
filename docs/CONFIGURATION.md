@@ -56,4 +56,6 @@ coded and not currently user configurable. See
 
 Expensive operations such as network requests, complex calculations and Redis queries are cached to reduce
 load on external services. Results are retained for up to 60 seconds before being refreshed. The built-in
-cache requires no configuration.
+cache requires no configuration. Caches use a time-to-live strategy and can be
+manually purged by calling the ``purge_caches`` method on the dashboard service
+or ``cache_purge`` on any ``ttl_cache`` decorated function.

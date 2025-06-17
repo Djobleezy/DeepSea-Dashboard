@@ -72,9 +72,14 @@ class MiningDashboardService:
         self.worker_service = worker_service
 
     def purge_caches(self):
-        """Clear any ttl_cache caches to free memory."""
+        """Purge or clear ttl_cache caches to free memory."""
         for attr_name in dir(self):
             attr = getattr(self, attr_name)
+            if hasattr(attr, "cache_purge"):
+                try:
+                    attr.cache_purge()
+                except Exception:
+                    pass
             if hasattr(attr, "cache_clear"):
                 try:
                     attr.cache_clear()

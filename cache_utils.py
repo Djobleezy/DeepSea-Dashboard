@@ -85,6 +85,14 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
                 cache.clear()
                 object_caches.clear()
 
+        def cache_purge():
+            """Purge expired items from all caches without clearing everything."""
+            now = time.time()
+            with lock:
+                _purge_expired(cache, now)
+                for c in list(object_caches.values()):
+                    _purge_expired(c, now)
+
         def cache_size():
             """Return the current number of cached entries after removing expired items."""
             now = time.time()
@@ -96,6 +104,7 @@ def ttl_cache(ttl_seconds=60, maxsize=None):
 
         wrapper.cache_clear = cache_clear
         wrapper.cache_size = cache_size
+        wrapper.cache_purge = cache_purge
         return wrapper
 
     return decorator

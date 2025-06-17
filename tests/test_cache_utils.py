@@ -183,3 +183,20 @@ def test_ttl_cache_with_sets(monkeypatch):
     fake_time[0] += 6
     assert sum_set({1, 2, 3}) == 6
     assert call_count["count"] == 2
+
+
+def test_ttl_cache_purge(monkeypatch):
+    """cache_purge removes expired items without clearing everything."""
+    fake_time = [0]
+    monkeypatch.setattr(time, "time", lambda: fake_time[0])
+
+    @ttl_cache(ttl_seconds=5)
+    def identity(x):
+        return x
+
+    identity(1)
+    assert identity.cache_size() == 1
+
+    fake_time[0] += 6
+    identity.cache_purge()
+    assert identity.cache_size() == 0
