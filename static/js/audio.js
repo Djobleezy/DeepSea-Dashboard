@@ -13,6 +13,9 @@
         let progressBar = document.getElementById('audio-progress');
         let timeDisplay = document.getElementById('audio-remaining');
         let showRemaining = true;
+        const rootStyle = getComputedStyle(document.documentElement);
+        const primaryColor = rootStyle.getPropertyValue('--primary-color').trim();
+        const primaryRgb = rootStyle.getPropertyValue('--primary-color-rgb').trim();
         if (!audio) { return; }
         const crossfadeDuration = 2;
         let isCrossfading = false;
@@ -258,7 +261,11 @@
                 timeDisplay = document.getElementById('audio-remaining');
             }
             if (progressBar && audio.duration) {
-                progressBar.value = (audio.currentTime / audio.duration) * 100;
+                const pct = (audio.currentTime / audio.duration) * 100;
+                progressBar.value = pct;
+                progressBar.style.setProperty('--audio-progress-value', pct + '%');
+                progressBar.style.background =
+                    `linear-gradient(to right, ${primaryColor} ${pct}%, rgba(${primaryRgb}, 0.2) ${pct}%)`;
             }
             if (timeDisplay && audio.duration) {
                 if (showRemaining) {

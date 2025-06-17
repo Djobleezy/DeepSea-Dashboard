@@ -1391,6 +1391,31 @@ const BitcoinMinuteRefresh = (function () {
 
       .audio-progress {
         width: 100%;
+        height: 6px;
+        margin-top: 4px;
+        appearance: none;
+        background-color: rgba(var(--primary-color-rgb, ${theme.rgb}), 0.2);
+        border: 1px solid rgba(var(--primary-color-rgb, ${theme.rgb}), 0.5);
+        border-radius: 2px;
+        background-image: linear-gradient(
+          to right,
+          var(--primary-color, ${theme.color}) var(--audio-progress-value, 0%),
+          rgba(var(--primary-color-rgb, ${theme.rgb}), 0.2) var(--audio-progress-value, 0%)
+        );
+        background-repeat: no-repeat;
+        cursor: pointer;
+      }
+
+      .audio-progress::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 0;
+        height: 0;
+      }
+
+      .audio-progress::-moz-range-thumb {
+        width: 0;
+        height: 0;
+        border: none;
       }
 
       .audio-remaining {
