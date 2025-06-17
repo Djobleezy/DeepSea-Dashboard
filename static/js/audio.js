@@ -68,6 +68,13 @@
                 volumeSlider.value = 100;
             }
         }
+        const updateVolumeSliderStyle = () => {
+            if (volumeSlider && volumeSlider.style) {
+                const pct = parseInt(volumeSlider.value, 10);
+                volumeSlider.style.setProperty('--volume-progress-value', pct + '%');
+            }
+        };
+        updateVolumeSliderStyle();
 
         let storedTime = parseFloat(localStorage.getItem('audioPlaybackTime'));
         const storedMuted = localStorage.getItem('audioMuted') === 'true';
@@ -317,6 +324,7 @@
                 audio.volume = volume;
                 nextAudio.volume = volume;
                 localStorage.setItem('audioVolume', volume.toString());
+                updateVolumeSliderStyle();
             });
         }
 
