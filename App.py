@@ -4,7 +4,6 @@ Main application module for the Bitcoin Mining Dashboard.
 
 import os
 import logging
-from logging.handlers import RotatingFileHandler
 import time
 import gc
 import psutil
@@ -22,14 +21,13 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask_caching import Cache
 from apscheduler.schedulers.background import BackgroundScheduler
-from notification_service import NotificationService, NotificationLevel, NotificationCategory
+from notification_service import NotificationLevel, NotificationCategory
 from urllib.parse import urlparse
+from data_service import MiningDashboardService
 
 # Import custom modules
 from config import load_config, save_config
-from data_service import MiningDashboardService
-from worker_service import WorkerService
-from state_manager import StateManager, MAX_HISTORY_ENTRIES
+from state_manager import MAX_HISTORY_ENTRIES
 from config import get_timezone
 from error_handlers import register_error_handlers
 from app_setup import (

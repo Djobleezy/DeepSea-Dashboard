@@ -12,5 +12,5 @@ except Exception:
     pass
 
 # Ensure logging.handlers exists for tests that monkeypatch it
-import logging.handlers
-import flask  # noqa: F401
+import logging.handlers  # noqa: F401,E402
+import flask  # noqa: F401,E402
