@@ -10,3 +10,7 @@ try:
     import pytz  # noqa: F401
 except Exception:
     pass
+
+# Ensure logging.handlers exists for tests that monkeypatch it
+import logging.handlers
+import flask  # noqa: F401

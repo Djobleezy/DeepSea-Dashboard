@@ -1,5 +1,7 @@
 import importlib
 import logging
+import logging.handlers
+import flask  # noqa: F401
 
 
 def test_reload_closes_previous_log_handlers(monkeypatch):

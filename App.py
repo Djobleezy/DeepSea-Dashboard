@@ -32,6 +32,12 @@ from worker_service import WorkerService
 from state_manager import StateManager, MAX_HISTORY_ENTRIES
 from config import get_timezone
 from error_handlers import register_error_handlers
+from app_setup import (
+    configure_logging,
+    init_state_manager,
+    init_services,
+    build_scheduler,
+)
 
 # Memory management configuration
 MEMORY_CONFIG = {
@@ -111,35 +117,10 @@ scheduler = None
 SERVER_START_TIME = datetime.now(ZoneInfo(get_timezone()))
 
 # Configure logging with rotation
-log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "dashboard.log")
+logger = configure_logging()
 
-log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-logger = logging.getLogger()
-logger.setLevel(getattr(logging, log_level, logging.INFO))
-
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-
-file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
-file_handler.setFormatter(formatter)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-
-# Close any existing handlers before replacing them to avoid leaks
-for handler in list(logger.handlers):
-    try:
-        handler.close()
-    except Exception:
-        pass
-logger.handlers.clear()
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-# Initialize state manager with Redis URL from environment
-redis_url = os.environ.get("REDIS_URL")
-state_manager = StateManager(redis_url)
+# Initialize state manager and services
+state_manager = init_state_manager()
 
 # Close any previous state manager instance to prevent resource leaks
 if _previous_state_manager:
@@ -150,8 +131,7 @@ if _previous_state_manager:
     finally:
         _previous_state_manager = None
 
-# Initialize notification service after state_manager
-notification_service = NotificationService(state_manager)
+dashboard_service, worker_service, notification_service = init_services(state_manager)
 
 # Close any previous notification service instance to prevent leaks
 if _previous_notification_service:
@@ -616,49 +596,22 @@ def scheduler_watchdog():
 def create_scheduler():
     """Create and configure a new scheduler instance with proper error handling."""
     try:
-        # Stop existing scheduler if it exists
         global scheduler
         if "scheduler" in globals() and scheduler:
             try:
-                # Check if scheduler is running before attempting to shut it down
                 if hasattr(scheduler, "running") and scheduler.running:
                     logging.info("Shutting down existing scheduler before creating a new one")
                     scheduler.shutdown(wait=True)
             except Exception as e:
                 logging.error(f"Error shutting down existing scheduler: {e}")
 
-        # Create a new scheduler with more robust configuration
-        new_scheduler = BackgroundScheduler(
-            job_defaults={
-                "coalesce": True,  # Combine multiple missed runs into a single one
-                "max_instances": 1,  # Prevent job overlaps
-                "misfire_grace_time": 30,  # Allow misfires up to 30 seconds
-            }
+        new_scheduler = build_scheduler(
+            update_metrics_job,
+            scheduler_watchdog,
+            memory_watchdog,
+            check_for_memory_leaks,
+            scheduler_cls=BackgroundScheduler,
         )
-
-        # Add the update job
-        new_scheduler.add_job(
-            func=update_metrics_job, trigger="interval", seconds=60, id="update_metrics_job", replace_existing=True
-        )
-
-        # Add watchdog job - runs every 30 seconds to check scheduler health
-        new_scheduler.add_job(
-            func=scheduler_watchdog, trigger="interval", seconds=30, id="scheduler_watchdog", replace_existing=True
-        )
-
-        # Add memory watchdog job - runs every 5 minutes
-        new_scheduler.add_job(
-            func=memory_watchdog, trigger="interval", minutes=5, id="memory_watchdog", replace_existing=True
-        )
-
-        # Add memory leak check job - runs every hour
-        new_scheduler.add_job(
-            func=check_for_memory_leaks, trigger="interval", hours=1, id="memory_leak_check", replace_existing=True
-        )
-
-        # Start the scheduler
-        new_scheduler.start()
-        logging.info("Scheduler created and started successfully")
         scheduler = new_scheduler
         return new_scheduler
     except Exception as e:
@@ -1854,25 +1807,7 @@ def api_earnings():
 # Add the middleware
 app.wsgi_app = RobustMiddleware(app.wsgi_app)
 
-# Update this section in App.py to properly initialize services
-
-# Initialize the dashboard service with network fee parameter
-config = load_config()
-dashboard_service = MiningDashboardService(
-    config.get("power_cost", 0.0),
-    config.get("power_usage", 0.0),
-    config.get("wallet"),
-    network_fee=config.get("network_fee", 0.0),
-    worker_service=None,
-)
-worker_service = WorkerService()
-# Connect the services
-if hasattr(dashboard_service, "set_worker_service"):
-    dashboard_service.set_worker_service(worker_service)
-worker_service.set_dashboard_service(dashboard_service)
-notification_service.dashboard_service = dashboard_service
-
-# Close any previous dashboard service instance to avoid resource leaks
+# Services initialized earlier by init_services()
 if _previous_dashboard_service:
     try:
         _previous_dashboard_service.close()
