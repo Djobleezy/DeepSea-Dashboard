@@ -18,13 +18,31 @@ earnings_bp = Blueprint("earnings", __name__)
 
 _dashboard_service: Any | None = None
 _state_manager: Any | None = None
+_services_initialized = False
 
 
 def init_earnings_routes(dashboard_service: Any, state_manager: Any) -> None:
     """Initialize the blueprint with required services."""
-    global _dashboard_service, _state_manager
+    global _dashboard_service, _state_manager, _services_initialized
     _dashboard_service = dashboard_service
     _state_manager = state_manager
+    _services_initialized = dashboard_service is not None and state_manager is not None
+    logging.info(f"Earnings routes initialized: {_services_initialized}")
+
+
+def check_services() -> tuple[bool, str]:
+    """Check if required services are initialized.
+
+    Returns:
+        Tuple of (is_initialized, error_message)
+    """
+    if not _services_initialized:
+        return False, "Services not properly initialized"
+    if _dashboard_service is None:
+        return False, "Dashboard service not available"
+    if _state_manager is None:
+        return False, "State manager not available"
+    return True, ""
 
 
 @earnings_bp.app_template_filter("format_datetime")
@@ -74,6 +92,14 @@ def payments_to_csv(payments: list[dict[str, Any]]) -> str:
 def earnings() -> Any:
     """Serve the earnings page with user's currency and timezone preferences."""
     try:
+        services_ok, error_msg = check_services()
+        if not services_ok:
+            logging.error(f"Services check failed: {error_msg}")
+            return render_template(
+                "error.html",
+                message=f"Service unavailable: {error_msg}. Please try again later.",
+            ), 503
+
         user_currency = get_currency()
         user_timezone = get_timezone()
 
@@ -140,6 +166,11 @@ def earnings() -> Any:
 def api_earnings() -> Any:
     """API endpoint for earnings data."""
     try:
+        services_ok, error_msg = check_services()
+        if not services_ok:
+            logging.error(f"Services check failed: {error_msg}")
+            return jsonify({"error": error_msg}), 503
+
         earnings_data = _dashboard_service.get_earnings_data()
         if not isinstance(earnings_data, dict) or earnings_data.get("error"):
             if isinstance(earnings_data, dict):
@@ -163,6 +194,11 @@ def api_earnings() -> Any:
 def payout_history() -> Any:
     """Manage payout history through a simple REST style interface."""
     try:
+        services_ok, error_msg = check_services()
+        if not services_ok:
+            logging.error(f"Services check failed: {error_msg}")
+            return jsonify({"error": error_msg}), 503
+
         if request.method == "GET":
             history = _state_manager.get_payout_history()
             return jsonify({"payout_history": history})
@@ -202,4 +238,5 @@ __all__ = [
     "payout_history",
     "payments_to_csv",
     "format_datetime",
+    "check_services",
 ]

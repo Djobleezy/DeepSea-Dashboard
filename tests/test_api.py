@@ -150,6 +150,19 @@ def test_payout_history_endpoint(client):
     assert resp.get_json()["payout_history"] == []
 
 
+def test_payout_history_missing_services_returns_503(client):
+    import earnings_routes
+
+    earnings_routes._dashboard_service = None
+    earnings_routes._state_manager = None
+    earnings_routes._services_initialized = False
+
+    resp = client.get("/api/payout-history")
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["error"]
+
+
 def test_block_events_endpoint(client):
     import App
     from datetime import datetime, timedelta
@@ -459,6 +472,19 @@ def test_earnings_returns_generic_error(client, monkeypatch):
     assert resp.status_code == 500
     data = resp.get_json()
     assert data["error"] == "internal server error"
+
+
+def test_earnings_missing_services_returns_503(client):
+    import earnings_routes
+
+    earnings_routes._dashboard_service = None
+    earnings_routes._state_manager = None
+    earnings_routes._services_initialized = False
+
+    resp = client.get("/api/earnings")
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["error"]
 
 
 def test_reset_chart_data_hashrate_only(client):
