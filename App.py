@@ -5,9 +5,9 @@ Main application module for the Bitcoin Mining Dashboard.
 import os
 import logging
 import time
-import gc
+import gc  # noqa: F401 - re-exported for tests
 import psutil
-from collections import deque
+from collections import deque  # noqa: F401 - re-exported for tests
 from json_utils import convert_deques
 import signal
 import sys
@@ -36,12 +36,12 @@ from app_setup import (
 )
 
 from memory_manager import (
-    memory_usage_history,
-    memory_usage_lock,
+    memory_usage_history,  # noqa: F401 - re-exported for tests
+    memory_usage_lock,  # noqa: F401 - re-exported for tests
     last_leak_check_time,  # noqa: F401 - re-exported for tests
     object_counts_history,  # noqa: F401 - re-exported for tests
     leak_growth_tracker,  # noqa: F401 - re-exported for tests
-    log_memory_usage,
+    log_memory_usage,  # noqa: F401 - re-exported for tests
     adaptive_gc,  # noqa: F401 - re-exported for tests
     check_for_memory_leaks,  # noqa: F401 - re-exported for tests
     record_memory_metrics,  # noqa: F401 - used in tests via re-export
@@ -54,6 +54,7 @@ import sse_service
 import notification_routes
 import scheduler_service
 import config_routes
+import memory_routes
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -153,6 +154,7 @@ config_routes.init_config_routes(
     update_metrics_job,
 )
 app.register_blueprint(config_routes.config_bp)
+app.register_blueprint(memory_routes.memory_bp)
 
 # Initialize memory manager with required dependencies
 init_memory_manager(
@@ -552,134 +554,6 @@ def force_refresh():
         return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
-@app.route("/api/memory-profile")
-def memory_profile():
-    """API endpoint for detailed memory profiling."""
-    try:
-        process = psutil.Process(os.getpid())
-
-        # Get detailed memory info
-        mem_info = process.memory_info()
-
-        # Count objects by type
-        type_counts = {}
-        for obj in gc.get_objects():
-            obj_type = type(obj).__name__
-            if obj_type not in type_counts:
-                type_counts[obj_type] = 0
-            type_counts[obj_type] += 1
-
-        # Sort types by count
-        most_common = sorted([(k, v) for k, v in type_counts.items()], key=lambda x: x[1], reverse=True)[:15]
-
-        # Get memory usage history stats
-        memory_trend = {}
-        if memory_usage_history:
-            recent = memory_usage_history[-1]
-            oldest = memory_usage_history[0] if len(memory_usage_history) > 1 else recent
-            memory_trend = {
-                "oldest_timestamp": oldest.get("timestamp"),
-                "recent_timestamp": recent.get("timestamp"),
-                "growth_mb": recent.get("rss_mb", 0) - oldest.get("rss_mb", 0),
-                "growth_percent": recent.get("percent", 0) - oldest.get("percent", 0),
-            }
-
-        # Return comprehensive memory profile
-        return jsonify(
-            {
-                "memory": {
-                    "rss_mb": mem_info.rss / 1024 / 1024,
-                    "vms_mb": mem_info.vms / 1024 / 1024,
-                    "percent": process.memory_percent(),
-                    "data_structures": {
-                        "arrow_history": {
-                            "entries": sum(
-                                len(v) for v in state_manager.get_history().values() if isinstance(v, (list, deque))
-                            ),
-                            "keys": list(state_manager.get_history().keys()),
-                        },
-                        "metrics_log": {"entries": len(state_manager.get_metrics_log())},
-                        "memory_usage_history": {"entries": len(memory_usage_history)},
-                        "sse_connections": sse_service.active_sse_connections,
-                    },
-                    "most_common_objects": dict(most_common),
-                    "trend": memory_trend,
-                },
-                "gc": {
-                    "garbage": len(gc.garbage),
-                    "counts": gc.get_count(),
-                    "threshold": gc.get_threshold(),
-                    "enabled": gc.isenabled(),
-                },
-                "system": {
-                    "uptime_seconds": (datetime.now(ZoneInfo(get_timezone())) - SERVER_START_TIME).total_seconds(),
-                    "python_version": sys.version,
-                },
-            }
-        )
-    except Exception as e:
-        logging.error(f"Error in memory profiling: {e}")
-        return jsonify({"error": "internal server error"}), 500
-
-
-@app.route("/api/memory-history")
-def memory_history():
-    """API endpoint for memory usage history."""
-    with memory_usage_lock:
-        history_copy = list(memory_usage_history)
-    return jsonify(
-        {
-            "history": history_copy,
-            "current": {
-                "rss_mb": psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024,
-                "percent": psutil.Process(os.getpid()).memory_percent(),
-            },
-        }
-    )
-
-
-@app.route("/api/force-gc", methods=["POST"])
-def force_gc():
-    """Force Python's garbage collector to run.
-
-    The optional JSON payload may include a ``generation`` key specifying
-    which GC generation to target (0-2). The endpoint returns statistics
-    about the collection including number of objects collected and the
-    duration of the run.
-    """
-    try:
-        generation = request.json.get("generation", 2) if request.is_json else 2
-
-        # Validate generation parameter
-        if generation not in [0, 1, 2]:
-            generation = 2
-
-        # Run GC and time it
-        start_time = time.time()
-        objects_before = len(gc.get_objects())
-
-        # Perform collection
-        collected = gc.collect(generation)
-
-        # Get stats
-        duration = time.time() - start_time
-        objects_after = len(gc.get_objects())
-
-        # Log memory usage after collection
-        log_memory_usage()
-
-        return jsonify(
-            {
-                "status": "success",
-                "collected": collected,
-                "duration_seconds": duration,
-                "objects_removed": objects_before - objects_after,
-                "generation": generation,
-            }
-        )
-    except Exception as e:
-        logging.error(f"Error during forced GC: {e}")
-        return jsonify({"status": "error", "message": "internal server error"}), 500
 
 
 
