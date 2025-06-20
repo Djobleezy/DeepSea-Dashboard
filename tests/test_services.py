@@ -838,3 +838,37 @@ def test_fetch_metrics_cancels_futures(monkeypatch):
 
     assert svc.fetch_metrics() is None
     assert ocean_future.cancelled and btc_future.cancelled
+
+
+def test_avg_days_between_payouts_fallback(monkeypatch):
+    svc = MiningDashboardService(0, 0, "w")
+
+    payments = [
+        {
+            "date": "2025-05-01 00:00",
+            "txid": "tx1",
+            "amount_btc": 0.000001,
+            "amount_sats": 100,
+            "status": "confirmed",
+            "date_iso": None,
+        },
+        {
+            "date": "2025-04-25 00:00",
+            "txid": "tx2",
+            "amount_btc": 0.000001,
+            "amount_sats": 100,
+            "status": "confirmed",
+            "date_iso": None,
+        },
+    ]
+
+    monkeypatch.setattr(svc, "get_payment_history_api", lambda days=360, btc_price=None: payments)
+    monkeypatch.setattr(svc, "get_payment_history_scrape", lambda btc_price=None: payments)
+    monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("config.get_currency", lambda: "USD")
+    monkeypatch.setattr(svc, "get_ocean_data", lambda: data_service.OceanData())
+    monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 0, 20000, 0))
+
+    data = svc.get_earnings_data()
+
+    assert data["avg_days_between_payouts"] == 6.0

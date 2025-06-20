@@ -44,6 +44,24 @@ def cleanup_soup(soup):
     gc.collect()
 
 
+def parse_payment_date(payment):
+    """Return a datetime for a payout entry using available date fields."""
+    tz = ZoneInfo(get_timezone())
+    dt = None
+    if payment.get("date_iso"):
+        try:
+            dt = datetime.fromisoformat(payment["date_iso"])
+        except Exception:
+            dt = None
+    if dt is None and payment.get("date"):
+        try:
+            dt = datetime.strptime(payment["date"], "%Y-%m-%d %H:%M")
+            dt = dt.replace(tzinfo=tz)
+        except Exception:
+            dt = None
+    return dt
+
+
 class MiningDashboardService:
     """Service for fetching and processing mining dashboard data."""
 
@@ -1183,9 +1201,10 @@ class MiningDashboardService:
             avg_payment = total_paid / len(payments) if payments else 0
             avg_payment_sats = int(round(avg_payment * self.sats_per_btc)) if avg_payment else 0
 
-            # Calculate average days between payouts using date_iso fields
+            # Calculate average days between payouts using date_iso or date fields
             avg_days_between_payouts = None
-            payout_dates = [datetime.fromisoformat(p["date_iso"]) for p in payments if p.get("date_iso")]
+            payout_dates = [parse_payment_date(p) for p in payments]
+            payout_dates = [d for d in payout_dates if d is not None]
             payout_dates.sort(reverse=True)
             if len(payout_dates) >= 2:
                 deltas = [
