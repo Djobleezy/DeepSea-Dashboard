@@ -6,6 +6,7 @@ from collections import deque
 def test_record_memory_metrics_prunes_in_place(monkeypatch):
     App = importlib.reload(importlib.import_module("App"))
     import memory_manager
+    import sse_service
     history = deque(maxlen=3)
     App.memory_usage_history = history
     memory_manager.memory_usage_history = history
@@ -20,7 +21,7 @@ def test_record_memory_metrics_prunes_in_place(monkeypatch):
 
     monkeypatch.setattr(App.psutil, "Process", lambda pid: DummyProc())
     monkeypatch.setattr(App, "get_timezone", lambda: "UTC")
-    App.active_sse_connections = 0
+    sse_service.active_sse_connections = 0
 
     for _ in range(5):
         App.record_memory_metrics()

@@ -22,6 +22,7 @@ def sse_client(monkeypatch):
 
     monkeypatch.setattr(bg.BackgroundScheduler, "start", lambda self: None)
 
+    importlib.reload(importlib.import_module("sse_service"))
     App = importlib.reload(importlib.import_module("App"))
 
     monkeypatch.setattr(App, "update_metrics_job", lambda force=False: None)
@@ -42,8 +43,9 @@ def parse_events(data):
 
 def test_stream_returns_data_when_cached(sse_client, monkeypatch):
     import App
+    import sse_service
 
-    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    monkeypatch.setattr(sse_service, "MAX_SSE_CONNECTION_TIME", 0)
     monkeypatch.setattr(App.time, "sleep", lambda x: None)
     App.cached_metrics = {"server_timestamp": 1, "val": 42}
 
@@ -55,10 +57,10 @@ def test_stream_returns_data_when_cached(sse_client, monkeypatch):
 
 
 def test_stream_connection_limit(sse_client, monkeypatch):
-    import App
+    import sse_service
 
-    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
-    App.active_sse_connections = App.MAX_SSE_CONNECTIONS
+    monkeypatch.setattr(sse_service, "MAX_SSE_CONNECTION_TIME", 0)
+    sse_service.active_sse_connections = sse_service.MAX_SSE_CONNECTIONS
     resp = sse_client.get("/stream")
     assert resp.status_code == 200
     body = resp.data.decode()
@@ -68,9 +70,10 @@ def test_stream_connection_limit(sse_client, monkeypatch):
 def test_stream_converts_deque(sse_client, monkeypatch):
     """SSE output should convert deque objects to lists."""
     import App
+    import sse_service
     from collections import deque
 
-    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    monkeypatch.setattr(sse_service, "MAX_SSE_CONNECTION_TIME", 0)
     monkeypatch.setattr(App.time, "sleep", lambda x: None)
     App.cached_metrics = {"server_timestamp": 1, "history": deque([1, 2])}
 
@@ -83,26 +86,27 @@ def test_stream_converts_deque(sse_client, monkeypatch):
 def test_stream_decrements_active_connections(sse_client, monkeypatch):
     """active_sse_connections should return to zero after stream ends."""
     import App
+    import sse_service
 
-    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
+    monkeypatch.setattr(sse_service, "MAX_SSE_CONNECTION_TIME", 0)
     monkeypatch.setattr(App.time, "sleep", lambda x: None)
-    App.active_sse_connections = 0
+    sse_service.active_sse_connections = 0
     App.cached_metrics = {"server_timestamp": 1}
 
     resp = sse_client.get("/stream")
     assert resp.status_code == 200
     _ = resp.data  # consume generator
-    assert App.active_sse_connections == 0
+    assert sse_service.active_sse_connections == 0
 
 
 def test_stream_connection_limit_does_not_decrement(sse_client, monkeypatch):
     """Connection limit errors should not change active_sse_connections."""
-    import App
+    import sse_service
 
-    monkeypatch.setattr(App, "MAX_SSE_CONNECTION_TIME", 0)
-    App.active_sse_connections = App.MAX_SSE_CONNECTIONS
+    monkeypatch.setattr(sse_service, "MAX_SSE_CONNECTION_TIME", 0)
+    sse_service.active_sse_connections = sse_service.MAX_SSE_CONNECTIONS
 
     resp = sse_client.get("/stream")
     assert resp.status_code == 200
     _ = resp.data  # consume generator
-    assert App.active_sse_connections == App.MAX_SSE_CONNECTIONS
+    assert sse_service.active_sse_connections == sse_service.MAX_SSE_CONNECTIONS

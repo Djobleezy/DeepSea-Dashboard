@@ -12,11 +12,10 @@ from json_utils import convert_deques
 import signal
 import sys
 import threading
-import json
 import requests
 import csv
 import io
-from flask import Flask, render_template, jsonify, Response, request, stream_with_context
+from flask import Flask, Response, jsonify, render_template, request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask_caching import Cache
@@ -27,7 +26,6 @@ from data_service import MiningDashboardService
 
 # Import custom modules
 from config import load_config, save_config
-from state_manager import MAX_HISTORY_ENTRIES
 from config import get_timezone
 from error_handlers import register_error_handlers
 from app_setup import (
@@ -52,9 +50,14 @@ from memory_manager import (
     init_memory_manager,
 )
 
+import sse_service
+
 # Initialize Flask app
 app = Flask(__name__)
 register_error_handlers(app)
+
+sse_service.init_sse_service(lambda: cached_metrics)
+app.register_blueprint(sse_service.sse_bp)
 
 
 @app.context_processor
@@ -66,11 +69,7 @@ def inject_request():
 # Set up caching using a simple in-memory cache
 cache = Cache(app, config={"CACHE_TYPE": "SimpleCache", "CACHE_DEFAULT_TIMEOUT": 10})
 
-# Global variables for SSE connections and metrics
-MAX_SSE_CONNECTIONS = 50  # Maximum concurrent SSE connections
-MAX_SSE_CONNECTION_TIME = 900  # 15 minutes maximum SSE connection time
-active_sse_connections = 0
-sse_connections_lock = threading.Lock()
+# SSE connection tracking moved to ``sse_service``
 
 # Allowed paths and limits for the batch API
 MAX_BATCH_REQUESTS = 10
@@ -142,7 +141,7 @@ init_memory_manager(
     state_manager,
     notification_service,
     lambda: dashboard_service,
-    lambda: active_sse_connections,
+    lambda: sse_service.active_sse_connections,
 )
 
 
@@ -401,130 +400,7 @@ def commafy(value):
         return value
 
 
-# --- Fixed SSE Endpoint with proper request context handling ---
-@app.route("/stream")
-def stream():
-    """SSE endpoint for real-time updates."""
-    # Capture request information that will be needed inside the generator.
-    try:
-        start_event_id = int(request.headers.get("Last-Event-ID", 0))
-    except ValueError:
-        start_event_id = 0
-
-    # The server now always streams the full history (MAX_HISTORY_ENTRIES)
-    num_points = MAX_HISTORY_ENTRIES
-
-    def event_stream(start_event_id, num_points):
-        """Yield Server-Sent Events for dashboard updates."""
-        global active_sse_connections, cached_metrics
-        client_id = None
-        incremented = False
-
-        try:
-            # Check if we're at the connection limit
-            with sse_connections_lock:
-                if active_sse_connections >= MAX_SSE_CONNECTIONS:
-                    logging.warning(f"Connection limit reached ({MAX_SSE_CONNECTIONS}), refusing new SSE connection")
-                    yield 'data: {"error": "Too many connections, please try again later", "retry": 5000}\n\n'
-                    return
-
-                active_sse_connections += 1
-                incremented = True
-                client_id = f"client-{int(time.time() * 1000) % 10000}"
-                logging.info(f"SSE {client_id}: Connection established (total: {active_sse_connections})")
-
-            # Set a maximum connection time - increased to 15 minutes for better user experience
-            end_time = time.time() + MAX_SSE_CONNECTION_TIME
-            last_timestamp = None
-            last_ping_time = time.time()
-
-            logging.info(f"SSE {client_id}: Streaming {num_points} history points")
-
-            # Send initial data immediately to prevent delay in dashboard updates
-            if cached_metrics:
-                initial_data = json.dumps(convert_deques(cached_metrics))
-                yield f"data: {initial_data}\n\n"
-                last_timestamp = cached_metrics.get("server_timestamp")
-            else:
-                # Send ping if no data available yet
-                yield f'data: {{"type": "ping", "client_id": "{client_id}"}}\n\n'
-
-            # Main event loop with improved error handling
-            while time.time() < end_time:
-                try:
-                    # Send data only if it's changed
-                    if cached_metrics and cached_metrics.get("server_timestamp") != last_timestamp:
-                        # Create a slimmer version with essential fields for SSE updates
-                        sse_metrics = {k: v for k, v in cached_metrics.items()}
-
-                        # Trim history if necessary
-
-                        # If arrow_history is very large, only send the configured number of points
-                        if "arrow_history" in sse_metrics:
-                            for key, values in sse_metrics["arrow_history"].items():
-                                if len(values) > num_points:
-                                    sse_metrics["arrow_history"][key] = values[-num_points:]
-
-                        # Serialize data only once, converting deques to lists
-                        data = json.dumps(convert_deques(sse_metrics))
-                        last_timestamp = cached_metrics.get("server_timestamp")
-                        yield f"data: {data}\n\n"
-
-                    # Send regular pings about every 30 seconds to keep connection alive
-                    if time.time() - last_ping_time >= 30:
-                        last_ping_time = time.time()
-                        yield (
-                            f'data: {{"type": "ping", "time": {int(last_ping_time)}, '
-                            f'"connections": {active_sse_connections}}}\n\n'
-                        )
-
-                    # Sleep to reduce CPU usage
-                    time.sleep(1)
-
-                    # Warn client 60 seconds before timeout so client can prepare to reconnect
-                    remaining_time = end_time - time.time()
-                    if remaining_time < 60 and int(remaining_time) % 15 == 0:  # Every 15 sec in last minute
-                        yield f'data: {{"type": "timeout_warning", "remaining": {int(remaining_time)}}}\n\n'
-
-                except Exception as e:
-                    logging.error(f"SSE {client_id}: Error in stream: {e}")
-                    time.sleep(2)  # Prevent tight error loops
-
-            # Connection timeout reached - send a reconnect instruction to client
-            logging.info(f"SSE {client_id}: Connection timeout reached ({MAX_SSE_CONNECTION_TIME}s)")
-            yield 'data: {"type": "timeout", "message": "Connection timeout reached", "reconnect": true}\n\n'
-
-        except GeneratorExit:
-            # This is how we detect client disconnection
-            logging.info(f"SSE {client_id}: Client disconnected (GeneratorExit)")
-            # Don't yield here - just let the generator exit normally
-
-        finally:
-            # Always decrement the connection counter when a connection was established
-            with sse_connections_lock:
-                if incremented:
-                    active_sse_connections = max(0, active_sse_connections - 1)
-                logging.info(
-                    f"SSE {client_id}: Connection closed (remaining: {active_sse_connections})"
-                )
-
-    # Configure response with improved error handling
-    try:
-        response = Response(stream_with_context(event_stream(start_event_id, num_points)), mimetype="text/event-stream")
-        response.headers["Cache-Control"] = "no-cache"
-        response.headers["X-Accel-Buffering"] = "no"  # Disable nginx buffering
-        response.headers["Access-Control-Allow-Origin"] = "*"  # Allow CORS
-        return response
-    except Exception as e:
-        logging.error(f"Error creating SSE response: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-
-
-# Duplicate stream endpoint for the dashboard path
-@app.route("/dashboard/stream")
-def dashboard_stream():
-    """Duplicate of the stream endpoint for the dashboard route."""
-    return stream()
+# SSE routes are provided by ``sse_service`` and registered below
 
 
 # --- Routes ---
@@ -893,7 +769,7 @@ def health_check():
         "uptime_formatted": (
             f"{int(uptime_seconds // 3600)}h " f"{int((uptime_seconds % 3600) // 60)}m " f"{int(uptime_seconds % 60)}s"
         ),
-        "connections": active_sse_connections,
+        "connections": sse_service.active_sse_connections,
         "memory": {
             "usage_mb": round(memory_usage_mb, 2),
             "percent": round(memory_percent, 2),
@@ -1038,7 +914,7 @@ def memory_profile():
                         },
                         "metrics_log": {"entries": len(state_manager.get_metrics_log())},
                         "memory_usage_history": {"entries": len(memory_usage_history)},
-                        "sse_connections": active_sse_connections,
+                        "sse_connections": sse_service.active_sse_connections,
                     },
                     "most_common_objects": dict(most_common),
                     "trend": memory_trend,
@@ -1650,7 +1526,10 @@ def graceful_shutdown(signum, frame):
             logging.error(f"Error closing log handler: {e}")
 
     # Log connection info before exit
-    logging.info(f"Active SSE connections at shutdown: {active_sse_connections}")
+    logging.info(
+        "Active SSE connections at shutdown: %s",
+        sse_service.active_sse_connections,
+    )
 
     # Exit with success code
     sys.exit(0)
