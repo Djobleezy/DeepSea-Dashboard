@@ -18,14 +18,14 @@ def server(monkeypatch):
     monkeypatch.setattr(bg.BackgroundScheduler, "start", lambda self: None)
     monkeypatch.setattr(App, "update_metrics_job", lambda force=False: None)
     monkeypatch.setattr(App.worker_service, "set_dashboard_service", lambda *a, **k: None)
+    monkeypatch.setattr(
+        App.worker_service,
+        "get_workers_data",
+        lambda *a, **k: App.worker_service.generate_default_workers_data(),
+    )
 
-    App.cached_metrics = {
-        "workers_hashing": 1,
-        "total_last_share": "now",
-        "blocks_found": "1",
-        "hashrate_10min": 10,
-        "hashrate_10min_unit": "TH/s",
-    }
+    # Force dashboard routes to fall back to default metrics
+    App.cached_metrics = None
 
     sample_history = [
         {
