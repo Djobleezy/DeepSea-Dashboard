@@ -8,6 +8,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 @pytest.fixture(scope="function")
@@ -88,8 +89,31 @@ def test_click_all_elements(server):
     try:
         pages = ["/dashboard", "/workers", "/earnings", "/blocks", "/notifications"]
 
+        selectors = [
+            ".metric-value",
+            ".summary-stat-value",
+            ".stat-value",
+            "#workers-count",
+            "#notifications-container",
+        ]
+
         for page in pages:
             driver.get(server + page)
+
+            # Wait briefly for metrics to populate
+            WebDriverWait(driver, 3).until(
+                lambda d: any(
+                    e.text.strip()
+                    for css in selectors
+                    for e in d.find_elements(By.CSS_SELECTOR, css)
+                )
+            )
+
+            # Capture metrics before interacting with the page
+            elements = []
+            for selector in selectors:
+                elements.extend(driver.find_elements(By.CSS_SELECTOR, selector))
+            assert any(e.text.strip() for e in elements)
 
             # Click all links and buttons on the page
             clickable = driver.find_elements(By.CSS_SELECTOR, "a, button")
@@ -98,19 +122,6 @@ def test_click_all_elements(server):
                     elem.click()
                 except Exception:
                     pass
-
-            # Ensure metrics or summary stats contain text
-            selectors = [
-                ".metric-value",
-                ".summary-stat-value",
-                ".stat-value",
-                "#workers-count",
-                "#notifications-container",
-            ]
-            elements = []
-            for selector in selectors:
-                elements.extend(driver.find_elements(By.CSS_SELECTOR, selector))
-            assert any(e.text.strip() for e in elements)
 
         # Specifically verify the payout summary on the dashboard
         driver.get(server + "/dashboard")
