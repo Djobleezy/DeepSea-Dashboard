@@ -13,12 +13,7 @@ from typing import Any
 import psutil
 from flask import Blueprint, jsonify, request
 
-from memory_manager import (
-    memory_usage_history,
-    memory_usage_lock,
-    log_memory_usage,
-    state_manager,
-)
+import memory_manager as mm
 import sse_service
 
 memory_bp = Blueprint("memory", __name__)
@@ -38,9 +33,9 @@ def memory_profile() -> Any:
         most_common = sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:15]
 
         memory_trend: dict[str, Any] = {}
-        if memory_usage_history:
-            recent = memory_usage_history[-1]
-            oldest = memory_usage_history[0] if len(memory_usage_history) > 1 else recent
+        if mm.memory_usage_history:
+            recent = mm.memory_usage_history[-1]
+            oldest = mm.memory_usage_history[0] if len(mm.memory_usage_history) > 1 else recent
             memory_trend = {
                 "oldest_timestamp": oldest.get("timestamp"),
                 "recent_timestamp": recent.get("timestamp"),
@@ -59,13 +54,13 @@ def memory_profile() -> Any:
                         "arrow_history": {
                             "entries": sum(
                                 len(v)
-                                for v in state_manager.get_history().values()
+                                for v in mm.state_manager.get_history().values()
                                 if isinstance(v, (list, deque))
                             ),
-                            "keys": list(state_manager.get_history().keys()),
+                            "keys": list(mm.state_manager.get_history().keys()),
                         },
-                        "metrics_log": {"entries": len(state_manager.get_metrics_log())},
-                        "memory_usage_history": {"entries": len(memory_usage_history)},
+                        "metrics_log": {"entries": len(mm.state_manager.get_metrics_log())},
+                        "memory_usage_history": {"entries": len(mm.memory_usage_history)},
                         "sse_connections": sse_service.active_sse_connections,
                     },
                     "most_common_objects": dict(most_common),
@@ -91,8 +86,8 @@ def memory_profile() -> Any:
 @memory_bp.route("/api/memory-history")
 def memory_history() -> Any:
     """Return historical memory usage metrics."""
-    with memory_usage_lock:
-        history_copy = list(memory_usage_history)
+    with mm.memory_usage_lock:
+        history_copy = list(mm.memory_usage_history)
     process = psutil.Process(os.getpid())
     return jsonify(
         {
@@ -117,7 +112,7 @@ def force_gc() -> Any:
         collected = gc.collect(generation)
         duration = time.time() - start_time
         objects_after = len(gc.get_objects())
-        log_memory_usage()
+        mm.log_memory_usage()
         return jsonify(
             {
                 "status": "success",

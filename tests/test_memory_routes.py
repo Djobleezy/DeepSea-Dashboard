@@ -2,6 +2,7 @@ import importlib
 import sys
 import types
 from collections import deque
+import time
 
 if "pytest" not in sys.modules:
     pytest = types.ModuleType("pytest")
@@ -46,7 +47,6 @@ def test_memory_history_endpoint(client, monkeypatch):
 
     history = deque([{"timestamp": "t1", "rss_mb": 1, "percent": 1}], maxlen=10)
     monkeypatch.setattr(memory_manager, "memory_usage_history", history)
-    monkeypatch.setattr(memory_routes, "memory_usage_history", history)
 
     class DummyLock:
         def __enter__(self):
@@ -55,7 +55,7 @@ def test_memory_history_endpoint(client, monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             pass
 
-    monkeypatch.setattr(memory_routes, "memory_usage_lock", DummyLock())
+    monkeypatch.setattr(memory_manager, "memory_usage_lock", DummyLock())
 
     class DummyProc:
         def __init__(self, _):
@@ -78,6 +78,7 @@ def test_memory_history_endpoint(client, monkeypatch):
 
 def test_force_gc_endpoint(client, monkeypatch):
     import memory_routes
+    import memory_manager
 
     sequence = {"flag": True}
 
@@ -89,11 +90,61 @@ def test_force_gc_endpoint(client, monkeypatch):
 
     monkeypatch.setattr(memory_routes.gc, "get_objects", fake_get_objects)
     monkeypatch.setattr(memory_routes.gc, "collect", lambda g: 2)
-    monkeypatch.setattr(memory_routes, "log_memory_usage", lambda: None)
+    monkeypatch.setattr(memory_manager, "log_memory_usage", lambda: None)
 
     resp = client.post("/api/force-gc", json={"generation": 1})
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["generation"] == 1
     assert data["objects_removed"] == 2
+
+
+def test_memory_profile_endpoint(client, monkeypatch):
+    import memory_routes
+    import memory_manager
+
+    history = deque([
+        {"timestamp": "t1", "rss_mb": 1, "percent": 1},
+        {"timestamp": "t2", "rss_mb": 2, "percent": 2},
+    ], maxlen=10)
+    monkeypatch.setattr(memory_manager, "memory_usage_history", history)
+
+    class DummyLock:
+        def __enter__(self):
+            pass
+
+        def __exit__(self, exc_type, exc, tb):
+            pass
+
+    monkeypatch.setattr(memory_manager, "memory_usage_lock", DummyLock())
+
+    class DummySM:
+        def get_history(self):
+            return {"a": [1, 2]}
+
+        def get_metrics_log(self):
+            return [1, 2, 3]
+
+    monkeypatch.setattr(memory_manager, "state_manager", DummySM())
+
+    class DummyProc:
+        def __init__(self, _):
+            pass
+
+        def memory_info(self):
+            return types.SimpleNamespace(rss=1024, vms=2048)
+
+        def memory_percent(self):
+            return 3.0
+
+        def create_time(self):
+            return time.time() - 100
+
+    monkeypatch.setattr(memory_routes.psutil, "Process", DummyProc)
+
+    resp = client.get("/api/memory-profile")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["memory"]["trend"]["growth_mb"] == 1
+    assert data["memory"]["data_structures"]["metrics_log"]["entries"] == 3
 
