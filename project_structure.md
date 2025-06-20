@@ -8,15 +8,27 @@ This document provides a comprehensive overview of the Bitcoin Mining Dashboard 
 DeepSea-Dashboard/
 │
 ├── App.py                      # Main application entry point
+├── app_setup.py                # Application initialization helpers
+├── cache_utils.py              # Caching utilities
 ├── config.py                   # Configuration management
 ├── config.json                 # Configuration file
+├── config_routes.py            # Config API blueprint
 ├── data_service.py             # Service for fetching mining data
+├── error_handlers.py           # Centralized error handlers
+├── json_utils.py               # JSON encoding helpers
+├── memory_manager.py           # Process memory watchdog
+├── memory_routes.py            # Memory management endpoints
+├── miner_specs.py              # Example ASIC configuration
 ├── models.py                   # Data models
+├── notification_routes.py      # Notifications API blueprint
+├── notification_service.py     # Service for notifications
+├── scheduler_service.py        # Background scheduler utilities
+├── sse_service.py              # Server-Sent Events manager
 ├── state_manager.py            # Manager for persistent state
 ├── worker_service.py           # Service for worker data management
-├── notification_service.py     # Service for notifications
 ├── minify.py                   # Script for minifying assets
 ├── setup.py                    # Setup script for organizing files
+├── Makefile                    # Common development commands
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Docker configuration
 ├── docker-compose.yml          # Docker Compose configuration
@@ -28,6 +40,7 @@ DeepSea-Dashboard/
 │   ├── workers.html           # Workers dashboard template
 │   ├── blocks.html            # Bitcoin blocks template
 │   ├── notifications.html     # Notifications template
+│   ├── earnings.html          # Earnings page template
 │   └── error.html             # Error page template
 │
 ├── static/                     # Static assets
@@ -38,6 +51,7 @@ DeepSea-Dashboard/
 │   │   ├── boot.css           # Boot sequence styles
 │   │   ├── blocks.css         # Blocks page styles
 │   │   ├── notifications.css  # Notifications page styles
+│   │   ├── earnings.css       # Earnings page styles
 │   │   ├── error.css          # Error page styles
 │   │   ├── retro-refresh.css  # Floating refresh bar styles
 │   │   └── theme-toggle.css   # Theme toggle styles
@@ -47,6 +61,7 @@ DeepSea-Dashboard/
 │       ├── workers.js         # Workers page functionality
 │       ├── blocks.js          # Blocks page functionality
 │       ├── notifications.js   # Notifications functionality
+│       ├── earnings.js        # Earnings page functionality
 │       ├── block-animation.js # Block mining animation
 │       ├── BitcoinProgressBar.js # System monitor functionality
 │       └── theme.js           # Theme toggle functionality
@@ -112,6 +127,24 @@ Implementation details:
 - Optimized storage format for Redis
 - Data compression techniques for large state objects
 - Automatic recovery of critical state
+
+#### memory_manager.py
+Tracks memory usage and triggers cleanup when limits are exceeded.
+- Logs periodic usage metrics
+- Invokes garbage collection if needed
+- Supports admin inspection via `memory_routes.py`
+
+#### scheduler_service.py
+Encapsulates background scheduler logic.
+- Manages periodic update jobs
+- Restarts jobs if they unexpectedly stop
+- Allows runtime rescheduling when the config changes
+
+#### sse_service.py
+Central hub for Server-Sent Events connections.
+- Registers and cleans up client streams
+- Broadcasts updates with backpressure control
+- Limits concurrent connections
 
 ### Frontend Components
 
