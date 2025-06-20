@@ -119,7 +119,7 @@ function prepareChartData(initialBlocks) {
 }
 
 // Clean up event handlers when refreshing or navigating
-function cleanupEventHandlers() {
+function cleanupEventHandlers(preserve_chart = false) {
     $(window).off("click.blockModal");
     $(document).off("keydown.blockModal");
     $(window).off('resize');
@@ -131,7 +131,7 @@ function cleanupEventHandlers() {
         clearInterval(refreshIntervalId);
         refreshIntervalId = null;
     }
-    if (minerChart) {
+    if (!preserve_chart && minerChart) {
         if (typeof minerChart.destroy === 'function') {
             minerChart.destroy();
         }
@@ -1043,8 +1043,8 @@ function showBlockDetails(block) {
     const modal = $("#block-modal");
     const blockDetails = $("#block-details");
 
-    // Clean up previous handlers
-    cleanupEventHandlers();
+    // Clean up previous handlers but keep the chart
+    cleanupEventHandlers(true);
 
     // Re-add scoped handlers
     setupModalKeyboardNavigation();
@@ -1345,5 +1345,5 @@ function closeModal() {
     const modal = $("#block-modal");
     modal.css("display", "none");
     modal.attr("aria-hidden", "true");
-    cleanupEventHandlers();
+    cleanupEventHandlers(true);
 }
