@@ -90,6 +90,12 @@ def update_config() -> Any:
                 network_fee=merged_config.get("network_fee", 0.0),
                 worker_service=_worker_service,
             )
+            try:
+                import App
+
+                App.dashboard_service = _dashboard_service
+            except Exception as e:  # pragma: no cover - defensive
+                logging.error("Error updating global dashboard service: %s", e)
             logging.info(
                 "Dashboard service reinitialized with new wallet: %s",
                 merged_config.get("wallet"),

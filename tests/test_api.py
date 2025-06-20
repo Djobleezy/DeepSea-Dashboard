@@ -105,6 +105,30 @@ def test_partial_update_preserves_existing_fields(client, monkeypatch):
     assert saved["network_fee"] == 0.1
 
 
+def test_update_config_replaces_dashboard_service(client, monkeypatch):
+    import App
+    import config as cfg
+    import config_routes
+
+    old_service = object()
+    App.dashboard_service = old_service
+    config_routes._dashboard_service = old_service
+
+    monkeypatch.setattr(cfg, "save_config", lambda c: True)
+    monkeypatch.setattr(config_routes, "save_config", lambda c: True)
+    monkeypatch.setattr(cfg, "load_config", lambda: {"wallet": "w"})
+    monkeypatch.setattr(config_routes, "load_config", lambda: {"wallet": "w"})
+
+    new_service = object()
+    monkeypatch.setattr(config_routes, "MiningDashboardService", lambda *a, **k: new_service)
+    monkeypatch.setattr(App.worker_service, "set_dashboard_service", lambda *a, **k: None)
+    monkeypatch.setattr(App, "update_metrics_job", lambda force=False: None)
+
+    resp = client.post("/api/config", json={"wallet": "new"})
+    assert resp.status_code == 200
+    assert App.dashboard_service is new_service
+
+
 def test_payout_history_endpoint(client):
     resp = client.get("/api/payout-history")
     assert resp.status_code == 200
