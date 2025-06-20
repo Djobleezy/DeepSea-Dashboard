@@ -1047,25 +1047,10 @@ function trackPayoutPerformance(data) {
     lastPayoutTracking.lastUnpaidEarnings = currentUnpaidEarnings;
 }
 
-// Calculate the average days between payouts in the history array
+// Deprecated: average payout interval is now sourced from the earnings API
+// and no longer calculated from local history.
 function updateAvgDaysFromHistory() {
-    const history = lastPayoutTracking.payoutHistory;
-
-    if (!history || history.length < 2) {
-        lastPayoutTracking.avgDays = null;
-        return;
-    }
-
-    const dates = history
-        .map(p => new Date(p.timestamp))
-        .sort((a, b) => b - a);
-
-    let total = 0;
-    for (let i = 0; i < dates.length - 1; i++) {
-        total += (dates[i] - dates[i + 1]) / 86400000; // ms per day
-    }
-
-    lastPayoutTracking.avgDays = total / (dates.length - 1);
+    // This function intentionally left blank.
 }
 
 
@@ -1177,7 +1162,6 @@ function add_payout_record(record) {
     if (lastPayoutTracking.payoutHistory.length > 30) {
         lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
     }
-    updateAvgDaysFromHistory();
     save_payout_history();
 }
 
@@ -1414,9 +1398,10 @@ async function verifyPayoutsAgainstOfficial() {
         const data = await res.json();
         if (!data || !data.payments || !data.payments.length) return;
 
-        if (data.avg_days_between_payouts !== undefined && data.avg_days_between_payouts !== null) {
-            lastPayoutTracking.avgDays = data.avg_days_between_payouts;
-        }
+        lastPayoutTracking.avgDays =
+            (data.avg_days_between_payouts !== undefined && data.avg_days_between_payouts !== null)
+                ? data.avg_days_between_payouts
+                : null;
 
         const officialPayments = data.payments.sort((a, b) =>
             new Date(b.date_iso || b.date) - new Date(a.date_iso || a.date)
@@ -1490,8 +1475,6 @@ async function verifyPayoutsAgainstOfficial() {
         if (lastPayoutTracking.payoutHistory.length > 30) {
             lastPayoutTracking.payoutHistory = lastPayoutTracking.payoutHistory.slice(0, 30);
         }
-
-        updateAvgDaysFromHistory();
 
         if ($("#payout-history-container").is(":visible")) {
             displayPayoutSummary();
