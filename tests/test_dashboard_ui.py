@@ -103,6 +103,7 @@ def test_click_all_elements(server):
             selectors = [
                 ".metric-value",
                 ".summary-stat-value",
+                ".stat-value",
                 "#workers-count",
                 "#notifications-container",
             ]
