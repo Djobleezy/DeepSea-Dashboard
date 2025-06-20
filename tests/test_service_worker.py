@@ -30,8 +30,12 @@ def client(monkeypatch):
     monkeypatch.setattr(App.worker_service, "set_dashboard_service", lambda *a, **k: None)
 
     sample_cfg = {"wallet": "w"}
-    monkeypatch.setattr(App, "load_config", lambda: sample_cfg)
-    monkeypatch.setattr(App, "save_config", lambda cfg: True)
+    import config as cfg
+    import config_routes
+    monkeypatch.setattr(cfg, "load_config", lambda: sample_cfg)
+    monkeypatch.setattr(cfg, "save_config", lambda c: True)
+    monkeypatch.setattr(config_routes, "load_config", lambda: sample_cfg)
+    monkeypatch.setattr(config_routes, "save_config", lambda c: True)
 
     return App.app.test_client()
 

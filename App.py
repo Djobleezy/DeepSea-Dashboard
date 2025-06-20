@@ -21,11 +21,11 @@ from zoneinfo import ZoneInfo
 from flask_caching import Cache
 from notification_service import NotificationLevel, NotificationCategory
 from urllib.parse import urlparse
-from data_service import MiningDashboardService
+from data_service import MiningDashboardService  # noqa: F401 - used in tests
 from apscheduler.schedulers.background import BackgroundScheduler  # noqa: F401 - used in tests
 
 # Import custom modules
-from config import load_config, save_config
+from config import load_config, save_config  # noqa: F401 - used in tests
 from config import get_timezone
 from error_handlers import register_error_handlers
 from app_setup import (
@@ -53,6 +53,7 @@ from memory_manager import (
 import sse_service
 import notification_routes
 import scheduler_service
+import config_routes
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -145,6 +146,13 @@ scheduler_service.configure(sys.modules[__name__])
 update_metrics_job = scheduler_service.update_metrics_job
 scheduler_watchdog = scheduler_service.scheduler_watchdog
 create_scheduler = scheduler_service.create_scheduler
+config_routes.init_config_routes(
+    dashboard_service,
+    worker_service,
+    notification_service,
+    update_metrics_job,
+)
+app.register_blueprint(config_routes.config_bp)
 
 # Initialize memory manager with required dependencies
 init_memory_manager(
@@ -402,120 +410,6 @@ def api_time():
     )
 
 
-# --- New Config Endpoints ---
-@app.route("/api/config", methods=["GET"])
-def get_config():
-    """API endpoint to get current configuration."""
-    try:
-        config = load_config()
-        return jsonify(config)
-    except Exception as e:
-        logging.error(f"Error getting configuration: {e}")
-        return jsonify({"error": "internal server error"}), 500
-
-
-@app.route("/api/config", methods=["POST"])
-def update_config():
-    """API endpoint to update configuration."""
-    global dashboard_service, worker_service
-
-    try:
-        # Get the request data
-        new_config = request.json
-        logging.info(f"Received config update request: {new_config}")
-
-        # Validate the configuration data
-        if not isinstance(new_config, dict):
-            logging.error("Invalid configuration format")
-            return jsonify({"error": "Invalid configuration format"}), 400
-
-        # Get current config to check if currency is changing
-        current_config = load_config()
-        # Determine if currency is changing before merging
-        currency_changed = (
-            "currency" in new_config
-            and new_config.get("currency") != current_config.get("currency", "USD")
-        )
-
-        # Default values for any completely new keys
-        defaults = {
-            "wallet": "yourwallethere",
-            "power_cost": 0.0,
-            "power_usage": 0.0,
-            "currency": "USD",
-            "EXCHANGE_RATE_API_KEY": "",
-        }
-
-        # Start with the current configuration and update only provided fields
-        merged_config = {**current_config}
-        for key, value in defaults.items():
-            merged_config.setdefault(key, value)
-        for key, value in new_config.items():
-            if value is not None:
-                merged_config[key] = value
-
-        # Save the configuration
-        logging.info(f"Saving configuration: {merged_config}")
-        if save_config(merged_config):
-            # Important: Reinitialize the dashboard service with the new configuration
-            if dashboard_service:
-                try:
-                    dashboard_service.close()
-                except Exception as e:
-                    logging.error(f"Error closing old dashboard service: {e}")
-
-            dashboard_service = MiningDashboardService(
-                merged_config.get("power_cost", 0.0),
-                merged_config.get("power_usage", 0.0),
-                merged_config.get("wallet"),
-                network_fee=merged_config.get("network_fee", 0.0),
-                worker_service=worker_service,
-            )
-            logging.info(
-                f"Dashboard service reinitialized with new wallet: {merged_config.get('wallet')}"
-            )
-
-            # Update worker service to use the new dashboard service (with the updated wallet)
-            worker_service.set_dashboard_service(dashboard_service)
-            if hasattr(dashboard_service, "set_worker_service"):
-                dashboard_service.set_worker_service(worker_service)
-            notification_service.dashboard_service = dashboard_service
-            logging.info("Worker service updated with the new dashboard service")
-
-            # If currency changed, update notifications to use the new currency
-            if currency_changed:
-                try:
-                    old_currency = current_config.get("currency", "USD")
-                    logging.info(
-                        f"Currency changed from {old_currency} to {merged_config['currency']}"
-                    )
-                    updated_count = notification_service.update_notification_currency(
-                        merged_config["currency"]
-                    )
-                    logging.info(
-                        f"Updated {updated_count} notifications to use {merged_config['currency']} currency"
-                    )
-                except Exception as e:
-                    logging.error(f"Error updating notification currency: {e}")
-
-            # Force a metrics update to reflect the new configuration
-            update_metrics_job(force=True)
-            logging.info("Forced metrics update after configuration change")
-
-            # Return success response with the saved configuration
-            return jsonify(
-                {
-                    "status": "success",
-                    "message": "Configuration saved successfully",
-                    "config": merged_config,
-                }
-            )
-        else:
-            logging.error("Failed to save configuration")
-            return jsonify({"error": "Failed to save configuration"}), 500
-    except Exception as e:
-        logging.error(f"Error updating configuration: {e}")
-        return jsonify({"error": "internal server error"}), 500
 
 
 # Health check endpoint with detailed diagnostics

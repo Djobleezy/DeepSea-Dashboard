@@ -31,8 +31,12 @@ def client(monkeypatch):
     monkeypatch.setattr(App.worker_service, "set_dashboard_service", lambda *a, **k: None)
 
     sample_cfg = {"wallet": "w"}
-    monkeypatch.setattr(App, "load_config", lambda: sample_cfg)
-    monkeypatch.setattr(App, "save_config", lambda cfg: True)
+    import config as cfg
+    import config_routes
+    monkeypatch.setattr(cfg, "load_config", lambda: sample_cfg)
+    monkeypatch.setattr(cfg, "save_config", lambda c: True)
+    monkeypatch.setattr(config_routes, "load_config", lambda: sample_cfg)
+    monkeypatch.setattr(config_routes, "save_config", lambda c: True)
 
     return App.app.test_client()
 
@@ -58,14 +62,16 @@ def test_update_config_endpoint(client):
 
 
 def test_update_config_with_api_key(client, monkeypatch):
-    import App
+    import config as cfg
+    import config_routes
     saved = {}
 
     def capture(cfg):
         saved.update(cfg)
         return True
 
-    monkeypatch.setattr(App, "save_config", capture)
+    monkeypatch.setattr(cfg, "save_config", capture)
+    monkeypatch.setattr(config_routes, "save_config", capture)
     resp = client.post(
         "/api/config",
         json={"wallet": "abc", "EXCHANGE_RATE_API_KEY": "KEY"},
@@ -76,10 +82,12 @@ def test_update_config_with_api_key(client, monkeypatch):
 
 def test_partial_update_preserves_existing_fields(client, monkeypatch):
     """Updating a single field should keep other config values."""
-    import App
+    import config as cfg
+    import config_routes
 
     current = {"wallet": "old", "currency": "EUR", "network_fee": 0.1}
-    monkeypatch.setattr(App, "load_config", lambda: current)
+    monkeypatch.setattr(cfg, "load_config", lambda: current)
+    monkeypatch.setattr(config_routes, "load_config", lambda: current)
 
     saved = {}
 
@@ -87,7 +95,8 @@ def test_partial_update_preserves_existing_fields(client, monkeypatch):
         saved.update(cfg)
         return True
 
-    monkeypatch.setattr(App, "save_config", capture)
+    monkeypatch.setattr(cfg, "save_config", capture)
+    monkeypatch.setattr(config_routes, "save_config", capture)
 
     resp = client.post("/api/config", json={"wallet": "new"})
     assert resp.status_code == 200

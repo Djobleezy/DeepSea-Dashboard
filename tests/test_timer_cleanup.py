@@ -29,7 +29,10 @@ def test_update_metrics_job_joins_timer(monkeypatch):
     monkeypatch.setattr(App, "adaptive_gc", lambda: False)
     monkeypatch.setattr(App, "log_memory_usage", lambda: None)
     monkeypatch.setattr(App.notification_service, "add_notification", lambda *a, **k: None)
-    monkeypatch.setattr(App, "load_config", lambda: {})
+    import config as cfg
+    import config_routes
+    monkeypatch.setattr(cfg, "load_config", lambda: {})
+    monkeypatch.setattr(config_routes, "load_config", lambda: {})
     monkeypatch.setitem(App.MEMORY_CONFIG, "ADAPTIVE_GC_ENABLED", False)
 
     App.update_metrics_job(force=True)
