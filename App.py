@@ -41,13 +41,13 @@ from memory_manager import (
     MEMORY_CONFIG,
     memory_usage_history,
     memory_usage_lock,
-    last_leak_check_time,
-    object_counts_history,
-    leak_growth_tracker,
+    last_leak_check_time,  # noqa: F401 - re-exported for tests
+    object_counts_history,  # noqa: F401 - re-exported for tests
+    leak_growth_tracker,  # noqa: F401 - re-exported for tests
     log_memory_usage,
     adaptive_gc,
     check_for_memory_leaks,
-    record_memory_metrics,
+    record_memory_metrics,  # noqa: F401 - used in tests via re-export
     memory_watchdog,
     init_memory_manager,
 )

@@ -31,8 +31,18 @@ leak_growth_tracker = {}
 
 state_manager = None
 notification_service = None
-get_dashboard_service = lambda: None
-get_active_connections = lambda: 0
+
+
+def get_dashboard_service():
+    """Return the dashboard service instance or ``None``."""
+
+    return None
+
+
+def get_active_connections():
+    """Return the number of active SSE connections."""
+
+    return 0
 
 def init_memory_manager(sm, notif_service, dashboard_service_getter, active_connections_getter):
     """Initialize memory manager dependencies."""
