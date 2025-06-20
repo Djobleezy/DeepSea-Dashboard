@@ -84,6 +84,12 @@ class MiningDashboardService:
             self.executor = ThreadPoolExecutor(max_workers=6)
             logging.warning("Recreated ThreadPoolExecutor after close")
 
+    def _ensure_session(self):
+        """Recreate the requests session if it was closed."""
+        if self.session is None:
+            self.session = requests.Session()
+            logging.warning("Recreated requests Session after close")
+
     def set_worker_service(self, worker_service):
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
@@ -462,6 +468,8 @@ class MiningDashboardService:
         api_base = "https://api.ocean.xyz/v1"
         result = {}
 
+        self._ensure_session()
+
         # Fetch hashrate info
         resp = None
         hr_data = {}
@@ -535,6 +543,7 @@ class MiningDashboardService:
         api_base = "https://api.ocean.xyz/v1"
         data = {}
         resp = None
+        self._ensure_session()
         try:
             url = f"{api_base}/pool_stat"
             resp = self.session.get(url, timeout=10)
@@ -558,6 +567,7 @@ class MiningDashboardService:
         """Fetch recent block data using /blocks."""
         api_base = "https://api.ocean.xyz/v1"
         resp = None
+        self._ensure_session()
         try:
             url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
             resp = self.session.get(url, timeout=10)
@@ -591,6 +601,7 @@ class MiningDashboardService:
         """
         base_url = "https://ocean.xyz"
         stats_url = f"{base_url}/stats/{self.wallet}"
+        self._ensure_session()
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -859,7 +870,7 @@ class MiningDashboardService:
     @ttl_cache(ttl_seconds=30, maxsize=20)
     def fetch_url(self, url: str, timeout: int = 5):
         """Fetch URL content safely without leaking resources."""
-
+        self._ensure_session()
         response = None
         try:
             response = self.session.get(url, timeout=timeout)
@@ -904,6 +915,7 @@ class MiningDashboardService:
             return {}
 
         response = None
+        self._ensure_session()
         try:
             # Use the configured API key with the v6 exchangerate-api endpoint
             url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}"
@@ -952,6 +964,7 @@ class MiningDashboardService:
         url = f"{api_base}/earnpay/{self.wallet}/{start_str}/{end_str}"
         payments = []
         resp = None
+        self._ensure_session()
 
         try:
             resp = self.session.get(url, timeout=10)
@@ -1027,6 +1040,7 @@ class MiningDashboardService:
         }
         payments = []
         resp = None
+        self._ensure_session()
         soup = None
         try:
             page = 0
@@ -1441,6 +1455,7 @@ class MiningDashboardService:
     def get_all_worker_rows(self):
         """Collect worker row data from the stats pages."""
         all_rows = []
+        self._ensure_session()
         page_num = 0
         max_pages = 10  # Limit to 10 pages of worker data
 
@@ -1627,6 +1642,7 @@ class MiningDashboardService:
         """
         base_url = "https://ocean.xyz"
         stats_url = f"{base_url}/stats/{self.wallet}"
+        self._ensure_session()
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -2018,6 +2034,7 @@ class MiningDashboardService:
         """Fetch worker data using the Ocean.xyz API."""
         api_base = "https://api.ocean.xyz/v1"
         resp = None
+        self._ensure_session()
         try:
             url = f"{api_base}/user_hashrate_full/{self.wallet}"
             logging.info(f"Fetching worker data from API: {url}")
