@@ -78,6 +78,12 @@ class MiningDashboardService:
         # Track whether the service has been closed
         self._closed = False
 
+    def _ensure_executor(self):
+        """Recreate the executor if it was closed."""
+        if self.executor is None:
+            self.executor = ThreadPoolExecutor(max_workers=6)
+            logging.warning("Recreated ThreadPoolExecutor after close")
+
     def set_worker_service(self, worker_service):
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
@@ -231,6 +237,7 @@ class MiningDashboardService:
         """
         if getattr(self, "_closed", False):
             raise RuntimeError("Cannot use closed service")
+        self._ensure_executor()
         # Add execution time tracking
         start_time = time.time()
 
@@ -1265,6 +1272,7 @@ class MiningDashboardService:
         Returns:
             tuple: (difficulty, network_hashrate, btc_price, block_count)
         """
+        self._ensure_executor()
         # Base URLs for API endpoints
         blockchain_info_urls = {
             "difficulty": "https://blockchain.info/q/getdifficulty",

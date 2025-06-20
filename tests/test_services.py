@@ -47,10 +47,11 @@ if "bs4" not in sys.modules:
     sys.modules["bs4"] = bs4_module
 
 from worker_service import WorkerService
-from data_service import MiningDashboardService
+from data_service import MiningDashboardService, CachedResponse
 from notification_service import NotificationService
 import data_service
 import state_manager
+import json
 
 
 def test_generate_default_workers_data(monkeypatch):
@@ -838,3 +839,22 @@ def test_fetch_metrics_cancels_futures(monkeypatch):
 
     assert svc.fetch_metrics() is None
     assert ocean_future.cancelled and btc_future.cancelled
+
+
+def test_executor_recreated_after_close(monkeypatch):
+    """Service should recreate its executor if used after close."""
+    svc = MiningDashboardService(0, 0, "w")
+    svc.close()
+
+    def dummy_fetch(url, timeout=5):
+        if "prices" in url:
+            return CachedResponse(True, 200, json.dumps({"USD": 65000}))
+        if "hashrate" in url:
+            return CachedResponse(True, 200, json.dumps({"currentHashrate": 500e18, "currentDifficulty": 1}))
+        return CachedResponse(True, 200, "1")
+
+    monkeypatch.setattr(svc, "fetch_url", dummy_fetch)
+
+    stats = svc.get_bitcoin_stats()
+    assert svc.executor is not None
+    assert stats == (1, 500e18, 65000.0, 1)
