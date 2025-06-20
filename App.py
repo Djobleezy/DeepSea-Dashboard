@@ -19,10 +19,10 @@ from flask import Flask, Response, jsonify, render_template, request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from flask_caching import Cache
-from apscheduler.schedulers.background import BackgroundScheduler
 from notification_service import NotificationLevel, NotificationCategory
 from urllib.parse import urlparse
 from data_service import MiningDashboardService
+from apscheduler.schedulers.background import BackgroundScheduler  # noqa: F401 - used in tests
 
 # Import custom modules
 from config import load_config, save_config
@@ -32,26 +32,27 @@ from app_setup import (
     configure_logging,
     init_state_manager,
     init_services,
-    build_scheduler,
+    build_scheduler,  # noqa: F401 - used in tests
 )
 
 from memory_manager import (
-    MEMORY_CONFIG,
     memory_usage_history,
     memory_usage_lock,
     last_leak_check_time,  # noqa: F401 - re-exported for tests
     object_counts_history,  # noqa: F401 - re-exported for tests
     leak_growth_tracker,  # noqa: F401 - re-exported for tests
     log_memory_usage,
-    adaptive_gc,
-    check_for_memory_leaks,
+    adaptive_gc,  # noqa: F401 - re-exported for tests
+    check_for_memory_leaks,  # noqa: F401 - re-exported for tests
     record_memory_metrics,  # noqa: F401 - used in tests via re-export
-    memory_watchdog,
+    memory_watchdog,  # noqa: F401 - re-exported for tests
+    MEMORY_CONFIG,  # noqa: F401 - re-exported for tests
     init_memory_manager,
 )
 
 import sse_service
 import notification_routes
+import scheduler_service
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -139,6 +140,12 @@ if _previous_notification_service:
 notification_routes.init_notification_routes(notification_service)
 app.register_blueprint(notification_routes.notifications_bp)
 
+# Configure scheduler service with this module's globals
+scheduler_service.configure(sys.modules[__name__])
+update_metrics_job = scheduler_service.update_metrics_job
+scheduler_watchdog = scheduler_service.scheduler_watchdog
+create_scheduler = scheduler_service.create_scheduler
+
 # Initialize memory manager with required dependencies
 init_memory_manager(
     state_manager,
@@ -160,225 +167,7 @@ def add_header(response):
 
 
 
-# --- Modified update_metrics_job function ---
-def update_metrics_job(force=False):
-    """
-    Background job to update metrics.
-
-    Args:
-        force (bool): Whether to force update regardless of timing
-    """
-    global cached_metrics, last_metrics_update_time, scheduler, scheduler_last_successful_run
-
-    logging.info("Starting update_metrics_job")
-
-    try:
-        # Check scheduler health - enhanced logic to detect failed executors
-        if not scheduler or not hasattr(scheduler, "running"):
-            logging.error("Scheduler object is invalid, attempting to recreate")
-            with scheduler_recreate_lock:
-                create_scheduler()
-            return
-
-        if not scheduler.running:
-            logging.warning("Scheduler stopped unexpectedly, attempting to restart")
-            try:
-                scheduler.start()
-                logging.info("Scheduler restarted successfully")
-            except Exception as e:
-                logging.error(f"Failed to restart scheduler: {e}")
-                # More aggressive recovery - recreate scheduler entirely
-                with scheduler_recreate_lock:
-                    create_scheduler()
-                return
-
-        # Test the scheduler's executor by checking its state
-        try:
-            # Check if any jobs exist and are scheduled
-            jobs = scheduler.get_jobs()
-            if not jobs:
-                logging.error("No jobs found in scheduler - recreating")
-                with scheduler_recreate_lock:
-                    create_scheduler()
-                return
-
-            # Check if the next run time is set for any job
-            next_runs = [job.next_run_time for job in jobs]
-            if not any(next_runs):
-                logging.error("No jobs with next_run_time found - recreating scheduler")
-                with scheduler_recreate_lock:
-                    create_scheduler()
-                return
-        except RuntimeError as e:
-            # Properly handle the "cannot schedule new futures after shutdown" error
-            if "cannot schedule new futures after shutdown" in str(e):
-                logging.error("Detected dead executor, recreating scheduler")
-                with scheduler_recreate_lock:
-                    create_scheduler()
-                return
-        except Exception as e:
-            logging.error(f"Error checking scheduler state: {e}")
-
-        # Skip update if the last one was too recent (prevents overlapping runs)
-        # Unless force=True is specified
-        current_time = time.time()
-        if not force and last_metrics_update_time and (current_time - last_metrics_update_time < 30):
-            logging.info("Skipping metrics update - previous update too recent")
-            return
-
-        # Set last update time to now
-        last_metrics_update_time = current_time
-        logging.info(f"Updated last_metrics_update_time: {last_metrics_update_time}")
-
-        # Add timeout handling with a timer
-        job_timeout = 45  # seconds
-        job_successful = False
-
-        def timeout_handler():
-            """Log an error if the metrics update exceeds the timeout."""
-            if not job_successful:
-                logging.error("Background job timed out after 45 seconds")
-
-        # Set timeout timer
-        timer = threading.Timer(job_timeout, timeout_handler)
-        timer.daemon = True
-        timer.start()
-
-        try:
-            # Use the dashboard service to fetch metrics
-            metrics = dashboard_service.fetch_metrics()
-            if metrics:
-                logging.info("Fetched metrics successfully")
-
-                # Add config_reset flag to metrics from the config
-                config = load_config()
-                metrics["config_reset"] = config.get("config_reset", False)
-                logging.info(f"Added config_reset flag to metrics: {metrics.get('config_reset')}")
-
-                # First check for notifications by comparing new metrics with old cached metrics
-                notification_service.check_and_generate_notifications(metrics, cached_metrics)
-
-                # Then update cached metrics after comparison
-                cached_metrics = metrics
-
-                # Clear the config_reset flag after it's been used
-                if metrics.get("config_reset"):
-                    config = load_config()
-                    if "config_reset" in config:
-                        del config["config_reset"]
-                        save_config(config)
-                        logging.info("Cleared config_reset flag from configuration after use")
-
-                # Update state history (only once)
-                state_manager.update_metrics_history(metrics)
-
-                logging.info("Background job: Metrics updated successfully")
-                job_successful = True
-
-                # Mark successful run time for watchdog
-                scheduler_last_successful_run = time.time()
-                logging.info(f"Updated scheduler_last_successful_run: {scheduler_last_successful_run}")
-
-                # Persist critical state
-                state_manager.persist_critical_state(
-                    cached_metrics,
-                    scheduler_last_successful_run,
-                    last_metrics_update_time,
-                )
-
-                # Periodically check and prune data to prevent memory growth
-                if current_time % 300 < 60:  # Every ~5 minutes
-                    logging.info("Pruning old data")
-                    state_manager.prune_old_data()
-
-                # Only save state to Redis on a similar schedule, not every update
-                if current_time % 300 < 60:  # Every ~5 minutes
-                    logging.info("Saving graph state")
-                    state_manager.save_graph_state()
-
-                # Adaptive memory cleanup
-                if MEMORY_CONFIG["ADAPTIVE_GC_ENABLED"]:
-                    # Check memory usage every 10 minutes or on cache update
-                    if current_time % 600 < 60 or force:
-                        if adaptive_gc():
-                            log_memory_usage()  # Log memory usage after GC
-                else:
-                    # Fixed interval full garbage collection
-                    if current_time % MEMORY_CONFIG["GC_INTERVAL_SECONDS"] < 60:
-                        interval = MEMORY_CONFIG["GC_INTERVAL_SECONDS"] // 60
-                        logging.info(f"Scheduled full memory cleanup (every {interval} minutes)")
-                        gc.collect(generation=2)  # Force full collection
-                        log_memory_usage()
-            else:
-                logging.error("Background job: Metrics update returned None")
-        except Exception as e:
-            logging.error(f"Background job: Unexpected error: {e}")
-            import traceback
-
-            logging.error(traceback.format_exc())
-            log_memory_usage()
-        finally:
-            # Cancel timer in finally block to ensure it's always canceled
-            timer.cancel()
-            if timer.is_alive():
-                try:
-                    timer.join()
-                except Exception:
-                    pass
-    except Exception as e:
-        logging.error(f"Background job: Unhandled exception: {e}")
-        import traceback
-
-        logging.error(traceback.format_exc())
-    logging.info("Completed update_metrics_job")
-
-
-# --- SchedulerWatchdog to monitor and recover ---
-def scheduler_watchdog():
-    """Periodically check if the scheduler is running and healthy."""
-    global scheduler, scheduler_last_successful_run
-
-    try:
-        # If no successful run in past 2 minutes, consider the scheduler dead
-        if scheduler_last_successful_run is None or time.time() - scheduler_last_successful_run > 120:
-            logging.warning("Scheduler watchdog: No successful runs detected in last 2 minutes")
-
-            # Check if actual scheduler exists and is reported as running
-            if not scheduler or not getattr(scheduler, "running", False):
-                logging.error("Scheduler watchdog: Scheduler appears to be dead, recreating")
-
-                # Use the lock to avoid multiple threads recreating simultaneously
-                with scheduler_recreate_lock:
-                    create_scheduler()
-    except Exception as e:
-        logging.error(f"Error in scheduler watchdog: {e}")
-
-
-# --- Create Scheduler ---
-def create_scheduler():
-    """Create and configure a new scheduler instance with proper error handling."""
-    try:
-        global scheduler
-        if "scheduler" in globals() and scheduler:
-            try:
-                if hasattr(scheduler, "running") and scheduler.running:
-                    logging.info("Shutting down existing scheduler before creating a new one")
-                    scheduler.shutdown(wait=True)
-            except Exception as e:
-                logging.error(f"Error shutting down existing scheduler: {e}")
-
-        new_scheduler = build_scheduler(
-            update_metrics_job,
-            scheduler_watchdog,
-            memory_watchdog,
-            check_for_memory_leaks,
-            scheduler_cls=BackgroundScheduler,
-        )
-        scheduler = new_scheduler
-        return new_scheduler
-    except Exception as e:
-        logging.error(f"Error creating scheduler: {e}")
-        return None
+# Scheduler management utilities are provided by ``scheduler_service``.
 
 
 # --- Custom Template Filter ---
