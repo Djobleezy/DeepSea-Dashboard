@@ -37,24 +37,20 @@ from app_setup import (
     build_scheduler,
 )
 
-# Memory management configuration
-MEMORY_CONFIG = {
-    "MAX_METRICS_LOG_ENTRIES": 180,  # Maximum metrics log entries to keep
-    "MAX_ARROW_HISTORY_ENTRIES": 180,  # Maximum arrow history entries per key
-    "GC_INTERVAL_SECONDS": 3600,  # How often to force full GC (1 hour)
-    # Trigger emergency cleanup when memory usage exceeds this percentage
-    "MEMORY_HIGH_WATERMARK": 80.0,
-    "ADAPTIVE_GC_ENABLED": True,  # Whether to use adaptive GC
-    "MEMORY_MONITORING_INTERVAL": 600,  # How often to log memory usage (5 minutes)
-    "MEMORY_HISTORY_MAX_ENTRIES": 288,  # Keep 24 hours of memory history at 5-min intervals
-}
-
-# Memory tracking global variables
-memory_usage_history = deque(maxlen=MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"])
-memory_usage_lock = threading.Lock()
-last_leak_check_time = 0
-object_counts_history = {}
-leak_growth_tracker = {}
+from memory_manager import (
+    MEMORY_CONFIG,
+    memory_usage_history,
+    memory_usage_lock,
+    last_leak_check_time,
+    object_counts_history,
+    leak_growth_tracker,
+    log_memory_usage,
+    adaptive_gc,
+    check_for_memory_leaks,
+    record_memory_metrics,
+    memory_watchdog,
+    init_memory_manager,
+)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -141,6 +137,14 @@ if _previous_notification_service:
     finally:
         _previous_notification_service = None
 
+# Initialize memory manager with required dependencies
+init_memory_manager(
+    state_manager,
+    notification_service,
+    lambda: dashboard_service,
+    lambda: active_sse_connections,
+)
+
 
 # --- Disable Client Caching for All Responses ---
 @app.after_request
@@ -152,248 +156,6 @@ def add_header(response):
     return response
 
 
-# --- Memory usage monitoring ---
-def log_memory_usage():
-    """Log current memory usage."""
-    try:
-        process = psutil.Process(os.getpid())
-        mem_info = process.memory_info()
-        logging.info(f"Memory usage: {mem_info.rss / 1024 / 1024:.2f} MB (RSS)")
-
-        # Log the size of key data structures
-        arrow_entries = sum(len(v) for v in state_manager.get_history().values() if isinstance(v, (list, deque)))
-        logging.info(f"Arrow history entries: {arrow_entries}")
-        logging.info(f"Metrics log entries: {len(state_manager.get_metrics_log())}")
-        logging.info(f"Active SSE connections: {active_sse_connections}")
-    except Exception as e:
-        logging.error(f"Error logging memory usage: {e}")
-
-
-def adaptive_gc(force_level=None):
-    """
-    Run garbage collection adaptively based on memory pressure.
-
-    Args:
-        force_level (int, optional): Force collection of this generation. If None,
-                                    determine based on memory pressure.
-
-    Returns:
-        bool: Whether garbage collection was performed
-    """
-    try:
-        process = psutil.Process(os.getpid())
-        mem_percent = process.memory_percent()
-
-        # Log current memory usage
-        logging.info(f"Memory usage before GC: {mem_percent:.1f}%")
-
-        # Define thresholds for different GC actions
-        if force_level is not None:
-            # Force collection at specified level
-            gc.collect(generation=force_level)
-            logging.info(f"Forced garbage collection at generation {force_level}")
-            gc_performed = True
-        elif mem_percent > 80:  # Critical memory pressure
-            logging.warning(f"Critical memory pressure detected: {mem_percent:.1f}% - Running full collection")
-            gc.collect(generation=2)  # Full collection
-            gc_performed = True
-        elif mem_percent > 60:  # High memory pressure
-            logging.info(f"High memory pressure detected: {mem_percent:.1f}% - Running generation 1 collection")
-            gc.collect(generation=1)  # Intermediate collection
-            gc_performed = True
-        elif mem_percent > 40:  # Moderate memory pressure
-            logging.info(f"Moderate memory pressure detected: {mem_percent:.1f}% - Running generation 0 collection")
-            gc.collect(generation=0)  # Young generation only
-            gc_performed = True
-        else:
-            # No collection needed
-            return False
-
-        # Log memory after collection
-        new_mem_percent = process.memory_percent()
-        memory_freed = mem_percent - new_mem_percent
-        if memory_freed > 0:
-            logging.info(f"Memory after GC: {new_mem_percent:.1f}% (freed {memory_freed:.1f}%)")
-        else:
-            logging.info(f"Memory after GC: {new_mem_percent:.1f}% (no memory freed)")
-
-        return gc_performed
-    except Exception as e:
-        logging.error(f"Error in adaptive GC: {e}")
-        return False
-
-
-def check_for_memory_leaks():
-    """Monitor object counts over time and flag persistent growth."""
-    global object_counts_history, last_leak_check_time, leak_growth_tracker
-
-    current_time = time.time()
-    if current_time - last_leak_check_time < 3600:  # Check once per hour
-        return
-
-    last_leak_check_time = current_time
-    gc.collect()  # trigger GC to prevent transient objects from skewing counts
-
-    try:
-        thread_count = threading.active_count()
-        dashboard_services = [
-            obj for obj in gc.get_objects() if isinstance(obj, MiningDashboardService)
-        ]
-        if len(dashboard_services) > 1:
-            logging.warning(
-                f"Multiple MiningDashboardService instances detected: {len(dashboard_services)}"
-            )
-        expected_thread_count = 50
-        if thread_count > expected_thread_count:
-            logging.warning(f"Excessive threads detected: {thread_count}")
-
-        # Get current counts
-        type_counts = {}
-        for obj in gc.get_objects():
-            obj_type = type(obj).__name__
-            if obj_type not in type_counts:
-                type_counts[obj_type] = 0
-            type_counts[obj_type] += 1
-
-        # Compare with previous counts
-        if object_counts_history:
-            potential_leaks = []
-            for obj_type, count in type_counts.items():
-                prev_count = object_counts_history.get(obj_type, 0)
-
-                # Only consider types with significant count
-                if prev_count > 100:
-                    growth = count - prev_count
-                    if growth > 0 and (growth / prev_count) > 0.5:
-                        leak_growth_tracker[obj_type] = leak_growth_tracker.get(obj_type, 0) + 1
-                        if leak_growth_tracker[obj_type] >= 2:
-                            potential_leaks.append(
-                                {
-                                    "type": obj_type,
-                                    "previous": prev_count,
-                                    "current": count,
-                                    "growth": f"{growth} (+{(growth/prev_count)*100:.1f}%)",
-                                }
-                            )
-                    else:
-                        leak_growth_tracker.pop(obj_type, None)
-
-            # Remove trackers for types no longer growing
-            for t in list(leak_growth_tracker.keys()):
-                if t not in type_counts or type_counts[t] <= object_counts_history.get(t, 0):
-                    leak_growth_tracker.pop(t, None)
-
-            if potential_leaks:
-                logging.warning(f"Potential memory leaks detected: {potential_leaks}")
-                notification_service.add_notification(
-                    f"Potential memory leaks detected - {len(potential_leaks)} object types grew. Check logs for details.",
-                    level=NotificationLevel.WARNING,
-                    category=NotificationCategory.SYSTEM,
-                )
-
-        # Store current counts for next comparison
-        object_counts_history = type_counts
-
-    except Exception as e:
-        logging.error(f"Error checking for memory leaks: {e}")
-
-
-def record_memory_metrics():
-    """Record memory usage metrics for trend analysis."""
-    global memory_usage_history
-
-    try:
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-
-        # Record key metrics
-        entry = {
-            "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
-            "rss_mb": memory_info.rss / 1024 / 1024,
-            "vms_mb": memory_info.vms / 1024 / 1024,
-            "percent": process.memory_percent(),
-            "arrow_history_entries": sum(
-                len(v) for v in state_manager.get_history().values() if isinstance(v, (list, deque))
-            ),
-            "metrics_log_entries": len(state_manager.get_metrics_log()),
-            "sse_connections": active_sse_connections,
-        }
-
-        with memory_usage_lock:
-
-            # Resize deque if configuration changed
-            desired_max = MEMORY_CONFIG["MEMORY_HISTORY_MAX_ENTRIES"]
-            if memory_usage_history.maxlen != desired_max:
-                # Replace the deque entirely so the old buffer can be
-                # garbage-collected instead of lingering with references.
-                memory_usage_history = deque(memory_usage_history, maxlen=desired_max)
-                globals()["memory_usage_history"] = memory_usage_history
-
-            memory_usage_history.append(entry)
-
-
-    except Exception as e:
-        logging.error(f"Error recording memory metrics: {e}")
-
-
-def memory_watchdog():
-    """Monitor memory usage and take action if it gets too high."""
-    try:
-        process = psutil.Process(os.getpid())
-        mem_percent = process.memory_percent()
-
-        # Record memory metrics each time the watchdog runs
-        record_memory_metrics()
-
-        # Log memory usage periodically
-        logging.info(f"Memory watchdog: Current usage: {mem_percent:.1f}%")
-
-        # If memory usage exceeds the high watermark, take emergency action
-        if mem_percent > MEMORY_CONFIG["MEMORY_HIGH_WATERMARK"]:
-            logging.warning(f"Memory usage critical ({mem_percent:.1f}%) - performing emergency cleanup")
-
-            # Emergency actions:
-            # 1. Force garbage collection
-            gc.collect(generation=2)
-
-            # 2. Aggressively prune history data (pass aggressive=True)
-            try:
-                state_manager.prune_old_data(aggressive=True)
-                logging.info("Aggressively pruned history data")
-            except Exception as e:
-                logging.error(f"Error pruning history data: {e}")
-
-            # 3. Clear any non-critical caches
-            ds = globals().get("dashboard_service")
-            if ds:
-                if hasattr(ds, "cache"):
-                    cache_obj = ds.cache
-                    if hasattr(cache_obj, "purge"):
-                        cache_obj.purge()
-                    elif hasattr(cache_obj, "clear"):
-                        cache_obj.clear()
-                    logging.info("Cleared dashboard service cache")
-                if hasattr(ds, "purge_caches"):
-                    try:
-                        ds.purge_caches()
-                        logging.info("Purged dashboard service caches")
-                    except Exception as e:
-                        logging.error(f"Error purging dashboard caches: {e}")
-
-            # 4. Notify about the memory issue
-            notification_service.add_notification(
-                f"High memory usage detected - {mem_percent:.1f}% (emergency cleanup performed)",
-                level=NotificationLevel.WARNING,
-                category=NotificationCategory.SYSTEM,
-            )
-
-            # Log memory after cleanup
-            new_mem_percent = process.memory_percent()
-            reduction = mem_percent - new_mem_percent
-            logging.info(f"Memory after emergency cleanup: {new_mem_percent:.1f}% (reduced by {reduction:.1f}%)")
-
-    except Exception as e:
-        logging.error(f"Error in memory watchdog: {e}")
 
 
 # --- Modified update_metrics_job function ---

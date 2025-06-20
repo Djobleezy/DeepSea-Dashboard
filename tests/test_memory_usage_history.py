@@ -5,8 +5,10 @@ from collections import deque
 
 def test_record_memory_metrics_prunes_in_place(monkeypatch):
     App = importlib.reload(importlib.import_module("App"))
+    import memory_manager
     history = deque(maxlen=3)
     App.memory_usage_history = history
+    memory_manager.memory_usage_history = history
     monkeypatch.setitem(App.MEMORY_CONFIG, "MEMORY_HISTORY_MAX_ENTRIES", 3)
 
     class DummyProc:
