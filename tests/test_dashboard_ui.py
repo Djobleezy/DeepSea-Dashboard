@@ -27,20 +27,33 @@ def server(monkeypatch):
     # Force dashboard routes to fall back to default metrics
     App.cached_metrics = None
 
-    sample_history = [
+    sample_payments = [
         {
-            "timestamp": "2025-01-01T00:00:00",
-            "amountBTC": "0.1",
-            "verified": True,
-            "officialId": "abc",
-            "lightningId": "",
+            "date": "2025-01-01 00:00",
+            "date_iso": "2025-01-01T00:00:00",
+            "amount_btc": 0.1,
+            "amount_sats": 10_000_000,
             "status": "confirmed",
         }
     ]
 
-    monkeypatch.setattr(App.state_manager, "get_payout_history", lambda: sample_history)
+    sample_earnings = {
+        "payments": sample_payments,
+        "total_payments": 1,
+        "total_paid_btc": 0.1,
+        "total_paid_sats": 10_000_000,
+        "total_paid_fiat": 5000,
+        "unpaid_earnings": 0.0,
+        "unpaid_earnings_sats": 0,
+        "est_time_to_payout": "Unknown",
+        "avg_days_between_payouts": None,
+        "monthly_summaries": [],
+        "currency": "USD",
+    }
+
+    monkeypatch.setattr(App.state_manager, "get_payout_history", lambda: sample_payments)
     monkeypatch.setattr(App.state_manager, "save_payout_history", lambda h: True)
-    monkeypatch.setattr(App.dashboard_service, "get_earnings_data", lambda: {"payments": sample_history})
+    monkeypatch.setattr(App.dashboard_service, "get_earnings_data", lambda: sample_earnings)
     monkeypatch.setattr(App.state_manager, "save_last_earnings", lambda e: True)
 
     def run_app():
