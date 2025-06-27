@@ -519,7 +519,7 @@ function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
                         console.error('Error processing block event', err);
                     }
                 });
-                saveBlockAnnotations();
+                saveBlockAnnotations(minutes);
                 if (trendChart) {
                     updateBlockAnnotations(trendChart);
                     trendChart.update('none');
@@ -2122,7 +2122,7 @@ function checkForBlockUpdates(data) {
         if (trendChart && trendChart.data && trendChart.data.labels.length > 0) {
             const ts = new Date().toISOString();
             blockAnnotations.push(ts);
-            saveBlockAnnotations();
+            saveBlockAnnotations(chartPoints);
             updateBlockAnnotations(trendChart);
         }
     }
