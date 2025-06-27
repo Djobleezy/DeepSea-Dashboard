@@ -24,7 +24,9 @@
         <button id="btn-30" class="toggle-btn active" onclick="setChartPoints(30)">30m</button>
         <button id="btn-60" class="toggle-btn" onclick="setChartPoints(60)">60m</button>
         <button id="btn-180" class="toggle-btn" onclick="setChartPoints(180)">180m</button>
+        {% if extended_history %}
         <button id="btn-all" class="toggle-btn" onclick="setChartPoints('all')">ALL</button>
+        {% endif %}
     </div>
 </div>
 <!-- Miner Status and Payout Info -->

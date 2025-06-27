@@ -220,6 +220,9 @@ def dashboard():
     global cached_metrics, last_metrics_update_time
 
     # Make sure we have metrics data before rendering the template
+    config = load_config()
+    extended_history = config.get("extended_history", False)
+
     if cached_metrics is None:
         # Force an immediate metrics fetch regardless of the time since last update
         logging.info("Dashboard accessed with no cached metrics - forcing immediate fetch")
@@ -271,11 +274,21 @@ def dashboard():
             }
             logging.warning("Rendering dashboard with default metrics - no data available yet")
             current_time = datetime.now(ZoneInfo(get_timezone())).strftime("%Y-%m-%d %H:%M:%S %p")
-            return render_template("dashboard.html", metrics=default_metrics, current_time=current_time)
+            return render_template(
+                "dashboard.html",
+                metrics=default_metrics,
+                current_time=current_time,
+                extended_history=extended_history,
+            )
 
     # If we have metrics, use them
     current_time = datetime.now(ZoneInfo(get_timezone())).strftime("%Y-%m-%d %H:%M:%S %p")
-    return render_template("dashboard.html", metrics=cached_metrics, current_time=current_time)
+    return render_template(
+        "dashboard.html",
+        metrics=cached_metrics,
+        current_time=current_time,
+        extended_history=extended_history,
+    )
 
 
 @app.route("/api/metrics")

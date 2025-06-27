@@ -314,6 +314,9 @@ let highHashrateThresholdTHS = 20.0;
 window.lowHashrateThresholdTHS = lowHashrateThresholdTHS;
 window.highHashrateThresholdTHS = highHashrateThresholdTHS;
 
+let extendedHistoryEnabled = false;
+window.extendedHistoryEnabled = extendedHistoryEnabled;
+
 // Fetch the configured timezone when the page loads
 function fetchTimezoneConfig() {
     fetch('/api/timezone')
@@ -340,8 +343,30 @@ function fetchHashrateThresholds() {
                 highHashrateThresholdTHS = parseFloat(cfg.high_hashrate_threshold_ths);
                 window.highHashrateThresholdTHS = highHashrateThresholdTHS;
             }
+            if (cfg.extended_history !== undefined) {
+                extendedHistoryEnabled = !!cfg.extended_history;
+                window.extendedHistoryEnabled = extendedHistoryEnabled;
+                updateAllButtonVisibility();
+                updateDatasetPointRadius(trendChart);
+            }
         })
         .catch(err => console.error('Error fetching hashrate thresholds:', err));
+}
+
+function updateAllButtonVisibility() {
+    const btn = document.getElementById('btn-all');
+    if (!btn) return;
+    btn.classList.toggle('d-none', !extendedHistoryEnabled);
+}
+
+function updateDatasetPointRadius(chart) {
+    if (!chart || !chart.data || !chart.data.datasets) return;
+    const radius = (extendedHistoryEnabled && chartPoints === Infinity) ? 0 : 3;
+    chart.data.datasets.forEach(ds => {
+        ds.pointRadius = radius;
+        ds.pointHoverRadius = radius;
+    });
+    chart.update('none');
 }
 
 // Call this on page load
@@ -646,17 +671,21 @@ function updateDaySeparators(chart, labelTimestamps) {
     }
 
     const theme = getCurrentTheme();
+    const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
     const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
         month: 'short',
         day: 'numeric'
     });
 
-    let lastDay = labelTimestamps[labelTimestamps.length - 1].getDate();
+    const getDay = ts => new Date(ts.toLocaleString('en-US', { timeZone: tz })).getDate();
+
+    let lastDay = getDay(labelTimestamps[labelTimestamps.length - 1]);
     let sepIdx = 0;
 
     for (let i = labelTimestamps.length - 2; i >= 0; i--) {
         const ts = labelTimestamps[i];
-        const currentDay = ts.getDate();
+        const currentDay = getDay(ts);
         if (currentDay !== lastDay) {
             anns['daySeparator' + sepIdx] = {
                 type: 'line',
@@ -667,7 +696,7 @@ function updateDaySeparators(chart, labelTimestamps) {
                 borderDash: [2, 2],
                 label: {
                     enabled: true,
-                    content: formatter.format(labelTimestamps[i + 1]),
+                    content: formatter.format(new Date(labelTimestamps[i + 1].toLocaleString('en-US', { timeZone: tz }))),
                     backgroundColor: 'rgba(0,0,0,0.8)',
                     color: theme.CHART.DAY_SEPARATOR,
                     font: {
@@ -855,6 +884,7 @@ function setChartPoints(points) {
     if (points === chartPoints) return;
     chartPoints = points;
     updateChartPointsButtons();
+    updateDatasetPointRadius(trendChart);
     // Reload block annotations for the new time range
     loadBlockAnnotations(chartPoints);
 
@@ -1861,7 +1891,7 @@ function initializeChart() {
         // Check if annotation plugin is available
         const hasAnnotationPlugin = window.simpleAnnotationPlugin !== undefined;
 
-        return new Chart(ctx, {
+        const chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
@@ -2037,6 +2067,9 @@ function initializeChart() {
                 }
             }
         });
+        updateDatasetPointRadius(chart);
+        updateBlockAnnotations(chart);
+        return chart;
     } catch (error) {
         console.error("Error initializing chart:", error);
         return null;
@@ -4412,6 +4445,7 @@ $(document).ready(function () {
                     }
                 }
             });
+            updateDatasetPointRadius(chart);
             updateBlockAnnotations(chart);
             return chart;
         } catch (error) {
@@ -4454,6 +4488,7 @@ $(document).ready(function () {
                     // Recreate the chart with new theme colors
                     trendChart.destroy();
                     trendChart = initializeChart();
+                    updateDatasetPointRadius(trendChart);
 
                     // The state will be automatically loaded from localStorage in updateChartWithNormalizedData
 
@@ -4722,6 +4757,7 @@ $(document).ready(function () {
 
     // Initialize the chart
     trendChart = initializeChart();
+    updateDatasetPointRadius(trendChart);
 
     // Add keyboard event listener for Shift+R
     $(document).keydown(function (event) {
