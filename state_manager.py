@@ -175,16 +175,19 @@ class StateManager:
                     # Restore arrow_history
                     compact_arrow_history = state.get("arrow_history", {})
                     for key, values in compact_arrow_history.items():
+                        restored = []
+                        for entry in values:
+                            restored_entry = {
+                                "time": entry.get("t", ""),
+                                "value": entry.get("v", 0),
+                                "arrow": entry.get("a", ""),
+                            }
+                            if entry.get("u"):
+                                restored_entry["unit"] = entry["u"]
+                            restored.append(restored_entry)
+
                         self.arrow_history[key] = deque(
-                            [
-                                {
-                                    "time": entry.get("t", ""),
-                                    "value": entry.get("v", 0),
-                                    "arrow": entry.get("a", ""),
-                                    "unit": entry.get("u", "th/s"),
-                                }
-                                for entry in values
-                            ],
+                            restored,
                             maxlen=MAX_HISTORY_ENTRIES,
                         )
 
@@ -272,10 +275,18 @@ class StateManager:
                         if len(values_list) > MAX_HISTORY_ENTRIES
                         else values_list
                     )
-                    compact_arrow_history[key] = [
-                        {"t": entry["time"], "v": entry["value"], "a": entry["arrow"], "u": entry.get("unit", "th/s")}
-                        for entry in recent_values
-                    ]
+                    compacted = []
+                    for entry in recent_values:
+                        compact_entry = {
+                            "t": entry["time"],
+                            "v": entry["value"],
+                            "a": entry["arrow"],
+                        }
+                        if entry.get("unit"):
+                            compact_entry["u"] = entry["unit"]
+                        compacted.append(compact_entry)
+
+                    compact_arrow_history[key] = compacted
 
             # Compact hashrate_history
             compact_hashrate_history = (
@@ -307,10 +318,11 @@ class StateManager:
                     ]
                     for key in essential_keys:
                         if key in original_metrics:
-                            metrics_copy[key] = {
-                                "value": original_metrics[key],
-                                "unit": original_metrics.get(f"{key}_unit", "th/s"),
-                            }
+                            entry_copy = {"value": original_metrics[key]}
+                            unit_val = original_metrics.get(f"{key}_unit")
+                            if unit_val:
+                                entry_copy["unit"] = unit_val
+                            metrics_copy[key] = entry_copy
                     compact_metrics_log.append({"ts": entry["timestamp"], "m": metrics_copy})
 
             # Compact variance_history

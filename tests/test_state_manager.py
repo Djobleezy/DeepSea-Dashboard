@@ -82,6 +82,27 @@ def test_load_graph_state_plain_json():
     assert new_mgr.arrow_history["hashrate_60sec"][0]["value"] == 1
 
 
+def test_save_load_no_unit_preservation():
+    mgr = StateManager()
+    mgr.redis_client = DummyRedis()
+    mgr.arrow_history = {
+        "workers_hashing": deque([
+            {"time": "t", "value": 5, "arrow": ""}
+        ], maxlen=180)
+    }
+    mgr.hashrate_history = []
+    mgr.metrics_log = deque([], maxlen=180)
+
+    mgr.save_graph_state()
+
+    new_mgr = StateManager()
+    new_mgr.redis_client = mgr.redis_client
+    new_mgr.load_graph_state()
+
+    entry = new_mgr.arrow_history["workers_hashing"][0]
+    assert "unit" not in entry
+
+
 def test_variance_history_calculation(monkeypatch):
     mgr = StateManager()
     monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
