@@ -447,6 +447,22 @@ def test_earnings_csv_export(client, monkeypatch):
     assert "date,txid,lightning_txid,amount_btc,amount_sats,status" in text
 
 
+def test_history_csv_export(client, monkeypatch):
+    import App
+
+    h = {"hashrate": [{"time": "t", "value": 1, "arrow": "", "unit": "th/s"}]}
+    m = [{"timestamp": "t", "metrics": {"hashrate": 1}}]
+    monkeypatch.setattr(App.state_manager, "get_history", lambda: h)
+    monkeypatch.setattr(App.state_manager, "get_metrics_log", lambda: m)
+
+    resp = client.get("/api/history?format=csv")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/csv"
+    text = resp.data.decode()
+    assert "metric,time,value,arrow,unit" in text
+    assert "timestamp,hashrate" in text
+
+
 
 def test_earnings_returns_generic_error(client, monkeypatch):
     import App

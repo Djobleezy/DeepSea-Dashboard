@@ -78,6 +78,7 @@ def test_validate_config_valid():
         "low_hashrate_threshold_ths": 3.0,
         "high_hashrate_threshold_ths": 20.0,
         "EXCHANGE_RATE_API_KEY": "KEY",
+        "extended_history": False,
     }
     assert config_module.validate_config(cfg)
 
@@ -93,6 +94,7 @@ def test_validate_config_missing_key():
         "low_hashrate_threshold_ths": 3.0,
         "high_hashrate_threshold_ths": 20.0,
         "EXCHANGE_RATE_API_KEY": "KEY",
+        "extended_history": False,
     }
     cfg.pop("wallet")
     assert not config_module.validate_config(cfg)

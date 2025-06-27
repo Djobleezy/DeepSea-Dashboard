@@ -11,7 +11,7 @@ from typing import Callable, Optional, Any
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from json_utils import convert_deques
-from state_manager import MAX_HISTORY_ENTRIES
+import state_manager
 
 # Default connection limits
 MAX_SSE_CONNECTIONS = 50
@@ -46,7 +46,7 @@ def stream() -> Response:
     except ValueError:
         start_event_id = 0
 
-    num_points = MAX_HISTORY_ENTRIES
+    num_points = state_manager.MAX_HISTORY_ENTRIES
 
     def event_stream(start_event_id: int, num_points: int):
         global active_sse_connections

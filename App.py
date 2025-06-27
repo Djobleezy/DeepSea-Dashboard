@@ -88,6 +88,7 @@ ALLOWED_BATCH_PATHS = {
     "/api/config",
     "/api/payout-history",
     "/api/earnings",
+    "/api/history",
     "/api/notifications",
     "/api/notifications/unread_count",
     "/api/notifications/mark_read",
@@ -655,6 +656,25 @@ def payout_history():
         return jsonify({"error": "internal server error"}), 500
 
 
+@app.route("/api/history")
+def export_history():
+    """Return arrow history and metrics log as JSON or CSV."""
+    try:
+        fmt = request.args.get("format", "json").lower()
+        history = state_manager.get_history()
+        metrics_log = list(state_manager.get_metrics_log())
+        if fmt == "csv":
+            csv_data = arrow_history_to_csv(history)
+            csv_data += "\n"
+            csv_data += metrics_log_to_csv(metrics_log)
+            headers = {"Content-Disposition": "attachment; filename=history.csv"}
+            return Response(csv_data, mimetype="text/csv", headers=headers)
+        return jsonify({"arrow_history": convert_deques(history), "metrics_log": metrics_log})
+    except Exception:
+        logging.exception("Error exporting history")
+        return jsonify({"error": "internal server error"}), 500
+
+
 # New endpoint to fetch recent block events for chart annotations
 @app.route("/api/block-events")
 def block_events():
@@ -894,6 +914,38 @@ def payments_to_csv(payments):
                     pay.get("status", ""),
                 ]
             )
+        return output.getvalue()
+
+
+def arrow_history_to_csv(history):
+    """Convert arrow_history dict to CSV string."""
+    with io.StringIO() as output:
+        writer = csv.writer(output)
+        writer.writerow(["metric", "time", "value", "arrow", "unit"])
+        for metric, entries in history.items():
+            for item in entries:
+                writer.writerow(
+                    [
+                        metric,
+                        item.get("time", ""),
+                        item.get("value", ""),
+                        item.get("arrow", ""),
+                        item.get("unit", ""),
+                    ]
+                )
+        return output.getvalue()
+
+
+def metrics_log_to_csv(metrics_log):
+    """Convert metrics_log list to CSV string."""
+    keys = sorted({k for entry in metrics_log for k in entry.get("metrics", {}).keys()})
+    with io.StringIO() as output:
+        writer = csv.writer(output)
+        writer.writerow(["timestamp", *keys])
+        for entry in metrics_log:
+            metrics = entry.get("metrics", {})
+            row = [entry.get("timestamp", "")] + [metrics.get(k, "") for k in keys]
+            writer.writerow(row)
         return output.getvalue()
 
 

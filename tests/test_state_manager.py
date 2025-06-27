@@ -271,6 +271,15 @@ def test_hashrate_history_loaded_as_deque(monkeypatch):
     assert isinstance(new_mgr.hashrate_history, deque)
     assert new_mgr.hashrate_history.maxlen == MAX_HISTORY_ENTRIES
 
+
+def test_extended_history_entries(monkeypatch):
+    import state_manager as sm
+    sm.MAX_HISTORY_ENTRIES = 10
+    mgr = sm.StateManager()
+    for i in range(15):
+        mgr.metrics_log.append({"timestamp": str(i), "metrics": {}})
+    assert len(mgr.metrics_log) == sm.MAX_HISTORY_ENTRIES
+
 def test_metrics_log_snapshot_omits_history(monkeypatch):
     """metrics_log should not store arrow_history or history fields."""
     mgr = StateManager()

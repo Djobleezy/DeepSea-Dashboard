@@ -30,6 +30,7 @@ DEFAULT_CONFIG = {
     "low_hashrate_threshold_ths": 3.0,
     "high_hashrate_threshold_ths": 20.0,
     "EXCHANGE_RATE_API_KEY": "",
+    "extended_history": False,
 }
 
 
@@ -45,6 +46,7 @@ def validate_config(config):
         "low_hashrate_threshold_ths": (int, float),
         "high_hashrate_threshold_ths": (int, float),
         "EXCHANGE_RATE_API_KEY": str,
+        "extended_history": bool,
     }
 
     for key, expected in required_types.items():

@@ -45,6 +45,20 @@ def configure_logging():
 def init_state_manager():
     """Return a state manager configured from environment variables."""
     redis_url = os.environ.get("REDIS_URL")
+    config = load_config()
+    extended = config.get("extended_history", False)
+    import state_manager
+    from memory_manager import MEMORY_CONFIG
+
+    if extended:
+        state_manager.MAX_HISTORY_ENTRIES = 43200
+        MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = 43200
+        MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = 43200
+    else:
+        state_manager.MAX_HISTORY_ENTRIES = 180
+        MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = 180
+        MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = 180
+
     return StateManager(redis_url)
 
 

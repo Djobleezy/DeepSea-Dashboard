@@ -756,6 +756,19 @@
             <input type="number" id="network-fee" step="0.1" min="0" max="10" placeholder="0.0" value="">
         </div>
         <div class="form-group">
+            <label for="extended-history">
+                Extended History
+                <span class="tooltip">
+                    ?
+                <span class="tooltip-text">Store one month of metrics instead of 3</span>
+                </span>
+            </label>
+            <select id="extended-history" class="form-control">
+                <option value="false">Standard (3 hrs)</option>
+                <option value="true">Extended (1 month)</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label for="timezone">
                 Timezone
                 <span class="tooltip">
@@ -919,6 +932,7 @@
             const networkFee = parseFloat(document.getElementById('network-fee').value) || 0;
             const currency = document.getElementById('currency').value;
             const apiKey = document.getElementById('exchange-rate-api-key').value.trim();
+            const extendedHistory = document.getElementById('extended-history').value === 'true';
 
             const updatedConfig = {
                 wallet: wallet || (currentConfig ? currentConfig.wallet : ""),
@@ -927,7 +941,8 @@
                 timezone: timezone,
                 network_fee: networkFee,
                 currency: currency,
-                EXCHANGE_RATE_API_KEY: apiKey
+                EXCHANGE_RATE_API_KEY: apiKey,
+                extended_history: extendedHistory
             };
 
             return fetch('/api/config', {
@@ -975,7 +990,8 @@
         let currentConfig = {
             wallet: "yourwallethere",
             power_cost: 0.0,
-            power_usage: 0.0
+            power_usage: 0.0,
+            extended_history: false
         };
 
         // Update loadConfig function to handle currency
@@ -998,6 +1014,7 @@
                         document.getElementById('power-usage').value = currentConfig.power_usage || "";
                         document.getElementById('network-fee').value = currentConfig.network_fee || "";
                         document.getElementById('exchange-rate-api-key').value = currentConfig.EXCHANGE_RATE_API_KEY || "";
+                        document.getElementById('extended-history').value = currentConfig.extended_history ? 'true' : 'false';
 
                         // Set currency dropdown value if available
                         if (currentConfig.currency) {
@@ -1016,7 +1033,8 @@
                             power_usage: 0.0,
                             network_fee: 0.0,
                             currency: "USD",
-                            EXCHANGE_RATE_API_KEY: ""
+                            EXCHANGE_RATE_API_KEY: "",
+                            extended_history: false
                         };
 
                         document.getElementById('wallet-address').value = currentConfig.wallet || "";
@@ -1025,6 +1043,7 @@
                         document.getElementById('network-fee').value = currentConfig.network_fee || "";
                         document.getElementById('exchange-rate-api-key').value = currentConfig.EXCHANGE_RATE_API_KEY || "";
                         document.getElementById('currency').value = currentConfig.currency || "USD";
+                        document.getElementById('extended-history').value = currentConfig.extended_history ? 'true' : 'false';
 
                         resolve(currentConfig);
                     });
@@ -1072,6 +1091,7 @@
             document.getElementById('power-usage').value = 0.0;
             document.getElementById('network-fee').value = 0.0;
             document.getElementById('exchange-rate-api-key').value = '';
+            document.getElementById('extended-history').value = 'false';
 
             // Visual feedback
             const btn = document.getElementById('use-defaults');

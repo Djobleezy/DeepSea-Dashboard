@@ -66,6 +66,7 @@ def update_config() -> Any:
             "power_usage": 0.0,
             "currency": "USD",
             "EXCHANGE_RATE_API_KEY": "",
+            "extended_history": False,
         }
 
         merged_config = {**current_config}
