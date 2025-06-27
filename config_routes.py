@@ -108,6 +108,34 @@ def update_config() -> Any:
             _notification_service.dashboard_service = _dashboard_service
             logging.info("Worker service updated with the new dashboard service")
 
+            extended_changed = (
+                "extended_history" in merged_config
+                and merged_config.get("extended_history")
+                != current_config.get("extended_history", False)
+            )
+            if extended_changed:
+                try:
+                    import App
+                    from app_setup import init_state_manager
+                    import memory_manager
+
+                    old_sm = App.state_manager
+                    if old_sm:
+                        try:
+                            old_sm.close()
+                        except Exception as e:  # pragma: no cover - defensive
+                            logging.error("Error closing old state manager: %s", e)
+
+                    App.state_manager = init_state_manager()
+                    memory_manager.state_manager = App.state_manager
+                    _notification_service.state_manager = App.state_manager
+                    logging.info(
+                        "State manager reinitialized with extended_history=%s",
+                        merged_config.get("extended_history"),
+                    )
+                except Exception as e:  # pragma: no cover - defensive
+                    logging.error("Error reinitializing state manager: %s", e)
+
             if currency_changed:
                 try:
                     old_currency = current_config.get("currency", "USD")
