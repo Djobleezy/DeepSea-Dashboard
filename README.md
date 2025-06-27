@@ -153,6 +153,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 - Currency conversion for earnings in selected fiat
 - Historical data for earnings analysis
 - Download payment history as CSV
+- Export hashrate history as CSV via `/api/history?format=csv`
 
 ### Blocks Explorer
 
