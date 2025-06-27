@@ -22,7 +22,11 @@ from config import get_timezone
 # rather than as module level globals.
 
 # Limits for data collections to prevent memory growth
+# Number of points to retain in graphs and sparkline displays
 MAX_HISTORY_ENTRIES = 180  # 3 hours worth at 1 min intervals
+# Sparklines should always show only the last 3 hours even when
+# extended history is enabled
+SPARKLINE_HISTORY_ENTRIES = 180
 # Separate history for short-term variance calculations (3 hours)
 MAX_VARIANCE_HISTORY_ENTRIES = 180  # 3 hours at 1 min intervals
 # Maximum number of minutes to autofill when variance data is missing
@@ -667,10 +671,11 @@ class StateManager:
                 # Sort by time to ensure chronological order
                 aggregated_history[key] = sorted(list(minute_groups.values()), key=lambda x: x["time"])
 
-                # Only keep the most recent 60 data points for the graph display
+                # Limit sparkline display to a 3-hour window even when extended
+                # history is enabled
                 aggregated_history[key] = (
-                    aggregated_history[key][-MAX_HISTORY_ENTRIES:]
-                    if len(aggregated_history[key]) > MAX_HISTORY_ENTRIES
+                    aggregated_history[key][-SPARKLINE_HISTORY_ENTRIES:]
+                    if len(aggregated_history[key]) > SPARKLINE_HISTORY_ENTRIES
                     else aggregated_history[key]
                 )
 

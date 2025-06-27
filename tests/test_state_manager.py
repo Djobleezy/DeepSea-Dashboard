@@ -413,3 +413,26 @@ def test_save_graph_state_extended_history(monkeypatch):
     data = json.loads(gzip.decompress(raw).decode("utf-8"))
 
     assert len(data["arrow_history"]["hashrate_60sec"]) == sm.MAX_HISTORY_ENTRIES
+
+
+def test_sparkline_history_limit_extended(monkeypatch):
+    """Sparklines should only expose a 3-hour window of data."""
+    import state_manager as sm
+
+    sm.MAX_HISTORY_ENTRIES = 43200
+    sm.SPARKLINE_HISTORY_ENTRIES = 180
+
+    mgr = sm.StateManager()
+    monkeypatch.setattr("state_manager.get_timezone", lambda: "UTC")
+
+    # Pre-populate a large history to mimic extended mode
+    entries = deque(maxlen=sm.MAX_HISTORY_ENTRIES)
+    for i in range(200):
+        entries.append({"time": f"{i:02d}:00:00", "value": i, "arrow": ""})
+    mgr.arrow_history = {"hashrate_60sec": entries}
+
+    metrics = {"hashrate_60sec": 201, "hashrate_60sec_unit": "th/s"}
+    mgr.update_metrics_history(metrics)
+
+    hist = metrics["arrow_history"]["hashrate_60sec"]
+    assert len(hist) == sm.SPARKLINE_HISTORY_ENTRIES
