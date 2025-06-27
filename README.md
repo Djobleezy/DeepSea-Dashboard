@@ -226,6 +226,9 @@ dataset (arrow history, metrics log and hashrate history) is capped at 180
 entries, equating to roughly three hours of data. Older points are compressed by
 the `StateManager` before saving to Redis—values are averaged so long-term
 trends remain accurate while memory usage stays predictable.
+When `extended_history` is enabled, this limit increases to one month (43200
+entries). A Redis URL must be configured to persist the additional history across
+restarts.
 Short-term variance history for earnings metrics is also persisted so 3-hour
 variance values remain visible after restarts. Minor gaps of a few minutes are
 filled automatically using the last known metric so the variance progress can

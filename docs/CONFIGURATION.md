@@ -20,7 +20,7 @@ The default configuration file contains the following keys:
 | `network_fee` | Additional fees beyond pool fees | `0.0` |
 | `currency` | Preferred fiat currency for earnings display | `"USD"` |
 | `EXCHANGE_RATE_API_KEY` | ExchangeRate-API key for currency conversion | `""` |
-| `extended_history` | Store one month of metrics history | `false` |
+| `extended_history` | Store one month of metrics history (requires Redis for persistence) | `false` |
 | `low_hashrate_threshold_ths` | Threshold used by the notification service to determine low hashrate mode (TH/s). Does **not** affect the front-end chart. | `3.0` |
 | `high_hashrate_threshold_ths` | Threshold above which normal hashrate mode resumes (TH/s) | `20.0` |
 

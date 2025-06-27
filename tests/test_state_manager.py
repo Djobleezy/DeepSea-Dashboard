@@ -392,3 +392,24 @@ def test_update_metrics_history_copies_entries(monkeypatch):
     metrics_entry = metrics["arrow_history"]["hashrate_60sec"][-1]
 
     assert metrics_entry is not state_entry
+
+
+def test_save_graph_state_extended_history(monkeypatch):
+    import state_manager as sm
+
+    sm.MAX_HISTORY_ENTRIES = 20
+    mgr = sm.StateManager()
+    mgr.redis_client = DummyRedis()
+
+    hist = deque(maxlen=sm.MAX_HISTORY_ENTRIES)
+    for i in range(25):
+        hist.append({"time": str(i), "value": i, "arrow": ""})
+    mgr.arrow_history = {"hashrate_60sec": hist}
+
+    mgr.last_save_time = 0
+    mgr.save_graph_state()
+
+    raw = mgr.redis_client.get(mgr.STATE_KEY)
+    data = json.loads(gzip.decompress(raw).decode("utf-8"))
+
+    assert len(data["arrow_history"]["hashrate_60sec"]) == sm.MAX_HISTORY_ENTRIES

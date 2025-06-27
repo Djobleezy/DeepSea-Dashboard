@@ -267,7 +267,11 @@ class StateManager:
             for key, values in self.arrow_history.items():
                 values_list = list(values)
                 if values_list:
-                    recent_values = values_list[-180:] if len(values_list) > 180 else values_list
+                    recent_values = (
+                        values_list[-MAX_HISTORY_ENTRIES:]
+                        if len(values_list) > MAX_HISTORY_ENTRIES
+                        else values_list
+                    )
                     compact_arrow_history[key] = [
                         {"t": entry["time"], "v": entry["value"], "a": entry["arrow"], "u": entry.get("unit", "th/s")}
                         for entry in recent_values
@@ -275,13 +279,19 @@ class StateManager:
 
             # Compact hashrate_history
             compact_hashrate_history = (
-                list(self.hashrate_history)[-60:] if len(self.hashrate_history) > 60 else list(self.hashrate_history)
+                list(self.hashrate_history)[-MAX_HISTORY_ENTRIES:]
+                if len(self.hashrate_history) > MAX_HISTORY_ENTRIES
+                else list(self.hashrate_history)
             )
 
             # Compact metrics_log with unit preservation
             compact_metrics_log = []
             if self.metrics_log:
-                recent_logs = list(self.metrics_log)[-30:]
+                recent_logs = (
+                    list(self.metrics_log)[-MAX_HISTORY_ENTRIES:]
+                    if len(self.metrics_log) > MAX_HISTORY_ENTRIES
+                    else list(self.metrics_log)
+                )
                 for entry in recent_logs:
                     metrics_copy = {}
                     original_metrics = entry["metrics"]
