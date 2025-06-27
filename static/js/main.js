@@ -588,7 +588,16 @@ function updateBlockAnnotations(chart) {
 
     const theme = getCurrentTheme();
     const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const useExtendedLabels = chart.data && Array.isArray(chart.data.labels) &&
+        chart.data.labels.some(lbl => lbl.includes(','));
+    const formatter = new Intl.DateTimeFormat('en-US', useExtendedLabels ? {
+        timeZone: tz,
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    } : {
         timeZone: tz,
         hour: '2-digit',
         minute: '2-digit',
