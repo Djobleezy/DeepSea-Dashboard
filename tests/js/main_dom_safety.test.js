@@ -12,7 +12,7 @@ const storageStub = {
 global.document = {
     readyState: 'complete',
     getElementById: (id) => {
-        if (['btn-30', 'btn-60', 'btn-180'].includes(id)) {
+        if (['btn-30', 'btn-60', 'btn-180', 'btn-all'].includes(id)) {
             return { classList: { toggle: () => {} } };
         }
         return null;

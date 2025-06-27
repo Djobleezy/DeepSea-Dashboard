@@ -15,7 +15,7 @@ const canvasStub = {
 };
 
 global.document.getElementById = (id) => {
-    if (['btn-30', 'btn-60', 'btn-180'].includes(id)) {
+    if (['btn-30', 'btn-60', 'btn-180', 'btn-all'].includes(id)) {
         return { classList: { toggle: () => {} } };
     }
     if (id === 'trendGraph') {

@@ -468,6 +468,9 @@ function clearBlockAnnotations() {
 window.clearBlockAnnotations = clearBlockAnnotations;
 
 function loadBlockAnnotations(minutes = 180, maxEntries = 100) {
+    if (!isFinite(minutes)) {
+        minutes = 43200; // 30 days fallback when requesting all data
+    }
     const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: tz,
@@ -778,15 +781,19 @@ function normalizeHashrate(value, unit, debug = false) {
 }
 
 // ===== Chart Data Points Control =====
-let chartPoints = 180; // Default to 180 points
+let chartPoints = 180; // Default to 180 points, Infinity = all data
 
 function updateChartPointsButtons() {
     document.getElementById('btn-30').classList.toggle('active', chartPoints === 30);
     document.getElementById('btn-60').classList.toggle('active', chartPoints === 60);
     document.getElementById('btn-180').classList.toggle('active', chartPoints === 180);
+    document.getElementById('btn-all').classList.toggle('active', chartPoints === Infinity);
 }
 
 function setChartPoints(points) {
+    if (points === 'all') {
+        points = Infinity;
+    }
     if (points === chartPoints) return;
     chartPoints = points;
     updateChartPointsButtons();
@@ -1525,9 +1532,13 @@ function setupEventSource() {
     try {
         const storedPreference = localStorage.getItem('chartPointsPreference');
         if (storedPreference) {
-            const points = parseInt(storedPreference, 10);
-            if ([30, 60, 180].includes(points)) {
-                chartPoints = points;
+            if (storedPreference === 'Infinity' || storedPreference === 'all') {
+                chartPoints = Infinity;
+            } else {
+                const points = parseInt(storedPreference, 10);
+                if ([30, 60, 180].includes(points)) {
+                    chartPoints = points;
+                }
             }
         }
     } catch (e) {
@@ -2540,7 +2551,7 @@ function updateChartWithNormalizedData(chart, data) {
                             validatedData[i] = 0; // Use 0 as a safe fallback
                         }
                     }
-                    // Limit the data points based on the selected chartPoints (30, 60, or 180)
+                    // Limit the data points based on the selected chartPoints (30, 60, 180 or all)
                     const limitedData = validatedData.slice(-chartPoints);
                     chart.data.datasets[0].data = limitedData;
 
@@ -4148,9 +4159,13 @@ $(document).ready(function () {
     try {
         const storedPreference = localStorage.getItem('chartPointsPreference');
         if (storedPreference) {
-            const points = parseInt(storedPreference, 10);
-            if ([30, 60, 180].includes(points)) {
-                chartPoints = points;
+            if (storedPreference === 'Infinity' || storedPreference === 'all') {
+                chartPoints = Infinity;
+            } else {
+                const points = parseInt(storedPreference, 10);
+                if ([30, 60, 180].includes(points)) {
+                    chartPoints = points;
+                }
             }
         }
     } catch (e) {
