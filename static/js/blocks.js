@@ -278,6 +278,20 @@ $(document).keydown(function (event) {
     // Check if Alt+W is pressed (key code 87 is 'W')
     if (event.altKey && event.keyCode === 87) {
         resetWalletAddress();
+        $.ajax({
+            url: "/api/notifications/clear",
+            method: "POST",
+            data: JSON.stringify({}),
+            contentType: "application/json",
+            success: function () {
+                if (typeof updateNotificationBadge === 'function') {
+                    updateNotificationBadge();
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("Error clearing notifications:", error);
+            }
+        });
 
         // Prevent default browser behavior
         event.preventDefault();
