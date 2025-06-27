@@ -824,3 +824,24 @@ html.bitcoin-theme #btc_price:hover {
     width: 40px !important;
   }
 }
+
+.hashrate-actions {
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
+.download-btn {
+  display: inline-block;
+  padding: 4px 8px;
+  font-family: var(--terminal-font);
+  font-size: 0.9rem;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.download-btn:hover {
+  background-color: var(--primary-color);
+  color: var(--bg-color);
+}
