@@ -628,6 +628,64 @@ function updateBlockAnnotations(chart) {
     });
 }
 
+function updateDaySeparators(chart, labelTimestamps) {
+    if (!chart || !chart.options || !Array.isArray(labelTimestamps)) return;
+
+    if (!chart.options.plugins) chart.options.plugins = {};
+    if (!chart.options.plugins.annotation) {
+        chart.options.plugins.annotation = { annotations: {} };
+    }
+
+    const anns = chart.options.plugins.annotation.annotations || {};
+    Object.keys(anns).forEach(key => {
+        if (key.startsWith('daySeparator')) delete anns[key];
+    });
+
+    if (labelTimestamps.length <= 1440) {
+        return;
+    }
+
+    const theme = getCurrentTheme();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric'
+    });
+
+    let lastDay = labelTimestamps[labelTimestamps.length - 1].getDate();
+    let sepIdx = 0;
+
+    for (let i = labelTimestamps.length - 2; i >= 0; i--) {
+        const ts = labelTimestamps[i];
+        const currentDay = ts.getDate();
+        if (currentDay !== lastDay) {
+            anns['daySeparator' + sepIdx] = {
+                type: 'line',
+                xMin: i + 1,
+                xMax: i + 1,
+                borderColor: theme.CHART.DAY_SEPARATOR,
+                borderWidth: 1,
+                borderDash: [2, 2],
+                label: {
+                    enabled: true,
+                    content: formatter.format(labelTimestamps[i + 1]),
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    color: theme.CHART.DAY_SEPARATOR,
+                    font: {
+                        family: "'VT323', monospace",
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    padding: { top: 4, bottom: 4, left: 6, right: 6 },
+                    borderRadius: 0,
+                    position: 'start'
+                }
+            };
+            sepIdx++;
+            lastDay = currentDay;
+        }
+    }
+}
+
 // Hashrate Normalization Utilities
 // Enhanced normalizeHashrate function with better error handling for units
 /**
@@ -2437,62 +2495,37 @@ function updateChartWithNormalizedData(chart, data) {
 
                     // Format time labels more efficiently (do this once, not in a map callback)
                     const timeZone = dashboardTimezone || 'America/Los_Angeles';
-                    const now = new Date();
-                    const yearMonthDay = {
-                        year: now.getFullYear(),
-                        month: now.getMonth(),
-                        day: now.getDate()
-                    };
+                    const endTime = data.server_timestamp ?
+                        new Date(data.server_timestamp) : new Date();
+                    const useExtendedLabels = validHistoryData.length > 1440;
 
-                    // Create time formatter function with consistent options
-                    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+                    const formatOptions = useExtendedLabels ? {
+                        timeZone: timeZone,
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                    } : {
                         timeZone: timeZone,
                         hour: '2-digit',
                         minute: '2-digit',
                         hour12: true
+                    };
+
+                    const timeFormatter = new Intl.DateTimeFormat('en-US', formatOptions);
+
+                    const labelTimestamps = validHistoryData.map((_, idx) => {
+                        const offset = (validHistoryData.length - 1 - idx) * 60000;
+                        return new Date(endTime.getTime() - offset);
                     });
 
-                    // Format all time labels at once
-                    const formattedLabels = validHistoryData.map(item => {
-                        const timeStr = item.time;
-                        try {
-                            // Parse time efficiently
-                            let hours = 0, minutes = 0, seconds = 0;
-
-                            if (timeStr.length === 8 && timeStr.indexOf(':') !== -1) {
-                                // Format: HH:MM:SS
-                                const parts = timeStr.split(':');
-                                hours = parseInt(parts[0], 10);
-                                minutes = parseInt(parts[1], 10);
-                                seconds = parseInt(parts[2], 10);
-                            } else if (timeStr.length === 5 && timeStr.indexOf(':') !== -1) {
-                                // Format: HH:MM
-                                const parts = timeStr.split(':');
-                                hours = parseInt(parts[0], 10);
-                                minutes = parseInt(parts[1], 10);
-                            } else {
-                                return timeStr; // Use original if format is unexpected
-                            }
-
-                            // Create time date with validation
-                            if (isNaN(hours) || isNaN(minutes) || isNaN(seconds) ||
-                                hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
-                                return timeStr; // Use original for invalid times
-                            }
-
-                            const timeDate = new Date(yearMonthDay.year, yearMonthDay.month, yearMonthDay.day,
-                                hours, minutes, seconds);
-
-                            // Format using the formatter
-                            const formatted = timeFormatter.format(timeDate);
-                            return formatted.replace(/\s[AP]M$/i, ''); // Remove AM/PM
-                        } catch (e) {
-                            console.error("Time formatting error:", e);
-                            return timeStr; // Use original on error
-                        }
-                    });
+                    const formattedLabels = labelTimestamps.map(ts =>
+                        timeFormatter.format(ts).replace(/\s[AP]M$/i, '')
+                    );
 
                     chart.data.labels = formattedLabels;
+                    chart.labelTimestamps = labelTimestamps;
 
                     // Process and normalize hashrate values with validation (optimize by avoiding multiple iterations)
                     const hashrateValues = [];
@@ -2555,9 +2588,11 @@ function updateChartWithNormalizedData(chart, data) {
                     const limitedData = validatedData.slice(-chartPoints);
                     chart.data.datasets[0].data = limitedData;
 
-                    // Similarly, limit the labels
+                    // Similarly, limit the labels and timestamps
                     const limitedLabels = formattedLabels.slice(-chartPoints);
+                    const limitedTimestamps = labelTimestamps.slice(-chartPoints);
                     chart.data.labels = limitedLabels;
+                    chart.labelTimestamps = limitedTimestamps;
 
                     // Store the full datasets for reference, but don't overwrite the displayed data
                     chart.fullData = validatedData;
@@ -2778,6 +2813,7 @@ function updateChartWithNormalizedData(chart, data) {
 
                 chart.data.labels = [currentTime];
                 chart.data.datasets[0].data = [normalizedValue];
+                chart.labelTimestamps = [now];
 
                 // MODIFICATION: For single datapoint in low hashrate mode, ensure 24hr avg is visible
                 if (useHashrate3hr && normalizedAvg > 0) {
@@ -2788,6 +2824,7 @@ function updateChartWithNormalizedData(chart, data) {
                     chart.options.scales.y.max = yMax;
                     console.log(`Low hashrate mode (single point): Adjusting y-axis to include 24hr avg: [${yMin.toFixed(2)}, ${yMax.toFixed(2)}]`);
                 }
+                updateDaySeparators(chart, chart.labelTimestamps);
             } catch (err) {
                 console.error("Error setting up single datapoint:", err);
                 chart.data.labels = ["Now"];
@@ -2852,6 +2889,7 @@ function updateChartWithNormalizedData(chart, data) {
             console.warn("Chart annotation plugin not properly configured");
         }
 
+        updateDaySeparators(chart, chart.labelTimestamps);
         updateBlockAnnotations(chart);
         // Finally update the chart with a safe non-animating update
         chart.update('none');

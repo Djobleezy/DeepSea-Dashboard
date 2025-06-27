@@ -14,7 +14,8 @@ const BITCOIN_THEME = {
         GRADIENT_START: '#f2a900',
         GRADIENT_END: 'rgba(242, 169, 0, 0.2)',
         ANNOTATION: '#ffd700',
-        BLOCK_EVENT: '#00ff00'
+        BLOCK_EVENT: '#00ff00',
+        DAY_SEPARATOR: '#888888'
     }
 };
 
@@ -31,7 +32,8 @@ const DEEPSEA_THEME = {
         GRADIENT_START: '#0088cc',
         GRADIENT_END: 'rgba(0, 136, 204, 0.2)',
         ANNOTATION: '#00b3ff',
-        BLOCK_EVENT: '#00ff00'
+        BLOCK_EVENT: '#00ff00',
+        DAY_SEPARATOR: '#888888'
     }
 };
 
@@ -48,7 +50,8 @@ const MATRIX_THEME = {
         GRADIENT_START: '#39ff14',
         GRADIENT_END: 'rgba(57, 255, 20, 0.2)',
         ANNOTATION: '#39ff14',
-        BLOCK_EVENT: '#00ff00'
+        BLOCK_EVENT: '#00ff00',
+        DAY_SEPARATOR: '#888888'
     }
 };
 
