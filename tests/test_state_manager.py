@@ -42,7 +42,9 @@ def test_save_and_load_graph_state_gzip():
     mgr = StateManager()
     mgr.redis_client = DummyRedis()
     mgr.arrow_history = {
-        "hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)
+        "hashrate_60sec": deque([
+            {"time": "2024-01-01 00:00:01", "value": 1, "arrow": "", "unit": "th/s"}
+        ], maxlen=180)
     }
     mgr.hashrate_history = [1]
     mgr.metrics_log = deque(
@@ -167,7 +169,9 @@ def test_variance_history_persistence(monkeypatch):
 
     now = datetime(2024, 1, 1, tzinfo=ZoneInfo("UTC"))
     mgr.arrow_history = {
-        "hashrate_60sec": deque([{"time": "00:00:01", "value": 1, "arrow": "", "unit": "th/s"}], maxlen=180)
+        "hashrate_60sec": deque([
+            {"time": "2024-01-01 00:00:01", "value": 1, "arrow": "", "unit": "th/s"}
+        ], maxlen=180)
     }
     mgr.hashrate_history = [1]
     mgr.metrics_log = deque(
@@ -331,7 +335,7 @@ def test_close_clears_cached_data():
     from datetime import datetime
 
     mgr = StateManager()
-    mgr.arrow_history = {"k": deque([{"time": "00:00:00", "value": 1}])}
+    mgr.arrow_history = {"k": deque([{"time": "2024-01-01 00:00:00", "value": 1}])}
     mgr.hashrate_history.append(1)
     mgr.metrics_log.append({"timestamp": "t", "metrics": {"a": 1}})
     mgr.payout_history = [1]

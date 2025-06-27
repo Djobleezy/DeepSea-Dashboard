@@ -519,7 +519,8 @@ class StateManager:
         from zoneinfo import ZoneInfo
         from datetime import timedelta
 
-        current_second = datetime.now(ZoneInfo(get_timezone())).strftime("%H:%M:%S")
+        # Use full timestamp so extended history can span multiple days
+        current_second = datetime.now(ZoneInfo(get_timezone())).strftime("%Y-%m-%d %H:%M:%S")
 
         with state_lock:
             for key in arrow_keys:
@@ -660,7 +661,11 @@ class StateManager:
             for key, entries in self.arrow_history.items():
                 minute_groups = {}
                 for entry in entries:
-                    minute = entry["time"][:5]  # extract HH:MM
+                    ts = entry["time"]
+                    if len(ts) > 8:
+                        minute = ts[:16]  # YYYY-MM-DD HH:MM
+                    else:
+                        minute = ts[:5]  # legacy HH:MM
                     # Store a copy so pruned entries can be freed
                     minute_groups[minute] = entry.copy()  # take last entry for that minute
 
