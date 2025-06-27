@@ -512,7 +512,7 @@ function applyMatrixTheme() {
         }
 
         updateMatrixHeaderText();
-        updateChartControlsLabel(true);
+        updateChartControlsLabel(false);
 
         if (window.refreshAudioThemeColors) {
             window.refreshAudioThemeColors();
@@ -646,7 +646,7 @@ function loadThemePreference() {
         if (matrixPref) {
             applyMatrixTheme();
             updateMatrixHeaderText();
-            updateChartControlsLabel(true);
+            updateChartControlsLabel(false);
             return;
         }
 
