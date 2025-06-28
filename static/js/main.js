@@ -434,11 +434,16 @@ function pruneBlockAnnotations(minutes = 180, maxEntries = 100) {
         blockAnnotations = blockAnnotations
             .map(ts => {
                 if (typeof ts === 'string' && ts.match(/^\d{1,2}:\d{2}$/)) {
+                    if (minutes > 1440) {
+                        // Legacy entries without a date can't be mapped across days
+                        return null;
+                    }
                     return parseOldLabel(ts, tz);
                 }
                 return ts;
             })
             .filter(ts => {
+                if (!ts) return false;
                 const time = new Date(ts).getTime();
                 return !isNaN(time) && time >= cutoff;
             });
@@ -2506,7 +2511,15 @@ function updateChartWithNormalizedData(chart, data) {
                     const timeZone = dashboardTimezone || 'America/Los_Angeles';
                     const endTime = data.server_timestamp ?
                         new Date(data.server_timestamp) : new Date();
-                    const useExtendedLabels = validHistoryData.length > 1440;
+                    const labelTimestamps = validHistoryData.map((_, idx) => {
+                        const offset = (validHistoryData.length - 1 - idx) * 60000;
+                        return new Date(endTime.getTime() - offset);
+                    });
+
+                    const timeSpanMinutes = (labelTimestamps[labelTimestamps.length - 1].getTime() -
+                        labelTimestamps[0].getTime()) / 60000;
+
+                    const useExtendedLabels = timeSpanMinutes >= 1440;
 
                     const formatOptions = useExtendedLabels ? {
                         timeZone: timeZone,
@@ -2523,11 +2536,6 @@ function updateChartWithNormalizedData(chart, data) {
                     };
 
                     const timeFormatter = new Intl.DateTimeFormat('en-US', formatOptions);
-
-                    const labelTimestamps = validHistoryData.map((_, idx) => {
-                        const offset = (validHistoryData.length - 1 - idx) * 60000;
-                        return new Date(endTime.getTime() - offset);
-                    });
 
                     const formattedLabels = labelTimestamps.map(ts =>
                         timeFormatter.format(ts).replace(/\s[AP]M$/i, '')
