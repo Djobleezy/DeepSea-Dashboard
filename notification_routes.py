@@ -80,11 +80,13 @@ def api_clear_notifications():
     category = request.json.get("category")
     older_than_days = request.json.get("older_than_days")
     read_only = request.json.get("read_only", False)
+    include_block = request.json.get("include_block", False)
 
     cleared_count = _notification_service.clear_notifications(
         category=category,
         older_than_days=older_than_days,
         read_only=read_only,
+        include_block=include_block,
     )
 
     return jsonify(

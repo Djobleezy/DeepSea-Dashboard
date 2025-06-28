@@ -335,6 +335,22 @@ def test_clear_notifications_retains_block_notifications(client):
     assert App.notification_service.notifications[0]["category"] == "block"
 
 
+def test_clear_notifications_including_blocks(client):
+    import App
+
+    App.notification_service.notifications = [
+        {"id": "1", "read": True, "category": "block", "timestamp": "2023-01-01T00:00:00"},
+        {"id": "2", "read": True, "category": "system", "timestamp": "2023-01-02T00:00:00"},
+    ]
+
+    resp = client.post("/api/notifications/clear", json={"include_block": True})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["cleared_count"] == 2
+    assert len(App.notification_service.notifications) == 0
+
+
 def test_batch_endpoint(client):
     resp = client.post(
         "/api/batch",

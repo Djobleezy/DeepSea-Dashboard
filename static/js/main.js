@@ -3934,7 +3934,9 @@ $(document).keydown(function (event) {
         $.ajax({
             url: "/api/notifications/clear",
             method: "POST",
-            data: JSON.stringify({}),
+            data: JSON.stringify({
+                include_block: true
+            }),
             contentType: "application/json",
             success: function () {
                 if (typeof updateNotificationBadge === 'function') {

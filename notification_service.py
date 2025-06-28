@@ -417,7 +417,11 @@ class NotificationService:
         return False
 
     def clear_notifications(
-        self, category: Optional[str] = None, older_than_days: Optional[int] = None, read_only: bool = False
+        self,
+        category: Optional[str] = None,
+        older_than_days: Optional[int] = None,
+        read_only: bool = False,
+        include_block: bool = False,
     ) -> int:
         """
         Clear notifications with optimized filtering.
@@ -426,6 +430,7 @@ class NotificationService:
             category (str, optional): Only clear specific category
             older_than_days (int, optional): Only clear notifications older than this
             read_only (bool, optional): Only clear notifications that have been read
+            include_block (bool, optional): Also clear block found notifications
 
         Returns:
             int: Number of notifications cleared
@@ -441,8 +446,9 @@ class NotificationService:
             n
             for n in self.notifications
             if (
-                n.get("category") == NotificationCategory.BLOCK.value
-            )  # Never delete block found notifications
+                not include_block
+                and n.get("category") == NotificationCategory.BLOCK.value
+            )  # Never delete block found notifications unless include_block
             or (
                 category and n.get("category") != category
             )  # Keep if we're filtering by category and this isn't that category
