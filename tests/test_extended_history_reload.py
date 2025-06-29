@@ -54,7 +54,10 @@ def test_update_config_reinitializes_state_manager(client, monkeypatch):
     new_sm = object()
     monkeypatch.setattr(app_setup, "init_state_manager", lambda: new_sm)
 
+    App.cached_metrics = {"foo": "bar"}
+
     resp = client.post("/api/config", json={"extended_history": True})
     assert resp.status_code == 200
     assert App.state_manager is new_sm
     assert closed["flag"]
+    assert App.cached_metrics is None

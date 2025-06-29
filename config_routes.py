@@ -133,6 +133,8 @@ def update_config() -> Any:
                         "State manager reinitialized with extended_history=%s",
                         merged_config.get("extended_history"),
                     )
+                    App.cached_metrics = None
+                    logging.info("Cleared cached metrics after extended_history change")
                 except Exception as e:  # pragma: no cover - defensive
                     logging.error("Error reinitializing state manager: %s", e)
 
