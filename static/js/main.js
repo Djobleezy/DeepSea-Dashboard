@@ -311,8 +311,10 @@ window.dashboardTimezone = dashboardTimezone; // Make it globally accessible
 // Hashrate thresholds
 let lowHashrateThresholdTHS = 3.0;
 let highHashrateThresholdTHS = 20.0;
+let extendedHistoryEnabled = false;
 window.lowHashrateThresholdTHS = lowHashrateThresholdTHS;
 window.highHashrateThresholdTHS = highHashrateThresholdTHS;
+window.extendedHistoryEnabled = extendedHistoryEnabled;
 
 // Fetch the configured timezone when the page loads
 function fetchTimezoneConfig() {
@@ -339,6 +341,10 @@ function fetchHashrateThresholds() {
             if (cfg.high_hashrate_threshold_ths !== undefined) {
                 highHashrateThresholdTHS = parseFloat(cfg.high_hashrate_threshold_ths);
                 window.highHashrateThresholdTHS = highHashrateThresholdTHS;
+            }
+            if (cfg.extended_history !== undefined) {
+                extendedHistoryEnabled = Boolean(cfg.extended_history);
+                window.extendedHistoryEnabled = extendedHistoryEnabled;
             }
         })
         .catch(err => console.error('Error fetching hashrate thresholds:', err));
@@ -1883,6 +1889,8 @@ function initializeChart() {
                     label: 'HASHRATE TREND (TH/s)',
                     data: [],
                     borderWidth: 2,
+                    pointRadius: extendedHistoryEnabled && chartPoints === Infinity ? 0 : 3,
+                    pointHoverRadius: extendedHistoryEnabled && chartPoints === Infinity ? 0 : 3,
                     borderColor: function (context) {
                         const chart = context.chart;
                         const { ctx, chartArea } = chart;
@@ -2908,6 +2916,13 @@ function updateChartWithNormalizedData(chart, data) {
 
         updateDaySeparators(chart, chart.labelTimestamps);
         updateBlockAnnotations(chart);
+
+        if (chart.data && chart.data.datasets && chart.data.datasets.length > 0) {
+            const removeMarkers = extendedHistoryEnabled && chartPoints === Infinity;
+            chart.data.datasets[0].pointRadius = removeMarkers ? 0 : 3;
+            chart.data.datasets[0].pointHoverRadius = removeMarkers ? 0 : 3;
+        }
+
         // Finally update the chart with a safe non-animating update
         chart.update('none');
     } catch (chartError) {
