@@ -181,6 +181,7 @@ For more details, refer to the [docker-compose documentation](https://docs.docke
 The application is designed for efficient resource utilization:
 - **Server**: Any system capable of running Python 3.9+
 - **Memory**: Minimal requirements (~100MB RAM)
+- **Extended History**: Enabling `extended_history` increases RAM usage by roughly 120MB
 - **Storage**: Less than 50MB for application files
 - **Database**: Optional Redis for persistent state
 - **Compatible with**: Windows, macOS, and Linux
@@ -227,8 +228,8 @@ entries, equating to roughly three hours of data. Older points are compressed by
 the `StateManager` before saving to Redis—values are averaged so long-term
 trends remain accurate while memory usage stays predictable.
 When `extended_history` is enabled, this limit increases to one month (43200
-entries). A Redis URL must be configured to persist the additional history across
-restarts.
+entries). This mode consumes roughly **120MB** of additional RAM and requires a
+Redis URL to persist the history across restarts.
 Short-term variance history for earnings metrics is also persisted so 3-hour
 variance values remain visible after restarts. Minor gaps of a few minutes are
 filled automatically using the last known metric so the variance progress can
