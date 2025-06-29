@@ -594,7 +594,7 @@ function updateBlockAnnotations(chart) {
     const theme = getCurrentTheme();
     const tz = window.dashboardTimezone || DEFAULT_TIMEZONE;
     const useExtendedLabels = chart.data && Array.isArray(chart.data.labels) &&
-        chart.data.labels.some(lbl => lbl.includes(','));
+        chart.data.labels.some(lbl => lbl.includes(',') || lbl.includes('\n'));
     const formatter = new Intl.DateTimeFormat('en-US', useExtendedLabels ? {
         timeZone: tz,
         month: 'short',
@@ -614,7 +614,11 @@ function updateBlockAnnotations(chart) {
         : new Set();
     let idx = 0;
     blockAnnotations.forEach(ts => {
-        const label = formatter.format(new Date(ts)).replace(/\s[AP]M$/i, '');
+        let label = formatter.format(new Date(ts)).replace(/\s[AP]M$/i, '');
+        if (useExtendedLabels) {
+            const parts = label.split(', ');
+            label = `${parts[0]}\n${parts[1]}`;
+        }
         if (!validLabels.has(label)) return;
         anns['blockEvent' + idx] = {
             type: 'line',
@@ -698,6 +702,41 @@ function updateDaySeparators(chart, labelTimestamps) {
             lastDay = currentDay;
         }
     }
+}
+
+// Utility to format x-axis labels based on the time span of data
+function formatChartLabels(labelTimestamps, timeZone) {
+    const timeSpanMinutes = (labelTimestamps[labelTimestamps.length - 1].getTime() -
+        labelTimestamps[0].getTime()) / 60000;
+
+    const useExtendedLabels = timeSpanMinutes >= 1440;
+
+    const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        month: 'short',
+        day: 'numeric'
+    });
+
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    const labels = labelTimestamps.map(ts => {
+        const base = timeFormatter.format(ts).replace(/\s[AP]M$/i, '');
+        if (useExtendedLabels) {
+            return `${dateFormatter.format(ts)}\n${base}`;
+        }
+        return base;
+    });
+
+    return { labels, useExtendedLabels };
+}
+
+if (typeof window !== 'undefined') {
+    window.formatChartLabels = formatChartLabels;
 }
 
 // Hashrate Normalization Utilities
@@ -2516,32 +2555,8 @@ function updateChartWithNormalizedData(chart, data) {
                         return new Date(endTime.getTime() - offset);
                     });
 
-                    const timeSpanMinutes = (labelTimestamps[labelTimestamps.length - 1].getTime() -
-                        labelTimestamps[0].getTime()) / 60000;
-
-                    const useExtendedLabels = timeSpanMinutes >= 1440;
-
-                    const formatOptions = useExtendedLabels ? {
-                        timeZone: timeZone,
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                    } : {
-                        timeZone: timeZone,
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                    };
-
-                    const timeFormatter = new Intl.DateTimeFormat('en-US', formatOptions);
-
-                    const formattedLabels = labelTimestamps.map(ts =>
-                        timeFormatter.format(ts).replace(/\s[AP]M$/i, '')
-                    );
-
-                    chart.data.labels = formattedLabels;
+                    const labelInfo = formatChartLabels(labelTimestamps, timeZone);
+                    chart.data.labels = labelInfo.labels;
                     chart.labelTimestamps = labelTimestamps;
 
                     // Process and normalize hashrate values with validation (optimize by avoiding multiple iterations)
