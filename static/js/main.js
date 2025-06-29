@@ -345,6 +345,9 @@ function fetchHashrateThresholds() {
             if (cfg.extended_history !== undefined) {
                 extendedHistoryEnabled = Boolean(cfg.extended_history);
                 window.extendedHistoryEnabled = extendedHistoryEnabled;
+                if (extendedHistoryEnabled && chartPoints === Infinity && trendChart && latestMetrics) {
+                    updateChartWithNormalizedData(trendChart, latestMetrics);
+                }
             }
         })
         .catch(err => console.error('Error fetching hashrate thresholds:', err));
