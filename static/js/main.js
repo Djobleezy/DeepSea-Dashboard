@@ -314,6 +314,15 @@ let highHashrateThresholdTHS = 20.0;
 let extendedHistoryEnabled = false;
 window.lowHashrateThresholdTHS = lowHashrateThresholdTHS;
 window.highHashrateThresholdTHS = highHashrateThresholdTHS;
+// Restore extended history preference from localStorage if present
+try {
+    const storedExt = localStorage.getItem('extendedHistoryEnabled');
+    if (storedExt !== null) {
+        extendedHistoryEnabled = storedExt === 'true';
+    }
+} catch (e) {
+    console.error('Error loading extended history preference', e);
+}
 window.extendedHistoryEnabled = extendedHistoryEnabled;
 
 // Fetch the configured timezone when the page loads
@@ -345,6 +354,11 @@ function fetchHashrateThresholds() {
             if (cfg.extended_history !== undefined) {
                 extendedHistoryEnabled = Boolean(cfg.extended_history);
                 window.extendedHistoryEnabled = extendedHistoryEnabled;
+                try {
+                    localStorage.setItem('extendedHistoryEnabled', String(extendedHistoryEnabled));
+                } catch (e) {
+                    console.error('Error storing extended history preference', e);
+                }
                 if (extendedHistoryEnabled && chartPoints === Infinity && trendChart && latestMetrics) {
                     updateChartWithNormalizedData(trendChart, latestMetrics);
                 }
@@ -4307,6 +4321,8 @@ $(document).ready(function () {
                         label: 'HASHRATE TREND (TH/s)',
                         data: [],
                         borderWidth: 2,
+                        pointRadius: extendedHistoryEnabled && chartPoints === Infinity ? 0 : 3,
+                        pointHoverRadius: extendedHistoryEnabled && chartPoints === Infinity ? 0 : 3,
                         borderColor: function (context) {
                             const chart = context.chart;
                             const { ctx, chartArea } = chart;
