@@ -2629,7 +2629,8 @@ function updateChartWithNormalizedData(chart, data) {
                     chart.data.datasets[0].data = limitedData;
 
                     // Similarly, limit the labels and timestamps
-                    const limitedLabels = formattedLabels.slice(-chartPoints);
+                    // Slice the already formatted labels based on the desired number of points
+                    const limitedLabels = labelInfo.labels.slice(-chartPoints);
                     const limitedTimestamps = labelTimestamps.slice(-chartPoints);
                     chart.data.labels = limitedLabels;
                     chart.labelTimestamps = limitedTimestamps;
