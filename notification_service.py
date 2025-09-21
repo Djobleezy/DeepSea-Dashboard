@@ -109,10 +109,7 @@ def get_exchange_rates(dashboard_service: MiningDashboardService = None):
                     data = response.json()
                     if data.get("result") == "success":
                         return data.get("conversion_rates", {})
-                    logging.error(
-                        "Exchange rate API returned unsuccessful result: %s",
-                        data.get("error_type", "Unknown error"),
-                    )
+                    logging.error("Exchange rate API returned unsuccessful result")
                 else:
                     logging.error("Failed to fetch exchange rates: %s", response.status_code)
             finally:
