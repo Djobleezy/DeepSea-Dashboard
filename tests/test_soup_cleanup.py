@@ -1,7 +1,7 @@
 import importlib
 from unittest.mock import MagicMock
 
-import ocean_scraper
+import ocean_scraper  # noqa: F401 — used by monkeypatch.setattr
 from data_service import MiningDashboardService
 
 
