@@ -1,7 +1,7 @@
 import importlib
 from unittest.mock import MagicMock
 
-import data_service
+import ocean_scraper
 from data_service import MiningDashboardService
 
 
@@ -31,9 +31,10 @@ def test_soup_decomposed(monkeypatch):
             decomposed.append(self)
             super().decompose()
 
-    monkeypatch.setattr(data_service, "BeautifulSoup", TrackingSoup)
+    # Patch BeautifulSoup in the module where it's actually used
+    monkeypatch.setattr(ocean_scraper, "BeautifulSoup", TrackingSoup)
     gc_called = {"flag": False}
-    monkeypatch.setattr(data_service.gc, "collect", lambda: gc_called.update(flag=True))
+    monkeypatch.setattr(ocean_scraper.gc, "collect", lambda: gc_called.update(flag=True))
 
     svc.get_payment_history_scrape()
 

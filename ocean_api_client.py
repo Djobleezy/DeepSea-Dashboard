@@ -1,0 +1,637 @@
+"""
+Ocean API client module — handles all HTTP API calls to Ocean.xyz,
+mempool.guide, blockchain.info, and exchange rate services.
+"""
+
+import logging
+import time
+import json
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from dataclasses import dataclass
+
+from models import convert_to_ths
+from config import get_timezone
+from cache_utils import ttl_cache
+from miner_specs import parse_worker_name
+from state_manager import MAX_PAYOUT_HISTORY_ENTRIES
+
+
+@dataclass
+class CachedResponse:
+    """Simplified response object storing only relevant fields."""
+
+    ok: bool
+    status_code: int
+    text: str
+
+    def json(self):
+        """Parse JSON from the stored text."""
+        return json.loads(self.text)
+
+
+class OceanApiClientMixin:
+    """Mixin providing all Ocean.xyz and external API call methods."""
+
+    @ttl_cache(ttl_seconds=30, maxsize=20)
+    def fetch_url(self, url: str, timeout: int = 5):
+        """Fetch URL content safely without leaking resources."""
+
+        response = None
+        try:
+            response = self.session.get(url, timeout=timeout)
+            text = response.text
+            status_code = response.status_code
+            ok = response.ok
+            return CachedResponse(ok=ok, status_code=status_code, text=text)
+        except Exception as e:
+            logging.error(f"Error fetching {url}: {e}")
+            return None
+        finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
+
+    def get_ocean_api_data(self):
+        """Fetch mining data using the official Ocean.xyz API."""
+        api_base = self.API_BASE
+        result = {}
+
+        # Fetch hashrate info
+        resp = None
+        hr_data = {}
+        try:
+            url = f"{api_base}/user_hashrate/{self.wallet}"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                hr_data = resp.json().get("result", {}) or {}
+            result["hashrate_60sec"] = hr_data.get("hashrate_60s")
+            result["hashrate_5min"] = hr_data.get("hashrate_300s")
+            result["hashrate_10min"] = hr_data.get("hashrate_600s")
+            result["hashrate_24hr"] = hr_data.get("hashrate_86400s")
+            # Try several keys for a ~3hr interval
+            result["hashrate_3hr"] = (
+                hr_data.get("hashrate_10800s") or hr_data.get("hashrate_7200s") or hr_data.get("hashrate_3600s")
+            )
+            # API returns raw H/s — convert to TH/s for dashboard display
+            for key in ("hashrate_60sec", "hashrate_5min", "hashrate_10min", "hashrate_24hr", "hashrate_3hr"):
+                raw = result.get(key)
+                if raw is not None:
+                    try:
+                        result[key] = convert_to_ths(float(raw), "H/s")
+                    except (ValueError, TypeError):
+                        pass
+            result["hashrate_60sec_unit"] = "th/s"
+            result["hashrate_5min_unit"] = "th/s"
+            result["hashrate_10min_unit"] = "th/s"
+            result["hashrate_24hr_unit"] = "th/s"
+            result["hashrate_3hr_unit"] = "th/s"
+            # active_worker_count lives in user_hashrate response
+            if hr_data.get("active_worker_count") is not None:
+                result["workers_hashing"] = hr_data["active_worker_count"]
+        except Exception as e:
+            logging.error(f"Error fetching user_hashrate API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+        # Fetch latest statsnap data
+        resp = None
+        try:
+            url = f"{api_base}/statsnap/{self.wallet}"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                snap = resp.json().get("result", {}) or {}
+                unpaid = snap.get("unpaid")
+                result["unpaid_earnings"] = float(unpaid) if unpaid is not None else None
+                earn_next = snap.get("estimated_earn_next_block")
+                result["estimated_earnings_next_block"] = float(earn_next) if earn_next is not None else None
+                rewards = snap.get("estimated_total_earn_next_block")
+                result["estimated_rewards_in_window"] = float(rewards) if rewards is not None else None
+                ts = snap.get("lastest_share_ts")
+                if ts:
+                    dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                    result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
+        except Exception as e:
+            logging.error(f"Error fetching statsnap API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+        # Merge additional data from other endpoints
+        result.update(self.get_pool_stat_api())
+
+        # Pull latest block information using /blocks
+        blocks = self.get_blocks_api(page=0, page_size=1)
+        if blocks:
+            block = blocks[0]
+            result["last_block_height"] = block.get("height")
+            ts = block.get("time") or block.get("timestamp")
+            if ts:
+                dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+
+        return result
+
+    def get_pool_stat_api(self):
+        """Fetch overall pool statistics using /pool_stat and /pool_hashrate."""
+        api_base = self.API_BASE
+        data = {}
+        resp = None
+        try:
+            url = f"{api_base}/pool_stat"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                stat = resp.json().get("result", {}) or {}
+                # pool_stat uses "active_workers" (not "workers")
+                data["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                data["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
+                data["network_difficulty"] = stat.get("network_difficulty")
+                # pool_stat does NOT contain hashrate or blocks_found
+        except Exception as e:
+            logging.error(f"Error fetching pool_stat API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+        # Pool hashrate lives in a separate endpoint
+        resp = None
+        try:
+            url = f"{api_base}/pool_hashrate"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                ph = resp.json().get("result", {}) or {}
+                raw_hashrate = ph.get("pool_60s") or ph.get("pool_300s")
+                if raw_hashrate is not None:
+                    data["pool_total_hashrate"] = convert_to_ths(float(raw_hashrate), "H/s")
+                    data["pool_total_hashrate_unit"] = "th/s"
+        except Exception as e:
+            logging.error(f"Error fetching pool_hashrate API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+        return data
+
+    def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
+        """Fetch recent block data using /blocks."""
+        api_base = self.API_BASE
+        resp = None
+        try:
+            url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                blocks = data.get("blocks")
+                if blocks is None:
+                    result = data.get("result")
+                    if isinstance(result, dict):
+                        blocks = result.get("blocks")
+                    elif isinstance(result, list):
+                        blocks = result
+                if isinstance(blocks, list):
+                    return blocks
+        except Exception as e:
+            logging.error(f"Error fetching blocks API: {e}")
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+        return []
+
+    def fetch_exchange_rates(self, base_currency="USD"):
+        """
+        Fetch currency exchange rates from ExchangeRate API using API key.
+
+        Args:
+            base_currency (str): Base currency for rates (default: USD)
+
+        Returns:
+            dict: Exchange rates for supported currencies
+        """
+        now = time.time()
+        # Return cached rates if they are still fresh
+        if self.exchange_rates_cache["rates"] and now - self.exchange_rates_cache["timestamp"] < self.exchange_rate_ttl:
+            return self.exchange_rates_cache["rates"]
+
+        # Get the configured currency and API key
+        from config import get_currency, get_exchange_rate_api_key
+
+        selected_currency = get_currency()
+        api_key = get_exchange_rate_api_key()
+
+        if not api_key:
+            logging.error("Exchange rate API key not configured")
+            return {}
+
+        response = None
+        try:
+            # Use the configured API key with the v6 exchangerate-api endpoint
+            url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}"
+            response = self.session.get(url, timeout=5)
+
+            if response.ok:
+                data = response.json()
+                if data.get("result") == "success":
+                    logging.info(f"Successfully fetched exchange rates for {selected_currency}")
+                    rates = data.get("conversion_rates", {})
+                    # Update cache on success
+                    self.exchange_rates_cache = {"rates": rates, "timestamp": now}
+                    return rates
+                else:
+                    logging.error(
+                        f"Exchange rate API returned unsuccessful result: {data.get('error_type', 'Unknown error')}"
+                    )
+                    # Clear cache on failure
+                    self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
+                    return {}
+            else:
+                logging.error(f"Failed to fetch exchange rates: {response.status_code}")
+                # Clear cache on failure
+                self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
+                return {}
+        except Exception as e:
+            logging.error(f"Error fetching exchange rates: {e}")
+            self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
+            return {}
+        finally:
+            if response:
+                try:
+                    response.close()
+                except Exception:
+                    pass
+
+    def get_payment_history_api(self, days=360, btc_price=None):
+        """Fetch payout history using the Ocean.xyz API."""
+        api_base = self.API_BASE
+        end_date = datetime.now(ZoneInfo("UTC"))
+        start_date = end_date - timedelta(days=days)
+
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+
+        url = f"{api_base}/earnpay/{self.wallet}/{start_str}/{end_str}"
+        payments = []
+        resp = None
+
+        try:
+            resp = self.session.get(url, timeout=10)
+            if not resp.ok:
+                logging.error(f"API earnpay request failed: {resp.status_code}")
+                return None
+
+            data = resp.json()
+            result_obj = data.get("result", {})
+            payouts = result_obj.get("payouts", [])
+
+            for item in payouts:
+                ts = item.get("ts")
+                txid = item.get("on_chain_txid", "")
+                lightning_txid = item.get("lightning_txid", "")
+                sats = item.get("total_satoshis_net_paid", 0) or 0
+                amount_btc = sats / self.sats_per_btc
+
+                date_iso = None
+                date_str = ""
+                if ts is not None:
+                    try:
+                        if isinstance(ts, (int, float)):
+                            dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC"))
+                        else:
+                            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                        local_dt = dt.astimezone(ZoneInfo(get_timezone()))
+                        date_iso = local_dt.isoformat()
+                        date_str = local_dt.strftime("%Y-%m-%d %H:%M")
+                    except Exception as e:
+                        logging.warning(f"Could not parse payout timestamp '{ts}': {e}")
+
+                payment = {
+                    "date": date_str,
+                    "txid": txid,
+                    "lightning_txid": lightning_txid,
+                    "amount_btc": amount_btc,
+                    "amount_sats": int(sats),
+                    "status": "confirmed",
+                    "date_iso": date_iso,
+                }
+
+                if btc_price is not None:
+                    payment["rate"] = btc_price
+                    payment["fiat_value"] = amount_btc * btc_price
+
+                payments.append(payment)
+
+                # Trim to avoid unbounded memory growth
+                if len(payments) >= MAX_PAYOUT_HISTORY_ENTRIES:
+                    break
+
+            # Limit result size to prevent excessive memory usage
+            return payments[:MAX_PAYOUT_HISTORY_ENTRIES]
+
+        except Exception as e:
+            logging.error(f"Error fetching payment history from API: {e}")
+            return None
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+    def get_worker_data_api(self):
+        """Fetch worker data using the Ocean.xyz API."""
+        api_base = self.API_BASE
+        resp = None
+        try:
+            url = f"{api_base}/user_hashrate_full/{self.wallet}"
+            logging.info(f"Fetching worker data from API: {url}")
+            resp = self.session.get(url, timeout=10)
+            if not resp.ok:
+                logging.error(f"API user_hashrate_full request failed: {resp.status_code}")
+                return None
+
+            data = resp.json()
+            workers_obj = data.get("workers") or data.get("result", {}).get("workers")
+            if not workers_obj:
+                # Some API responses may store workers inside 'user_hashrate'
+                workers_obj = data.get("user_hashrate", {}).get("workers")
+
+            if not workers_obj:
+                # If still empty, maybe the response is a list
+                if isinstance(data, list):
+                    workers_iter = [(w.get("workername") or w.get("name"), w) for w in data]
+                else:
+                    logging.warning("No worker info returned from API")
+                    return None
+            else:
+                workers_iter = (
+                    workers_obj.items()
+                    if isinstance(workers_obj, dict)
+                    else [(w.get("workername") or w.get("name"), w) for w in workers_obj]
+                )
+
+            workers = []
+            total_hashrate = 0
+            workers_online = 0
+            workers_offline = 0
+            invalid_names = ["online", "offline", "status", "worker", "total"]
+
+            for name, info in workers_iter:
+                if not name or name.lower() in invalid_names:
+                    continue
+
+                hr3 = (
+                    info.get("hashrate_10800")
+                    or info.get("hashrate_7200")
+                    or info.get("hashrate_3600")
+                    or info.get("hashrate_300s")
+                )
+                hr60 = info.get("hashrate_60s") or 0
+
+                status = "online" if (hr60 or hr3) else "offline"
+
+                worker = {
+                    "name": name,
+                    "status": status,
+                    "type": "ASIC",
+                    "model": "Unknown",
+                    "hashrate_60sec": hr60 or 0,
+                    "hashrate_60sec_unit": "H/s",
+                    "hashrate_3hr": hr3 or 0,
+                    "hashrate_3hr_unit": "H/s",
+                    "efficiency": 0,
+                    "last_share": "N/A",
+                    "earnings": 0,
+                    "power_consumption": 0,
+                    "temperature": 0,
+                }
+
+                if status == "online":
+                    workers_online += 1
+                else:
+                    workers_offline += 1
+
+                specs = parse_worker_name(worker["name"])
+                if specs:
+                    worker["type"] = specs["type"]
+                    worker["model"] = specs["model"]
+                    worker["efficiency"] = specs["efficiency"]
+                    hr_ths = convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                    worker["power_consumption"] = round(hr_ths * specs["efficiency"])
+
+                total_hashrate += convert_to_ths(worker["hashrate_3hr"], worker["hashrate_3hr_unit"])
+                workers.append(worker)
+
+            if not workers:
+                logging.warning("API worker data returned no valid workers")
+                return None
+
+            result = {
+                "workers": workers,
+                "total_hashrate": total_hashrate,
+                "hashrate_unit": "TH/s",
+                "workers_total": len(workers),
+                "workers_online": workers_online,
+                "workers_offline": workers_offline,
+                "total_earnings": 0,
+                "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
+            }
+
+            return result
+        except Exception as e:
+            logging.error(f"Error in API worker data fetch: {e}")
+            return None
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+    @ttl_cache(ttl_seconds=60, maxsize=1)
+    def get_bitcoin_stats(self):
+        """
+        Fetch Bitcoin network statistics with improved error handling and caching.
+        Uses mempool.guide APIs for more accurate network hashrate, block height, and multi-currency price data.
+
+        Returns:
+            tuple: (difficulty, network_hashrate, btc_price, block_count)
+        """
+        # Base URLs for API endpoints
+        blockchain_info_urls = {
+            "difficulty": "https://blockchain.info/q/getdifficulty",
+            "hashrate": "https://blockchain.info/q/hashrate",  # Keep as fallback
+            "ticker": "https://blockchain.info/ticker",  # Keep as fallback
+            "blockcount": "https://blockchain.info/q/getblockcount",  # Keep as fallback
+        }
+
+        # Add mempool.guide APIs
+        mempool_urls = {
+            "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d",  # Includes network difficulty
+            "prices": "https://mempool.guide/api/v1/prices",
+            "block_height": "https://mempool.guide/api/blocks/tip/height",  # New API endpoint for block height
+        }
+
+        # Fallback mempool.space APIs (same format as mempool.guide)
+        mempool_space_urls = {
+            "hashrate": "https://mempool.space/api/v1/mining/hashrate/3d",
+            "prices": "https://mempool.space/api/v1/prices",
+            "block_height": "https://mempool.space/api/blocks/tip/height",
+        }
+
+        # Use previous cached values as defaults if available
+        difficulty = self.cache.get("difficulty")
+        network_hashrate = self.cache.get("network_hashrate")
+        btc_price = self.cache.get("btc_price")
+        block_count = self.cache.get("block_count")
+
+        responses = {}
+        try:
+            # Add all API endpoints to futures using the shared executor
+            futures = {}
+
+            # Add blockchain.info endpoints
+            for key, url in blockchain_info_urls.items():
+                futures[key] = self.executor.submit(self.fetch_url, url)
+
+            # Add mempool.guide endpoints
+            for key, url in mempool_urls.items():
+                futures[f"mempool_{key}"] = self.executor.submit(self.fetch_url, url)
+
+            # Get all responses
+            responses = {key: futures[key].result(timeout=5) for key in futures}
+
+            # Fallback to mempool.space if any mempool.guide request failed
+            for key, url in mempool_space_urls.items():
+                mempool_key = f"mempool_{key}"
+                resp = responses.get(mempool_key)
+                if not resp or not resp.ok:
+                    logging.warning(f"mempool.guide {key} API failed, falling back to mempool.space")
+                    responses[mempool_key] = self.fetch_url(url)
+
+            # Process mempool.guide price data (primary source)
+            price_data = {}
+            mempool_price_response = responses.get("mempool_prices")
+            if mempool_price_response and mempool_price_response.ok:
+                try:
+                    price_data = mempool_price_response.json()
+                    if "USD" in price_data:
+                        btc_price = float(price_data.get("USD"))
+                        self.cache["btc_price"] = btc_price
+                        self.cache["btc_price_USD"] = btc_price
+                        logging.info(f"Successfully fetched USD price from mempool.guide: {btc_price}")
+                    for curr, value in price_data.items():
+                        if curr != "time":
+                            self.cache[f"btc_price_{curr}"] = float(value)
+
+                except (ValueError, TypeError, json.JSONDecodeError) as e:
+                    logging.error(f"Error parsing mempool.guide price data: {e}")
+            else:
+                logging.warning(
+                    "Could not fetch price data from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
+
+            # Fall back to blockchain.info for price if mempool.guide failed or currency not available
+            if btc_price is None and responses["ticker"] and responses["ticker"].ok:
+                try:
+                    ticker_data = responses["ticker"].json()
+                    btc_price = float(ticker_data.get("USD", {}).get("last", 0))
+                    self.cache["btc_price"] = btc_price
+                    self.cache["btc_price_USD"] = btc_price
+                    logging.info(f"Using blockchain.info price: {btc_price}")
+                except (ValueError, TypeError, json.JSONDecodeError) as e:
+                    logging.error(f"Error parsing blockchain.info price: {e}")
+            block_height_response = responses.get("mempool_block_height")
+            if block_height_response and block_height_response.ok:
+                try:
+                    # The API returns just the block height as a simple integer value
+                    block_count = int(block_height_response.text)
+                    self.cache["block_count"] = block_count
+                    logging.info(f"Successfully fetched latest block height from mempool.guide: {block_count}")
+                except (ValueError, TypeError) as e:
+                    logging.error(f"Error parsing block height from mempool.guide: {e}")
+                    # Will fall back to blockchain.info below if this fails
+            else:
+                logging.warning(
+                    "Could not fetch block height from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
+
+            # Process mempool.guide hashrate data (primary source)
+            mempool_hashrate_response = responses.get("mempool_hashrate")
+            if mempool_hashrate_response and mempool_hashrate_response.ok:
+                try:
+                    hashrate_data = mempool_hashrate_response.json()
+                    # Use currentHashrate from the API (already in H/s)
+                    network_hashrate = hashrate_data.get("currentHashrate")
+
+                    # Also update difficulty if available in the response
+                    if "currentDifficulty" in hashrate_data:
+                        difficulty = hashrate_data.get("currentDifficulty")
+
+                    # Cache the updated values
+                    self.cache["network_hashrate"] = network_hashrate
+                    self.cache["difficulty"] = difficulty
+
+                    logging.info(
+                        f"Successfully fetched network hashrate from mempool.guide: {network_hashrate/1e18:.2f} EH/s"
+                    )
+                except (ValueError, TypeError, json.JSONDecodeError) as e:
+                    logging.error(f"Error parsing mempool.guide hashrate data: {e}")
+            else:
+                logging.warning(
+                    "Could not fetch hashrate from mempool.guide or mempool.space, falling back to blockchain.info"
+                )
+
+                # Process blockchain.info hashrate as fallback
+            if network_hashrate is None and responses["hashrate"] and responses["hashrate"].ok:
+                try:
+                    # blockchain.info returns hashrate in GH/s, convert to H/s for consistency
+                    network_hashrate = float(responses["hashrate"].text) * 1e9
+                    self.cache["network_hashrate"] = network_hashrate
+                    logging.info(f"Using blockchain.info network hashrate: {network_hashrate/1e18:.2f} EH/s")
+                except (ValueError, TypeError) as e:
+                    logging.error(f"Error parsing network hashrate from blockchain.info: {e}")
+
+            # Handle difficulty (if not already set by mempool.guide)
+            if difficulty is None and responses["difficulty"] and responses["difficulty"].ok:
+                try:
+                    difficulty = float(responses["difficulty"].text)
+                    self.cache["difficulty"] = difficulty
+                except (ValueError, TypeError) as e:
+                    logging.error(f"Error parsing difficulty: {e}")
+
+            # Handle blockchain.info block count as fallback if mempool.guide failed
+            if block_count is None and responses["blockcount"] and responses["blockcount"].ok:
+                try:
+                    block_count = int(responses["blockcount"].text)
+                    self.cache["block_count"] = block_count
+                    logging.info(f"Using blockchain.info block height: {block_count}")
+                except (ValueError, TypeError) as e:
+                    logging.error(f"Error parsing block count: {e}")
+
+        except Exception as e:
+            logging.error(f"Error fetching Bitcoin stats: {e}")
+        finally:
+            for resp in responses.values():
+                if resp:
+                    try:
+                        resp.close()
+                    except Exception:
+                        pass
+
+        return difficulty, network_hashrate, btc_price, block_count

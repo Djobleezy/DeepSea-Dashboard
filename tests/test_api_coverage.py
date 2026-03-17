@@ -146,7 +146,7 @@ class TestApiFirstSkipGuards:
 
         with patch.object(svc.session, "get", return_value=mock_resp):
             with patch.object(svc, "get_ocean_api_data", return_value=self.FULLY_POPULATED_API):
-                with patch("data_service.BeautifulSoup") as mock_bs_class:
+                with patch("ocean_scraper.BeautifulSoup") as mock_bs_class:
                     mock_soup = MagicMock()
                     mock_soup.find = find_spy
                     mock_bs_class.return_value = mock_soup
