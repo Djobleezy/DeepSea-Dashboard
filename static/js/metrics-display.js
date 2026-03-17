@@ -259,7 +259,7 @@ function updateNotificationBadge() {
 
             if (unreadCount > 0) {
                 badge.text(unreadCount);
-                badge.addClass('has-unread');
+                badge.addClass('has-unread').show();
 
                 // Add animation when count increases
                 if (unreadCount > previousCount) {
@@ -274,7 +274,7 @@ function updateNotificationBadge() {
                 }
             } else {
                 badge.text('');
-                badge.removeClass('has-unread badge-pulse');
+                badge.removeClass('has-unread badge-pulse').hide();
             }
         },
         error: function (xhr, status, error) {

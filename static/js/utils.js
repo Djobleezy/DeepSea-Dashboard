@@ -124,10 +124,10 @@ function normalizeHashrate(value, unit, debug = false) {
         console.warn(`Unrecognized hashrate unit: "${unit}", assuming TH/s. Value: ${value}`);
 
         // Automatically detect and suggest the appropriate unit based on magnitude
-        if (value > 1000) {
-            console.warn(`NOTE: Value ${value} is quite large for TH/s. Could it be PH/s?`);
-        } else if (value > 1000000) {
+        if (value > 1000000) {
             console.warn(`NOTE: Value ${value} is extremely large for TH/s. Could it be EH/s?`);
+        } else if (value > 1000) {
+            console.warn(`NOTE: Value ${value} is quite large for TH/s. Could it be PH/s?`);
         } else if (value < 0.001) {
             console.warn(`NOTE: Value ${value} is quite small for TH/s. Could it be GH/s or MH/s?`);
         }
@@ -345,7 +345,10 @@ function formatCurrencyValue(value, currency) {
 
 // Update the BTC price and earnings card header with the selected currency
 function updateCurrencyLabels(currency, powerEstimated) {
-    const earningsHeader = document.querySelector('.card-header:contains("USD EARNINGS")');
+    // :contains() is jQuery-only and not valid in querySelectorAll; use filter instead
+    const earningsHeader = Array.from(document.querySelectorAll('.card-header')).find(
+        el => el.textContent.includes('EARNINGS')
+    );
     if (earningsHeader) {
         earningsHeader.textContent = `${powerEstimated ? 'Est. ' : ''}${currency} EARNINGS`;
     }

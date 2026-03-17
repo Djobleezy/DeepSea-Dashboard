@@ -10,6 +10,7 @@ let reconnectionDelay = 1000; // Start with 1 second
 let pingInterval = null;
 let lastPingTime = Date.now();
 let connectionLostTimeout = null;
+let pollInterval = null; // Fallback polling interval handle (prevent duplicates)
 
 // Cleanup the existing SSE connection and related timers
 function cleanupEventSource() {
@@ -89,6 +90,11 @@ function setupEventSource() {
             console.log("EventSource connection opened successfully");
             connectionRetryCount = 0; // Reset retry count on successful connection
             reconnectionDelay = 1000; // Reset reconnection delay
+            // Clear fallback polling if SSE reconnects
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
             hideConnectionIssue();
 
             // Add this line to hide the loading overlay immediately when connected
@@ -186,10 +192,12 @@ function setupEventSource() {
                     pingInterval = null;
                 }
 
-                // Switch to regular polling
+                // Switch to regular polling (guard against duplicate intervals)
                 showConnectionIssue("Using polling mode");
-                setInterval(manualRefresh, 30000); // Poll every 30 seconds
-                manualRefresh(); // Do an immediate refresh
+                if (!pollInterval) {
+                    pollInterval = setInterval(manualRefresh, 30000); // Poll every 30 seconds
+                    manualRefresh(); // Do an immediate refresh
+                }
                 return;
             }
 

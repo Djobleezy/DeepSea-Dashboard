@@ -4,7 +4,7 @@
  * payout-tracker.js - Payout tracking, history, and verification
  */
 
-// Add this to the top of main.js with other global variables
+// Payout tracking state (lives here in payout-tracker.js, not in main.js)
 let lastPayoutTracking = {
     lastUnpaidEarnings: null,
     payoutHistory: [],
@@ -316,7 +316,7 @@ function initPayoutTracking() {
     verifyPayoutsAgainstOfficial();
 
     // Schedule regular checks for new data
-    setInterval(verifyPayoutsAgainstOfficial, 1 * 60 * 1000); // Check every 1 minutes
+    setInterval(verifyPayoutsAgainstOfficial, 1 * 60 * 1000); // Check every minute
 }
 
 // Update toggle function to include only summary display
