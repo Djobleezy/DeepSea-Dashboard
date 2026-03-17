@@ -62,7 +62,7 @@ def minify_css():
         logger.info("Minified %s", src.name)
 
 
-def minify_html():
+def minify_html_templates():
     """Minify HTML templates."""
     tmpl_dir = Path("templates")
     out_dir = tmpl_dir / "min"
@@ -97,7 +97,7 @@ def main():
     if args.all or args.css:
         minify_css()
     if args.all or args.html:
-        minify_html()
+        minify_html_templates()
 
 
 if __name__ == "__main__":
