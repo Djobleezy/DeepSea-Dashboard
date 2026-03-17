@@ -107,7 +107,8 @@ class WorkerService:
 
                 if real_worker_data and real_worker_data.get("workers") and len(real_worker_data["workers"]) > 0:
                     valid_names = any(
-                        w.get("name", "").lower() not in ["online", "offline", "total", "worker", "status"]
+                        w.get("name", "").strip()
+                        and w.get("name", "").lower() not in ["online", "offline", "total", "worker", "status"]
                         for w in real_worker_data["workers"]
                     )
 
@@ -334,9 +335,9 @@ class WorkerService:
         real_worker_names = []
         if self.worker_data_cache and self.worker_data_cache.get("workers"):
             real_worker_names = [
-                w["name"]
+                w.get("name", "")
                 for w in self.worker_data_cache["workers"]
-                if w.get("name", "").lower() not in ["online", "offline", "total"]
+                if w.get("name", "").strip() and w.get("name", "").lower() not in ["online", "offline", "total"]
             ]
 
         unpaid_earnings = cached_metrics.get("unpaid_earnings", 0)

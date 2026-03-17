@@ -2,8 +2,9 @@
 Worker simulator module for DeepSea Dashboard.
 
 Contains pure simulation/generation functions for creating realistic worker
-data when real Ocean.xyz worker data is unavailable. No I/O, no caching —
-just deterministic (modulo random) data generation.
+data when real Ocean.xyz worker data is unavailable. No network/disk I/O,
+no caching — just data generation. Logging and timezone lookups are the only
+side-effects.
 """
 
 import logging
@@ -305,9 +306,11 @@ def generate_simulated_workers(
                 if w["hashrate_60sec"] > 0:
                     w["hashrate_60sec"] = round(w["hashrate_60sec"] * scale, 2)
             else:
-                # Last online worker gets the remainder to avoid rounding drift
+                # Last online worker absorbs the remainder to avoid rounding drift.
+                # Clamp to 0 to prevent negative values if earlier rounded values
+                # summed to more than total_hashrate.
                 assigned = sum(ow["hashrate_3hr"] for ow in online_workers_list[:-1])
-                w["hashrate_3hr"] = round(total_hashrate - assigned, 2)
+                w["hashrate_3hr"] = max(0.0, round(total_hashrate - assigned, 2))
                 if w["hashrate_60sec"] > 0:
                     w["hashrate_60sec"] = round(w["hashrate_60sec"] * scale, 2)
 
