@@ -1,6 +1,7 @@
 """Utility helpers for caching expensive operations."""
 
 import json
+import logging
 import time
 import threading
 import weakref
@@ -200,4 +201,137 @@ class TTLDict:
             self._purge_expired()
 
 
-__all__ = ["ttl_cache", "TTLDict"]
+class CircuitBreaker:
+    """Simple three-state circuit breaker (CLOSED → OPEN → HALF-OPEN).
+
+    Tracks consecutive failures for a named endpoint.  Once ``max_failures``
+    successive failures are recorded the circuit opens and all calls are
+    rejected immediately (returning ``None``) until the ``reset_timeout``
+    elapses.  After the timeout one probe request is allowed (HALF-OPEN); if
+    it succeeds the circuit resets to CLOSED; if it fails the timeout
+    restarts.
+
+    Usage::
+
+        cb = CircuitBreaker(name="ocean.xyz", max_failures=5, reset_timeout=60)
+
+        response = cb.call(session.get, url, timeout=10)
+        if response is None:
+            # Circuit is open or request failed
+            ...
+
+    The instance is thread-safe.
+    """
+
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
+
+    def __init__(self, name: str, max_failures: int = 5, reset_timeout: float = 60.0):
+        self.name = name
+        self.max_failures = max_failures
+        self.reset_timeout = reset_timeout
+        self._state = self.CLOSED
+        self._failure_count = 0
+        self._opened_at: float = 0.0
+        self._lock = threading.Lock()
+
+    # ------------------------------------------------------------------
+    # Public helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def state(self) -> str:
+        with self._lock:
+            return self._state
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._failure_count = 0
+            self._state = self.CLOSED
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._failure_count += 1
+            if self._failure_count >= self.max_failures:
+                if self._state != self.OPEN:
+                    logging.warning(
+                        "CircuitBreaker[%s]: opening after %d failures",
+                        self.name,
+                        self._failure_count,
+                    )
+                self._state = self.OPEN
+                self._opened_at = time.time()
+
+    def _allow_probe(self) -> bool:
+        """Return True if enough time has passed to attempt a probe."""
+        with self._lock:
+            if self._state == self.CLOSED:
+                return True
+            if self._state == self.OPEN and (time.time() - self._opened_at) >= self.reset_timeout:
+                self._state = self.HALF_OPEN
+                logging.info("CircuitBreaker[%s]: entering HALF_OPEN — probing", self.name)
+                return True
+            if self._state == self.HALF_OPEN:
+                return True
+            return False
+
+    def call(self, fn, *args, **kwargs):
+        """Call *fn* if the circuit allows it; return ``None`` otherwise.
+
+        Args:
+            fn: Callable to invoke (e.g. ``session.get``).
+            *args: Positional arguments forwarded to *fn*.
+            **kwargs: Keyword arguments forwarded to *fn*.
+
+        Returns:
+            The return value of *fn* on success, or ``None`` when the circuit
+            is open or *fn* raises an exception.
+        """
+        if not self._allow_probe():
+            logging.debug("CircuitBreaker[%s]: OPEN — request blocked", self.name)
+            return None
+        try:
+            result = fn(*args, **kwargs)
+            self.record_success()
+            return result
+        except Exception as exc:
+            self.record_failure()
+            logging.error("CircuitBreaker[%s]: failure — %s", self.name, exc)
+            return None
+
+
+def retry_request(fn, *args, retries: int = 3, backoff: float = 1.0, **kwargs):
+    """Call *fn* up to *retries* times with exponential back-off.
+
+    Back-off sequence: ``backoff``, ``backoff * 2``, ``backoff * 4``, …
+
+    On each failure the exception is logged.  Returns the result of the first
+    successful call, or ``None`` if all attempts fail.
+
+    Args:
+        fn: Callable to invoke (e.g. a :class:`CircuitBreaker` ``call`` or
+            plain ``session.get``).
+        *args: Positional arguments forwarded to *fn*.
+        retries: Maximum number of attempts (default 3).
+        backoff: Initial back-off delay in seconds (default 1.0).
+        **kwargs: Keyword arguments forwarded to *fn*.
+
+    Returns:
+        The return value of *fn* on success, or ``None`` after all retries.
+    """
+    delay = backoff
+    for attempt in range(1, retries + 1):
+        try:
+            result = fn(*args, **kwargs)
+            if result is not None:
+                return result
+        except Exception as exc:
+            logging.warning("retry_request attempt %d/%d failed: %s", attempt, retries, exc)
+        if attempt < retries:
+            time.sleep(delay)
+            delay *= 2
+    return None
+
+
+__all__ = ["ttl_cache", "TTLDict", "CircuitBreaker", "retry_request"]
