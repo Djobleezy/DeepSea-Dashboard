@@ -20,6 +20,122 @@ from cache_utils import ttl_cache
 from miner_specs import parse_worker_name
 from state_manager import MAX_PAYOUT_HISTORY_ENTRIES
 
+# ---------------------------------------------------------------------------
+# API Field Coverage Map (DS-01)
+# ---------------------------------------------------------------------------
+# Documents which OceanData fields are populated by the official Ocean.xyz
+# REST API vs. HTML scraping.  Used by get_ocean_data() to skip redundant
+# scrape work when the API has already filled a field.
+#
+# Columns:
+#   api_endpoint  - Ocean.xyz API endpoint that provides the value (or None)
+#   scrape_source - HTML element id or description scraped as fallback / supplement
+#   status        - "api-primary"  : API covers it; scrape only fills gaps
+#                   "scrape-only"  : no API equivalent; must scrape
+#                   "both"         : API + scrape used together (e.g., payout snap)
+# ---------------------------------------------------------------------------
+API_FIELD_COVERAGE = {
+    # ---- Hashrates ----
+    "hashrate_60sec": {
+        "api_endpoint": "user_hashrate (hashrate_60s)",
+        "scrape_source": "hashrates-tablerows",
+        "status": "api-primary",
+    },
+    "hashrate_5min": {
+        "api_endpoint": "user_hashrate (hashrate_300s)",
+        "scrape_source": "hashrates-tablerows",
+        "status": "api-primary",
+    },
+    "hashrate_10min": {
+        "api_endpoint": "user_hashrate (hashrate_600s)",
+        "scrape_source": "hashrates-tablerows",
+        "status": "api-primary",
+    },
+    "hashrate_3hr": {
+        "api_endpoint": "user_hashrate (hashrate_10800/7200/3600)",
+        "scrape_source": "hashrates-tablerows",
+        "status": "api-primary",
+    },
+    "hashrate_24hr": {
+        "api_endpoint": "user_hashrate (hashrate_86400)",
+        "scrape_source": "hashrates-tablerows",
+        "status": "api-primary",
+    },
+    # ---- Pool-level stats ----
+    "pool_total_hashrate": {
+        "api_endpoint": "pool_stat (hashrate_60s)",
+        "scrape_source": "pool-status-item",
+        "status": "api-primary",
+    },
+    "workers_hashing": {
+        "api_endpoint": "pool_stat (workers/active_workers)",
+        "scrape_source": "usersnap-statcards",
+        "status": "api-primary",
+    },
+    "blocks_found": {
+        "api_endpoint": "pool_stat (blocks/blocks_found)",
+        "scrape_source": "blocks-found div",
+        "status": "api-primary",
+    },
+    # ---- Last block ----
+    "last_block_height": {
+        "api_endpoint": "blocks (height)",
+        "scrape_source": "pool-status-item (LAST BLOCK span)",
+        "status": "api-primary",
+    },
+    "last_block_time": {
+        "api_endpoint": "blocks (time/timestamp)",
+        "scrape_source": "pool-status-item (LAST BLOCK span)",
+        "status": "api-primary",
+    },
+    # ---- User / payout stats ----
+    "unpaid_earnings": {
+        "api_endpoint": "statsnap (unpaid)",
+        "scrape_source": "usersnap-statcards",
+        "status": "api-primary",
+    },
+    "estimated_earnings_next_block": {
+        "api_endpoint": "statsnap (estimated_earn_next_block)",
+        "scrape_source": "payoutsnap-statcards",
+        "status": "api-primary",
+    },
+    "estimated_rewards_in_window": {
+        "api_endpoint": "statsnap (shares_in_tides)",
+        "scrape_source": "payoutsnap-statcards",
+        "status": "api-primary",
+    },
+    "total_last_share": {
+        "api_endpoint": "statsnap (lastest_share_ts)",
+        "scrape_source": "workers-tablerows (Total row)",
+        "status": "api-primary",
+    },
+    # ---- Scrape-only (no API equivalent) ----
+    "pool_fees_percentage": {
+        "api_endpoint": None,
+        "scrape_source": "earnings-tablerows (col 3/4 ratio)",
+        "status": "scrape-only",
+        "note": "Derived from BTC earnings vs pool-fees columns; no API field available.",
+    },
+    "last_block_earnings": {
+        "api_endpoint": None,
+        "scrape_source": "earnings-tablerows (col 2 BTC value → sats)",
+        "status": "scrape-only",
+        "note": "Earnings for the most recent block payout; not exposed by API.",
+    },
+    "estimated_earnings_per_day": {
+        "api_endpoint": None,
+        "scrape_source": "lifetimesnap-statcards (earnings/day card)",
+        "status": "scrape-only",
+        "note": "Pool-displayed estimate; no direct API equivalent.",
+    },
+    "est_time_to_payout": {
+        "api_endpoint": None,
+        "scrape_source": "usersnap-statcards (est time until minimum payout)",
+        "status": "scrape-only",
+        "note": "Human-readable time string only available via HTML.",
+    },
+}
+
 
 @dataclass
 class CachedResponse:
@@ -627,31 +743,43 @@ class MiningDashboardService:
 
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Safely extract pool status information
+            # Safely extract pool status information.
+            # Pool hashrate and last-block data are "api-primary" fields; only
+            # scrape them when the API did not supply a value.
+            _need_pool_hashrate = data.pool_total_hashrate is None
+            _need_last_block = data.last_block_height is None
             try:
-                pool_status = soup.find("p", id="pool-status-item")
-                if pool_status:
-                    text = pool_status.get_text(strip=True)
-                    m_total = re.search(r"HASHRATE:\s*([\d\.]+)\s*(\w+/s)", text, re.IGNORECASE)
-                    if m_total:
-                        raw_val = float(m_total.group(1))
-                        unit = m_total.group(2)
-                        data.pool_total_hashrate = raw_val
-                        data.pool_total_hashrate_unit = unit
-                    span = pool_status.find("span", class_="pool-status-newline")
-                    if span:
-                        last_block_text = span.get_text(strip=True)
-                        m_block = re.search(r"LAST BLOCK:\s*(\d+\s*\(.*\))", last_block_text, re.IGNORECASE)
-                        if m_block:
-                            full_last_block = m_block.group(1)
-                            data.last_block = full_last_block
-                            match = re.match(r"(\d+)\s*\((.*?)\)", full_last_block)
-                            if match:
-                                data.last_block_height = match.group(1)
-                                data.last_block_time = match.group(2)
-                            else:
-                                data.last_block_height = full_last_block
-                                data.last_block_time = ""
+                if _need_pool_hashrate or _need_last_block:
+                    pool_status = soup.find("p", id="pool-status-item")
+                    if pool_status:
+                        if _need_pool_hashrate:
+                            text = pool_status.get_text(strip=True)
+                            m_total = re.search(r"HASHRATE:\s*([\d\.]+)\s*(\w+/s)", text, re.IGNORECASE)
+                            if m_total:
+                                raw_val = float(m_total.group(1))
+                                unit = m_total.group(2)
+                                data.pool_total_hashrate = raw_val
+                                data.pool_total_hashrate_unit = unit
+                        if _need_last_block:
+                            span = pool_status.find("span", class_="pool-status-newline")
+                            if span:
+                                last_block_text = span.get_text(strip=True)
+                                m_block = re.search(r"LAST BLOCK:\s*(\d+\s*\(.*\))", last_block_text, re.IGNORECASE)
+                                if m_block:
+                                    full_last_block = m_block.group(1)
+                                    data.last_block = full_last_block
+                                    match = re.match(r"(\d+)\s*\((.*?)\)", full_last_block)
+                                    if match:
+                                        data.last_block_height = match.group(1)
+                                        data.last_block_time = match.group(2)
+                                    else:
+                                        data.last_block_height = full_last_block
+                                        data.last_block_time = ""
+                else:
+                    logging.debug(
+                        "Skipping pool-status-item scrape: "
+                        "API already supplied pool_total_hashrate and last_block_height"
+                    )
             except Exception as e:
                 logging.error(f"Error parsing pool status: {e}")
 
@@ -687,33 +815,40 @@ class MiningDashboardService:
             except Exception as e:
                 logging.error(f"Error parsing earnings data: {e}")
 
-            # Parse hashrate data from the hashrates table
+            # Parse hashrate data from the hashrates table.
+            # All hashrate fields are "api-primary"; only scrape intervals
+            # that the API did not populate.
+            _hr_gaps = {
+                "24 hrs": ("hashrate_24hr", "hashrate_24hr_unit"),
+                "3 hrs": ("hashrate_3hr", "hashrate_3hr_unit"),
+                "10 min": ("hashrate_10min", "hashrate_10min_unit"),
+                "5 min": ("hashrate_5min", "hashrate_5min_unit"),
+                "60 sec": ("hashrate_60sec", "hashrate_60sec_unit"),
+            }
+            # Trim to only intervals still missing
+            _hr_gaps = {k: v for k, v in _hr_gaps.items() if getattr(data, v[0]) is None}
             try:
-                time_mapping = {
-                    "24 hrs": ("hashrate_24hr", "hashrate_24hr_unit"),
-                    "3 hrs": ("hashrate_3hr", "hashrate_3hr_unit"),
-                    "10 min": ("hashrate_10min", "hashrate_10min_unit"),
-                    "5 min": ("hashrate_5min", "hashrate_5min_unit"),
-                    "60 sec": ("hashrate_60sec", "hashrate_60sec_unit"),
-                }
-                hashrate_table = soup.find("tbody", id="hashrates-tablerows")
-                if hashrate_table:
-                    for row in hashrate_table.find_all("tr", class_="table-row"):
-                        cells = row.find_all("td", class_="table-cell")
-                        if len(cells) >= 2:
-                            period_text = cells[0].get_text(strip=True).lower()
-                            hashrate_str = cells[1].get_text(strip=True).lower()
-                            try:
-                                parts = hashrate_str.split()
-                                hashrate_val = float(parts[0])
-                                unit = parts[1] if len(parts) > 1 else "th/s"
-                                for key, (attr, unit_attr) in time_mapping.items():
-                                    if key.lower() in period_text:
-                                        setattr(data, attr, hashrate_val)
-                                        setattr(data, unit_attr, unit)
-                                        break
-                            except Exception as e:
-                                logging.error(f"Error parsing hashrate '{hashrate_str}': {e}")
+                if _hr_gaps:
+                    hashrate_table = soup.find("tbody", id="hashrates-tablerows")
+                    if hashrate_table:
+                        for row in hashrate_table.find_all("tr", class_="table-row"):
+                            cells = row.find_all("td", class_="table-cell")
+                            if len(cells) >= 2:
+                                period_text = cells[0].get_text(strip=True).lower()
+                                hashrate_str = cells[1].get_text(strip=True).lower()
+                                try:
+                                    parts = hashrate_str.split()
+                                    hashrate_val = float(parts[0])
+                                    unit = parts[1] if len(parts) > 1 else "th/s"
+                                    for key, (attr, unit_attr) in _hr_gaps.items():
+                                        if key.lower() in period_text:
+                                            setattr(data, attr, hashrate_val)
+                                            setattr(data, unit_attr, unit)
+                                            break
+                                except Exception as e:
+                                    logging.error(f"Error parsing hashrate '{hashrate_str}': {e}")
+                else:
+                    logging.debug("Skipping hashrates-tablerows scrape: all hashrate intervals already filled by API")
             except Exception as e:
                 logging.error(f"Error parsing hashrate table: {e}")
 
@@ -737,85 +872,119 @@ class MiningDashboardService:
             except Exception as e:
                 logging.error(f"Error parsing lifetime stats: {e}")
 
-            # Parse payout stats data
+            # Parse payout stats data.
+            # estimated_earnings_next_block and estimated_rewards_in_window are
+            # "api-primary"; only scrape if the API left them empty.
+            _need_next_block = data.estimated_earnings_next_block is None
+            _need_window = data.estimated_rewards_in_window is None
             try:
-                payout_snap = soup.find("div", id="payoutsnap-statcards")
-                if payout_snap:
-                    for container in payout_snap.find_all("div", class_="blocks dashboard-container"):
-                        label_div = container.find("div", class_="blocks-label")
-                        if label_div:
-                            label_text = label_div.get_text(strip=True).lower()
-                            earnings_span = label_div.find_next("span", class_=lambda x: x != "tooltiptext")
-                            if earnings_span:
-                                span_text = earnings_span.get_text(strip=True)
-                                try:
-                                    earnings_value = float(span_text.split()[0].replace(",", ""))
-                                    if "earnings" in label_text and "block" in label_text:
-                                        data.estimated_earnings_next_block = earnings_value
-                                    elif "rewards" in label_text and "window" in label_text:
-                                        data.estimated_rewards_in_window = earnings_value
-                                except Exception:
-                                    pass
+                if _need_next_block or _need_window:
+                    payout_snap = soup.find("div", id="payoutsnap-statcards")
+                    if payout_snap:
+                        for container in payout_snap.find_all("div", class_="blocks dashboard-container"):
+                            label_div = container.find("div", class_="blocks-label")
+                            if label_div:
+                                label_text = label_div.get_text(strip=True).lower()
+                                earnings_span = label_div.find_next("span", class_=lambda x: x != "tooltiptext")
+                                if earnings_span:
+                                    span_text = earnings_span.get_text(strip=True)
+                                    try:
+                                        earnings_value = float(span_text.split()[0].replace(",", ""))
+                                        if _need_next_block and "earnings" in label_text and "block" in label_text:
+                                            data.estimated_earnings_next_block = earnings_value
+                                        elif _need_window and "rewards" in label_text and "window" in label_text:
+                                            data.estimated_rewards_in_window = earnings_value
+                                    except Exception:
+                                        pass
+                else:
+                    logging.debug(
+                        "Skipping payoutsnap-statcards scrape: "
+                        "estimated_earnings_next_block and estimated_rewards_in_window already filled by API"
+                    )
             except Exception as e:
                 logging.error(f"Error parsing payout stats: {e}")
 
-            # Parse user stats data
+            # Parse user stats data.
+            # workers_hashing and unpaid_earnings are "api-primary"; only scrape
+            # if the API left them empty.  est_time_to_payout is "scrape-only"
+            # and is always collected here.
+            _need_workers = data.workers_hashing is None
+            _need_unpaid = data.unpaid_earnings is None
             try:
-                usersnap = soup.find("div", id="usersnap-statcards")
-                if usersnap:
-                    for container in usersnap.find_all("div", class_="blocks dashboard-container"):
-                        label_div = container.find("div", class_="blocks-label")
-                        if label_div:
-                            label_text = label_div.get_text(strip=True).lower()
-                            value_span = label_div.find_next("span", class_=lambda x: x != "tooltiptext")
-                            if value_span:
-                                span_text = value_span.get_text(strip=True)
-                                if "workers currently hashing" in label_text:
-                                    try:
-                                        data.workers_hashing = int(span_text.replace(",", ""))
-                                    except Exception:
-                                        pass
-                                elif "unpaid earnings" in label_text and "btc" in span_text.lower():
-                                    try:
-                                        data.unpaid_earnings = float(span_text.split()[0].replace(",", ""))
-                                    except Exception:
-                                        pass
-                                elif "estimated time until minimum payout" in label_text:
-                                    data.est_time_to_payout = span_text
+                if _need_workers or _need_unpaid or True:  # always scrape for est_time_to_payout
+                    usersnap = soup.find("div", id="usersnap-statcards")
+                    if usersnap:
+                        for container in usersnap.find_all("div", class_="blocks dashboard-container"):
+                            label_div = container.find("div", class_="blocks-label")
+                            if label_div:
+                                label_text = label_div.get_text(strip=True).lower()
+                                value_span = label_div.find_next("span", class_=lambda x: x != "tooltiptext")
+                                if value_span:
+                                    span_text = value_span.get_text(strip=True)
+                                    if _need_workers and "workers currently hashing" in label_text:
+                                        try:
+                                            data.workers_hashing = int(span_text.replace(",", ""))
+                                            _need_workers = False
+                                        except Exception:
+                                            pass
+                                    elif (
+                                        _need_unpaid
+                                        and "unpaid earnings" in label_text
+                                        and "btc" in span_text.lower()
+                                    ):
+                                        try:
+                                            data.unpaid_earnings = float(span_text.split()[0].replace(",", ""))
+                                            _need_unpaid = False
+                                        except Exception:
+                                            pass
+                                    elif "estimated time until minimum payout" in label_text:
+                                        # scrape-only: always collect
+                                        data.est_time_to_payout = span_text
             except Exception as e:
                 logging.error(f"Error parsing user stats: {e}")
 
-            # Parse blocks found data
+            # Parse blocks found data.
+            # blocks_found is "api-primary" (pool_stat endpoint); only scrape
+            # when the API did not supply it.
             try:
-                blocks_container = soup.find(
-                    lambda tag: tag.name == "div" and "blocks found" in tag.get_text(strip=True).lower()
-                )
-                if blocks_container:
-                    span = blocks_container.find_next_sibling("span")
-                    if span:
-                        num_match = re.search(r"(\d+)", span.get_text(strip=True))
-                        if num_match:
-                            data.blocks_found = num_match.group(1)
+                if data.blocks_found is None:
+                    blocks_container = soup.find(
+                        lambda tag: tag.name == "div" and "blocks found" in tag.get_text(strip=True).lower()
+                    )
+                    if blocks_container:
+                        span = blocks_container.find_next_sibling("span")
+                        if span:
+                            num_match = re.search(r"(\d+)", span.get_text(strip=True))
+                            if num_match:
+                                data.blocks_found = num_match.group(1)
+                else:
+                    logging.debug("Skipping blocks-found scrape: API already supplied blocks_found")
             except Exception as e:
                 logging.error(f"Error parsing blocks found: {e}")
 
-            # Parse last share time data
+            # Parse last share time data.
+            # total_last_share is "api-primary" (statsnap lastest_share_ts);
+            # only fall back to scraping the workers table when the API did not
+            # supply a formatted timestamp.
             try:
-                workers_table = soup.find("tbody", id="workers-tablerows")
-                if workers_table:
-                    for row in workers_table.find_all("tr", class_="table-row"):
-                        cells = row.find_all("td")
-                        if cells and cells[0].get_text(strip=True).lower().startswith("total"):
-                            last_share_str = cells[2].get_text(strip=True)
-                            try:
-                                naive_dt = datetime.strptime(last_share_str, "%Y-%m-%d %H:%M")
-                                utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
-                                la_dt = utc_dt.astimezone(ZoneInfo(get_timezone()))
-                                data.total_last_share = la_dt.strftime("%Y-%m-%d %I:%M %p")
-                            except Exception as e:
-                                logging.error(f"Error converting last share time '{last_share_str}': {e}")
-                                data.total_last_share = last_share_str
-                            break
+                if data.total_last_share == "N/A":
+                    workers_table = soup.find("tbody", id="workers-tablerows")
+                    if workers_table:
+                        for row in workers_table.find_all("tr", class_="table-row"):
+                            cells = row.find_all("td")
+                            if cells and cells[0].get_text(strip=True).lower().startswith("total"):
+                                last_share_str = cells[2].get_text(strip=True)
+                                try:
+                                    naive_dt = datetime.strptime(last_share_str, "%Y-%m-%d %H:%M")
+                                    utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+                                    la_dt = utc_dt.astimezone(ZoneInfo(get_timezone()))
+                                    data.total_last_share = la_dt.strftime("%Y-%m-%d %I:%M %p")
+                                except Exception as e:
+                                    logging.error(f"Error converting last share time '{last_share_str}': {e}")
+                                    data.total_last_share = last_share_str
+                                break
+                else:
+                    logging.debug("Skipping workers-tablerows last-share scrape: API already supplied total_last_share")
             except Exception as e:
                 logging.error(f"Error parsing last share time: {e}")
 
