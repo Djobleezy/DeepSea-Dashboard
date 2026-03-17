@@ -6,7 +6,7 @@ const { setupBasicDOM } = require('./test_utils');
 
 setupBasicDOM();
 
-const filePath = path.join(__dirname, '../../static/js/main.js');
+const filePath = path.join(__dirname, '../../static/js/utils.js');
 const lines = fs.readFileSync(filePath, 'utf8').split('\n');
 const start = lines.findIndex(l => l.includes('function calculateBlockProbability')); // start of snippet
 let end = start;

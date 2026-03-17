@@ -56,7 +56,7 @@ global.$ = function () {
     return obj;
 };
 
-const code = fs.readFileSync(__dirname + '/../../static/js/main.js', 'utf8');
+const code = fs.readFileSync(__dirname + '/../../static/js/utils.js', 'utf8');
 vm.runInThisContext(code);
 
 assert.strictEqual(typeof normalizeHashrate, 'function');

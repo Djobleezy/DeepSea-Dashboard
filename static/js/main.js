@@ -970,6 +970,7 @@ $(document).keydown(function (event) {
         // Prevent default browser behavior
         event.preventDefault();
     }
+});
 
 $(document).ready(function () {
     // Apply theme based on stored preference - moved to beginning for better initialization

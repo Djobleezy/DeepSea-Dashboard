@@ -45,8 +45,18 @@ global.getCurrentTheme = () => ({
     }
 });
 
-const code = fs.readFileSync(__dirname + '/../../static/js/main.js', 'utf8');
-vm.runInThisContext(code);
+// Stub globals that chart-manager.js depends on from other modules
+global.extendedHistoryEnabled = false;
+global.loadBlockAnnotations = () => {};
+global.trendChart = null;
+global.latestMetrics = {};
+Chart.register = () => {};
+
+// Load utils first (provides normalizeHashrate), then chart-manager (provides initializeChart)
+const utilsCode = fs.readFileSync(__dirname + '/../../static/js/utils.js', 'utf8');
+vm.runInThisContext(utilsCode);
+const chartCode = fs.readFileSync(__dirname + '/../../static/js/chart-manager.js', 'utf8');
+vm.runInThisContext(chartCode);
 
 const chart = initializeChart();
 

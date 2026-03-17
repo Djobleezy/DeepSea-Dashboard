@@ -61,6 +61,9 @@ global.$ = function () {
     return obj;
 };
 
+// Load module dependencies before main.js (mirrors dashboard.html script order)
+const utilsCode = fs.readFileSync(__dirname + '/../../static/js/utils.js', 'utf8');
+vm.runInThisContext(utilsCode);
 const code = fs.readFileSync(__dirname + '/../../static/js/main.js', 'utf8');
 vm.runInThisContext(code);
 
