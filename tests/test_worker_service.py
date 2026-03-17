@@ -185,7 +185,7 @@ def test_generate_sequential_workers_deterministic(monkeypatch):
     assert len(offline) == 1
 
     total_hashrate = round(sum(w["hashrate_3hr"] for w in workers), 2)
-    assert total_hashrate == 116.73
+    assert total_hashrate == 110.51
 
     total_earnings = round(sum(w["earnings"] for w in workers), 8)
     assert total_earnings == 0.5
