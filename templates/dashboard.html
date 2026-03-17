@@ -409,5 +409,14 @@
 {% block javascript %}
 <!-- External JavaScript file with our application logic -->
 <script src="{{ url_for('static', filename='js/sparklines.js') }}"></script>
+<!-- Split modules (loaded in dependency order) -->
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/arrow-indicator.js') }}"></script>
+<script src="{{ url_for('static', filename='js/block-annotations.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chart-manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payout-tracker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sse-client.js') }}"></script>
+<script src="{{ url_for('static', filename='js/metrics-display.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

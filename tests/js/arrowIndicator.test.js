@@ -12,7 +12,7 @@ global.THEME = { SHARED: { GREEN: 'green', RED: 'red' } };
 global.getCurrentTheme = () => ({ SHARED: { GREEN: 'green', RED: 'red' } });
 global.window.normalizeHashrate = (v) => v;
 
-const filePath = path.join(__dirname, '../../static/js/main.js');
+const filePath = path.join(__dirname, '../../static/js/arrow-indicator.js');
 const lines = fs.readFileSync(filePath, 'utf8').split('\n');
 const start = lines.findIndex(l => l.includes('class ArrowIndicator'));
 const end = lines.findIndex((l, i) => i > start && l.includes('// Create the singleton instance'));

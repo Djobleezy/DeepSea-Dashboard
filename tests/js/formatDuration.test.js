@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const filePath = path.join(__dirname, '../../static/js/main.js');
+const filePath = path.join(__dirname, '../../static/js/utils.js');
 const lines = fs.readFileSync(filePath, 'utf8').split('\n');
 const start = lines.findIndex(l => l.includes('function formatDuration('));
 let end = start;

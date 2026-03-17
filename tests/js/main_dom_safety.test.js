@@ -61,6 +61,24 @@ global.$ = function () {
     return obj;
 };
 
+// Load module dependencies before main.js (mirrors dashboard.html script order)
+const utilsCode = fs.readFileSync(__dirname + '/../../static/js/utils.js', 'utf8');
+vm.runInThisContext(utilsCode);
+
+// Stub globals required by metrics-display.js and arrow-indicator.js before loading them
+global.arrowIndicator = { updateIndicators: () => {} };
+global.BitcoinMinuteRefresh = { notifyRefresh: () => {}, updateServerTime: () => {} };
+global.blockAnnotations = [];
+global.chartPoints = 30;
+global.saveBlockAnnotations = () => {};
+global.updateBlockAnnotations = () => {};
+global.getCurrentTheme = () => ({ PRIMARY: '#00aaff' });
+global.Audio = function() { this.play = () => Promise.resolve(); this.addEventListener = () => {}; };
+global.fetch = () => Promise.resolve({ json: () => Promise.resolve({}) });
+
+const metricsCode = fs.readFileSync(__dirname + '/../../static/js/metrics-display.js', 'utf8');
+vm.runInThisContext(metricsCode);
+
 const code = fs.readFileSync(__dirname + '/../../static/js/main.js', 'utf8');
 vm.runInThisContext(code);
 
