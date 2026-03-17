@@ -47,19 +47,13 @@ def init_state_manager():
     redis_url = os.environ.get("REDIS_URL")
     config = load_config()
     extended = config.get("extended_history", False)
-    import state_manager
     from memory_manager import MEMORY_CONFIG
 
-    if extended:
-        state_manager.MAX_HISTORY_ENTRIES = 43200
-        MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = 43200
-        MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = 43200
-    else:
-        state_manager.MAX_HISTORY_ENTRIES = 180
-        MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = 180
-        MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = 180
+    max_entries = 43200 if extended else 180  # 30 days vs 3 hours at 1min intervals
+    MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = max_entries
+    MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = max_entries
 
-    return StateManager(redis_url)
+    return StateManager(redis_url, max_history_entries=max_entries)
 
 
 def init_services(state_manager):
