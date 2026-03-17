@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 
 from cssmin import cssmin
-import htmlmin
+import minify_html
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def minify_css():
         logger.info("Minified %s", src.name)
 
 
-def minify_html():
+def minify_html_templates():
     """Minify HTML templates."""
     tmpl_dir = Path("templates")
     out_dir = tmpl_dir / "min"
@@ -73,7 +73,7 @@ def minify_html():
             continue
         out = out_dir / src.name.replace(".html", ".min.html")
         out.write_text(
-            htmlmin.minify(src.read_text(), remove_comments=True, reduce_empty_attributes=True), encoding="utf-8"
+            minify_html.minify(src.read_text(), minify_js=False, minify_css=False), encoding="utf-8"
         )
         logger.info("Minified %s", src.name)
 
@@ -97,7 +97,7 @@ def main():
     if args.all or args.css:
         minify_css()
     if args.all or args.html:
-        minify_html()
+        minify_html_templates()
 
 
 if __name__ == "__main__":
