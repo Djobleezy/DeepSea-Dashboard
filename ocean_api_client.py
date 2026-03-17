@@ -12,9 +12,17 @@ from dataclasses import dataclass
 
 from models import convert_to_ths
 from config import get_timezone
-from cache_utils import ttl_cache
+from cache_utils import ttl_cache, CircuitBreaker, retry_request
 from miner_specs import parse_worker_name
 from state_manager import MAX_PAYOUT_HISTORY_ENTRIES
+
+# ---------------------------------------------------------------------------
+# Module-level circuit breakers — one per external host.
+# Each opens after 5 consecutive failures and resets after 60 s.
+# ---------------------------------------------------------------------------
+_ocean_circuit = CircuitBreaker(name="api.ocean.xyz", max_failures=5, reset_timeout=60)
+_mempool_circuit = CircuitBreaker(name="mempool.guide", max_failures=5, reset_timeout=60)
+_exchange_circuit = CircuitBreaker(name="exchange-rates", max_failures=5, reset_timeout=60)
 
 
 @dataclass
@@ -54,19 +62,65 @@ class OceanApiClientMixin:
                 except Exception:
                     pass
 
+    def _fetch_ocean_api(self, url: str, timeout: int = 10):
+        """Fetch an Ocean.xyz API endpoint with circuit-breaker + retry.
+
+        Wraps ``session.get`` with the module-level Ocean circuit breaker and
+        up to 2 retries (backoff: 1 s, 2 s).  Returns the raw
+        ``requests.Response`` on success, or ``None`` when the circuit is open
+        or all retries fail.
+
+        Args:
+            url: Full URL to fetch.
+            timeout: Per-request connect+read timeout in seconds.
+
+        Returns:
+            A ``requests.Response`` instance, or ``None`` on failure.
+        """
+
+        def _do_get():
+            return _ocean_circuit.call(self.session.get, url, timeout=timeout)
+
+        return retry_request(_do_get, retries=2, backoff=1.0)
+
+    def _fetch_mempool_api(self, url: str, timeout: int = 10):
+        """Fetch a mempool.guide endpoint with circuit-breaker + retry.
+
+        Returns a ``requests.Response`` instance, or ``None`` on failure.
+        """
+
+        def _do_get():
+            return _mempool_circuit.call(self.session.get, url, timeout=timeout)
+
+        return retry_request(_do_get, retries=2, backoff=1.0)
+
+    def _fetch_exchange_api(self, url: str, timeout: int = 10):
+        """Fetch an exchange-rate endpoint with circuit-breaker + retry.
+
+        Returns a ``requests.Response`` instance, or ``None`` on failure.
+        """
+
+        def _do_get():
+            return _exchange_circuit.call(self.session.get, url, timeout=timeout)
+
+        return retry_request(_do_get, retries=2, backoff=1.0)
+
     def get_ocean_api_data(self):
         """Fetch mining data using the official Ocean.xyz API."""
         api_base = self.API_BASE
         result = {}
 
         # Fetch hashrate info
-        resp = None
         hr_data = {}
         try:
             url = f"{api_base}/user_hashrate/{self.wallet}"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is not None and resp.ok:
                 hr_data = resp.json().get("result", {}) or {}
+                try:
+                    resp.close()
+                except Exception:
+                    pass
             result["hashrate_60sec"] = hr_data.get("hashrate_60s")
             result["hashrate_5min"] = hr_data.get("hashrate_300s")
             result["hashrate_10min"] = hr_data.get("hashrate_600s")
@@ -93,20 +147,17 @@ class OceanApiClientMixin:
                 result["workers_hashing"] = hr_data["active_worker_count"]
         except Exception as e:
             logging.error(f"Error fetching user_hashrate API: {e}")
-        finally:
-            if resp is not None:
+
+        # Fetch latest statsnap data
+        try:
+            url = f"{api_base}/statsnap/{self.wallet}"
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is not None and resp.ok:
+                snap = resp.json().get("result", {}) or {}
                 try:
                     resp.close()
                 except Exception:
                     pass
-
-        # Fetch latest statsnap data
-        resp = None
-        try:
-            url = f"{api_base}/statsnap/{self.wallet}"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
-                snap = resp.json().get("result", {}) or {}
                 unpaid = snap.get("unpaid")
                 result["unpaid_earnings"] = float(unpaid) if unpaid is not None else None
                 earn_next = snap.get("estimated_earn_next_block")
@@ -119,12 +170,6 @@ class OceanApiClientMixin:
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
         except Exception as e:
             logging.error(f"Error fetching statsnap API: {e}")
-        finally:
-            if resp is not None:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
 
         # Merge additional data from other endpoints
         result.update(self.get_pool_stat_api())
@@ -145,12 +190,15 @@ class OceanApiClientMixin:
         """Fetch overall pool statistics using /pool_stat and /pool_hashrate."""
         api_base = self.API_BASE
         data = {}
-        resp = None
         try:
             url = f"{api_base}/pool_stat"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is not None and resp.ok:
                 stat = resp.json().get("result", {}) or {}
+                try:
+                    resp.close()
+                except Exception:
+                    pass
                 # pool_stat uses "active_workers" (not "workers")
                 data["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
                 data["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
@@ -158,43 +206,37 @@ class OceanApiClientMixin:
                 # pool_stat does NOT contain hashrate or blocks_found
         except Exception as e:
             logging.error(f"Error fetching pool_stat API: {e}")
-        finally:
-            if resp is not None:
+
+        # Pool hashrate lives in a separate endpoint
+        try:
+            url = f"{api_base}/pool_hashrate"
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is not None and resp.ok:
+                ph = resp.json().get("result", {}) or {}
                 try:
                     resp.close()
                 except Exception:
                     pass
-
-        # Pool hashrate lives in a separate endpoint
-        resp = None
-        try:
-            url = f"{api_base}/pool_hashrate"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
-                ph = resp.json().get("result", {}) or {}
                 raw_hashrate = ph.get("pool_60s") or ph.get("pool_300s")
                 if raw_hashrate is not None:
                     data["pool_total_hashrate"] = convert_to_ths(float(raw_hashrate), "H/s")
                     data["pool_total_hashrate_unit"] = "th/s"
         except Exception as e:
             logging.error(f"Error fetching pool_hashrate API: {e}")
-        finally:
-            if resp is not None:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
         return data
 
     def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
         """Fetch recent block data using /blocks."""
         api_base = self.API_BASE
-        resp = None
         try:
             url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
-            resp = self.session.get(url, timeout=10)
-            if resp.ok:
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is not None and resp.ok:
                 data = resp.json()
+                try:
+                    resp.close()
+                except Exception:
+                    pass
                 blocks = data.get("blocks")
                 if blocks is None:
                     result = data.get("result")
@@ -206,12 +248,6 @@ class OceanApiClientMixin:
                     return blocks
         except Exception as e:
             logging.error(f"Error fetching blocks API: {e}")
-        finally:
-            if resp:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
         return []
 
     def fetch_exchange_rates(self, base_currency="USD"):
@@ -239,13 +275,12 @@ class OceanApiClientMixin:
             logging.error("Exchange rate API key not configured")
             return {}
 
-        response = None
         try:
             # Use the configured API key with the v6 exchangerate-api endpoint
             url = f"https://v6.exchangerate-api.com/v6/{api_key}/latest/{base_currency}"
-            response = self.session.get(url, timeout=5)
+            response = self._fetch_exchange_api(url, timeout=5)
 
-            if response.ok:
+            if response is not None and response.ok:
                 data = response.json()
                 if data.get("result") == "success":
                     logging.info(f"Successfully fetched exchange rates for {selected_currency}")
@@ -260,21 +295,23 @@ class OceanApiClientMixin:
                     # Clear cache on failure
                     self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
                     return {}
-            else:
+            elif response is not None:
                 logging.error(f"Failed to fetch exchange rates: {response.status_code}")
+                try:
+                    response.close()
+                except Exception:
+                    pass
                 # Clear cache on failure
+                self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
+                return {}
+            else:
+                # Circuit open or all retries failed
                 self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
                 return {}
         except Exception as e:
             logging.error(f"Error fetching exchange rates: {e}")
             self.exchange_rates_cache = {"rates": {}, "timestamp": 0.0}
             return {}
-        finally:
-            if response:
-                try:
-                    response.close()
-                except Exception:
-                    pass
 
     def get_payment_history_api(self, days=360, btc_price=None):
         """Fetch payout history using the Ocean.xyz API."""
@@ -287,10 +324,11 @@ class OceanApiClientMixin:
 
         url = f"{api_base}/earnpay/{self.wallet}/{start_str}/{end_str}"
         payments = []
-        resp = None
 
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is None:
+                return None
             if not resp.ok:
                 logging.error(f"API earnpay request failed: {resp.status_code}")
                 return None
@@ -356,11 +394,12 @@ class OceanApiClientMixin:
     def get_worker_data_api(self):
         """Fetch worker data using the Ocean.xyz API."""
         api_base = self.API_BASE
-        resp = None
         try:
             url = f"{api_base}/user_hashrate_full/{self.wallet}"
             logging.info(f"Fetching worker data from API: {url}")
-            resp = self.session.get(url, timeout=10)
+            resp = self._fetch_ocean_api(url, timeout=10)
+            if resp is None:
+                return None
             if not resp.ok:
                 logging.error(f"API user_hashrate_full request failed: {resp.status_code}")
                 return None
