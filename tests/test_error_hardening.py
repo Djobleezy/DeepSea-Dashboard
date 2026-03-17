@@ -3,7 +3,6 @@ and their integration with OceanApiClientMixin."""
 
 import time
 import threading
-import pytest
 
 from cache_utils import CircuitBreaker, retry_request
 
@@ -63,7 +62,6 @@ def test_circuit_breaker_blocks_when_open():
     assert cb.state == CircuitBreaker.OPEN
 
     # Call should be blocked (None returned without calling fn again)
-    call_count_before = 0  # fn always raises so successful calls == 0
     result = cb.call(fn)
     assert result is None
 
