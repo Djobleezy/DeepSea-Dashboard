@@ -146,6 +146,9 @@ def test_get_worker_data_original_basic(monkeypatch):
     real_bs4 = importlib.import_module("bs4")
     monkeypatch.setattr(data_service, "BeautifulSoup", real_bs4.BeautifulSoup)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
 
     data = svc.get_worker_data_original()
     assert data["workers_total"] == 1

@@ -50,6 +50,9 @@ from worker_service import WorkerService
 from data_service import MiningDashboardService
 from notification_service import NotificationService
 import data_service
+import ocean_api_client
+import ocean_scraper  # noqa: F401 — needed for monkeypatch targets
+import metrics_calculator  # noqa: F401 — needed for monkeypatch targets
 import state_manager
 
 
@@ -127,7 +130,7 @@ def test_exchange_rate_caching(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
     fake_time = [0]
-    monkeypatch.setattr(data_service.time, "time", lambda: fake_time[0])
+    monkeypatch.setattr(ocean_api_client.time, "time", lambda: fake_time[0])
 
     # Provide a dummy API key so the service does not abort early
     monkeypatch.setenv("EXCHANGE_RATE_API_KEY", "TESTKEY")
@@ -177,6 +180,9 @@ def test_get_payment_history_api_nested_result(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
 
     payments = svc.get_payment_history_api(days=1, btc_price=20000)
 
@@ -211,6 +217,9 @@ def test_get_earnings_data_with_nested_result(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr("config.get_currency", lambda: "USD")
     monkeypatch.setattr(svc, "get_ocean_data", lambda: data_service.OceanData())
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 0, 20000, 0))
@@ -249,6 +258,9 @@ def test_get_payment_history_scrape(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     import importlib
     import sys
 
@@ -290,6 +302,9 @@ def test_get_payment_history_scrape_lightning(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     import importlib
     import sys
 
@@ -342,6 +357,9 @@ def test_get_payment_history_scrape_pagination(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     import importlib
     import sys
 
@@ -376,6 +394,9 @@ def test_get_payment_history_api_limits_results(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
 
     payments = svc.get_payment_history_api()
     assert len(payments) == state_manager.MAX_PAYOUT_HISTORY_ENTRIES
@@ -400,6 +421,9 @@ def test_get_payment_history_scrape_limits_results(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     import importlib
     sys.modules.pop("bs4", None)
     real_bs4 = importlib.import_module("bs4")
@@ -441,6 +465,9 @@ def test_get_payment_history_api_handles_request_error(monkeypatch):
     svc.session = DummySession()
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
 
     assert svc.get_payment_history_api() is None
 
@@ -461,6 +488,9 @@ def test_get_earnings_data_fallback_to_scrape(monkeypatch):
     ]
     monkeypatch.setattr(svc, "get_payment_history_scrape", lambda btc_price=None: sample)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr("config.get_currency", lambda: "USD")
     monkeypatch.setattr(svc, "get_ocean_data", lambda: data_service.OceanData())
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 0, 20000, 0))
@@ -488,6 +518,9 @@ def test_get_worker_data_api(monkeypatch):
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
 
     data = svc.get_worker_data_api()
 
@@ -657,6 +690,9 @@ def test_fetch_metrics_estimates_power(monkeypatch):
     svc = MiningDashboardService(0, 0, "w", worker_service=dummy)
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
@@ -695,6 +731,9 @@ def test_fetch_metrics_real_worker_data(monkeypatch):
     svc = MiningDashboardService(0, 0, "w", worker_service=dummy)
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
@@ -727,6 +766,9 @@ def test_fetch_metrics_power_configured(monkeypatch):
     svc = MiningDashboardService(0, 2000, "w", worker_service=DummyWS())
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
@@ -748,6 +790,9 @@ def test_server_start_time_constant(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr(
         svc,
         "get_ocean_data",
@@ -871,6 +916,9 @@ def test_avg_days_between_payouts_fallback(monkeypatch):
     monkeypatch.setattr(svc, "get_payment_history_api", lambda days=360, btc_price=None: payments)
     monkeypatch.setattr(svc, "get_payment_history_scrape", lambda btc_price=None: payments)
     monkeypatch.setattr("data_service.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_api_client.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+    monkeypatch.setattr("metrics_calculator.get_timezone", lambda: "UTC")
     monkeypatch.setattr("config.get_currency", lambda: "USD")
     monkeypatch.setattr(svc, "get_ocean_data", lambda: data_service.OceanData())
     monkeypatch.setattr(svc, "get_bitcoin_stats", lambda: (0, 0, 20000, 0))
