@@ -152,9 +152,9 @@ def test_payout_history_endpoint(client):
 
 def test_block_events_endpoint(client):
     import App
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     App.notification_service.notifications = [
         {
             "id": "1",
