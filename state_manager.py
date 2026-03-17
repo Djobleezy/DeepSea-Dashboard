@@ -37,13 +37,16 @@ state_lock = threading.Lock()
 class StateManager:
     """Manager for persistent state and history data."""
 
-    def __init__(self, redis_url=None):
+    def __init__(self, redis_url=None, max_history_entries=None):
         """
         Initialize the state manager.
 
         Args:
             redis_url (str, optional): Redis URL for persistent storage
+            max_history_entries (int, optional): Override for history size.
+                Defaults to the module-level ``MAX_HISTORY_ENTRIES``.
         """
+        self.max_history_entries = max_history_entries or MAX_HISTORY_ENTRIES
         self.redis_client = self._connect_to_redis(redis_url) if redis_url else None
         self.STATE_KEY = "graph_state"
         self.last_save_time = 0
@@ -51,8 +54,8 @@ class StateManager:
 
         # Initialize in-memory structures for historical data
         self.arrow_history = {}  # Stored per second
-        self.hashrate_history = deque(maxlen=MAX_HISTORY_ENTRIES)
-        self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
+        self.hashrate_history = deque(maxlen=self.max_history_entries)
+        self.metrics_log = deque(maxlen=self.max_history_entries)
         self.payout_history = []
         # Maintain short-term history for 3hr variance calculations
         self.variance_history = {}
@@ -188,12 +191,12 @@ class StateManager:
 
                         self.arrow_history[key] = deque(
                             restored,
-                            maxlen=MAX_HISTORY_ENTRIES,
+                            maxlen=self.max_history_entries,
                         )
 
                     # Restore hashrate_history
                     self.hashrate_history = deque(
-                        state.get("hashrate_history", []), maxlen=MAX_HISTORY_ENTRIES
+                        state.get("hashrate_history", []), maxlen=self.max_history_entries
                     )
 
                     # Restore variance_history if present
@@ -212,7 +215,7 @@ class StateManager:
 
                     # Restore metrics_log
                     compact_metrics_log = state.get("metrics_log", [])
-                    self.metrics_log = deque(maxlen=MAX_HISTORY_ENTRIES)
+                    self.metrics_log = deque(maxlen=self.max_history_entries)
                     for entry in compact_metrics_log:
                         metrics = entry.get("m", {})
                         # Convert optimized ``{"value": x}`` entries back to
@@ -224,12 +227,12 @@ class StateManager:
                 else:  # Original format
                     raw_history = state.get("arrow_history", {})
                     self.arrow_history = {
-                        key: deque(values, maxlen=MAX_HISTORY_ENTRIES) for key, values in raw_history.items()
+                        key: deque(values, maxlen=self.max_history_entries) for key, values in raw_history.items()
                     }
                     self.hashrate_history = deque(
-                        state.get("hashrate_history", []), maxlen=MAX_HISTORY_ENTRIES
+                        state.get("hashrate_history", []), maxlen=self.max_history_entries
                     )
-                    self.metrics_log = deque(state.get("metrics_log", []), maxlen=MAX_HISTORY_ENTRIES)
+                    self.metrics_log = deque(state.get("metrics_log", []), maxlen=self.max_history_entries)
 
                 logging.info(f"Loaded graph state from Redis (format version {version}).")
             else:
@@ -271,8 +274,8 @@ class StateManager:
                 values_list = list(values)
                 if values_list:
                     recent_values = (
-                        values_list[-MAX_HISTORY_ENTRIES:]
-                        if len(values_list) > MAX_HISTORY_ENTRIES
+                        values_list[-self.max_history_entries:]
+                        if len(values_list) > self.max_history_entries
                         else values_list
                     )
                     compacted = []
@@ -290,8 +293,8 @@ class StateManager:
 
             # Compact hashrate_history
             compact_hashrate_history = (
-                list(self.hashrate_history)[-MAX_HISTORY_ENTRIES:]
-                if len(self.hashrate_history) > MAX_HISTORY_ENTRIES
+                list(self.hashrate_history)[-self.max_history_entries:]
+                if len(self.hashrate_history) > self.max_history_entries
                 else list(self.hashrate_history)
             )
 
@@ -299,8 +302,8 @@ class StateManager:
             compact_metrics_log = []
             if self.metrics_log:
                 recent_logs = (
-                    list(self.metrics_log)[-MAX_HISTORY_ENTRIES:]
-                    if len(self.metrics_log) > MAX_HISTORY_ENTRIES
+                    list(self.metrics_log)[-self.max_history_entries:]
+                    if len(self.metrics_log) > self.max_history_entries
                     else list(self.metrics_log)
                 )
                 for entry in recent_logs:
@@ -368,7 +371,7 @@ class StateManager:
 
         with state_lock:
             # Set thresholds based on aggressiveness
-            max_history = MAX_HISTORY_ENTRIES // 2 if aggressive else MAX_HISTORY_ENTRIES
+            max_history = self.max_history_entries // 2 if aggressive else self.max_history_entries
 
             # Prune arrow_history with more sophisticated approach
             for key in self.arrow_history:
@@ -409,7 +412,7 @@ class StateManager:
                     else:
                         history_list = recent_data
 
-                    self.arrow_history[key] = deque(history_list, maxlen=MAX_HISTORY_ENTRIES)
+                    self.arrow_history[key] = deque(history_list, maxlen=self.max_history_entries)
                     logging.info(
                         f"Pruned {key} history from original state to {len(self.arrow_history[key])} entries"
                     )
@@ -425,7 +428,7 @@ class StateManager:
                     step = 4 if aggressive else 3  # More aggressive step
                     sparse_older_logs = [older_logs[i] for i in range(0, len(older_logs), step)]
                     new_logs = sparse_older_logs + recent_logs
-                    self.metrics_log = deque(new_logs, maxlen=MAX_HISTORY_ENTRIES)
+                    self.metrics_log = deque(new_logs, maxlen=self.max_history_entries)
                     logging.info(f"Pruned metrics log to {len(self.metrics_log)} entries")
 
             # Free memory more aggressively
@@ -593,7 +596,7 @@ class StateManager:
                                 arrow = self.arrow_history[key][-1]["arrow"]
 
                     if key not in self.arrow_history:
-                        self.arrow_history[key] = deque(maxlen=MAX_HISTORY_ENTRIES)
+                        self.arrow_history[key] = deque(maxlen=self.max_history_entries)
 
                     if not self.arrow_history[key] or self.arrow_history[key][-1]["time"] != current_second:
                         # Create new entry
@@ -686,8 +689,8 @@ class StateManager:
 
                 # Only keep the most recent 60 data points for the graph display
                 aggregated_history[key] = (
-                    aggregated_history[key][-MAX_HISTORY_ENTRIES:]
-                    if len(aggregated_history[key]) > MAX_HISTORY_ENTRIES
+                    aggregated_history[key][-self.max_history_entries:]
+                    if len(aggregated_history[key]) > self.max_history_entries
                     else aggregated_history[key]
                 )
 
@@ -756,7 +759,7 @@ class StateManager:
             else:
                 for key in keys:
                     if key in self.arrow_history:
-                        self.arrow_history[key] = deque(maxlen=MAX_HISTORY_ENTRIES)
+                        self.arrow_history[key] = deque(maxlen=self.max_history_entries)
 
     # ------------------------------------------------------------------
     # Payout history management
