@@ -533,7 +533,7 @@ def test_get_worker_data_fallback(monkeypatch):
 def test_get_pool_stat_api(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
-    sample = {"hashrate_60s": 1000, "workers": 5, "blocks": 10}
+    sample = {"result": {"hashrate_60s": 1000, "workers": 5, "blocks": 10}}
 
     def fake_get(url, timeout=10):
         resp = MagicMock()

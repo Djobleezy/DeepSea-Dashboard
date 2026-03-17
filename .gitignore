@@ -25,3 +25,4 @@ templates/min/
 /logs/dashboard.log.4
 /logs/dashboard.log.5
 /logs/dashboard.log
+logs/

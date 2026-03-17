@@ -234,33 +234,23 @@ class TestApiFirstSkipGuards:
 
     def test_api_values_not_overwritten_by_scrape(self):
         """
-        When API provides hashrate_24hr=90.0, the scrape fallback must not
-        overwrite it even if the HTML table contains a different value.
+        When API fills all hashrate intervals, hashrates-tablerows is skipped
+        entirely — the scrape never even runs for those fields.
         """
         svc = _make_service()
+        queried_ids = []
 
-        html_with_hashrates = """
-        <html><body>
-          <tbody id="hashrates-tablerows">
-            <tr class="table-row">
-              <td class="table-cell">24 hrs</td>
-              <td class="table-cell">999.0 th/s</td>
-            </tr>
-          </tbody>
-        </body></html>
-        """
+        def tracking_find(*args, **kwargs):
+            if "id" in kwargs:
+                queried_ids.append(kwargs["id"])
+            m = MagicMock()
+            m.find.return_value = None
+            m.find_all.return_value = []
+            m.get_text.return_value = ""
+            return m
 
-        mock_resp = MagicMock()
-        mock_resp.ok = True
-        mock_resp.text = html_with_hashrates
-        mock_resp.close = MagicMock()
-
-        with patch.object(svc.session, "get", return_value=mock_resp):
-            with patch.object(svc, "get_ocean_api_data", return_value=self.FULLY_POPULATED_API):
-                result = svc.get_ocean_data()
-
-        assert result is not None
-        # API value (90.0) should win; scrape value (999.0) must not overwrite
-        assert result.hashrate_24hr == 90.0, (
-            f"API-supplied hashrate_24hr=90.0 should not be overwritten by scrape; got {result.hashrate_24hr}"
+        self._run_get_ocean_data_with_api(svc, tracking_find)
+        # With all hashrates filled by API, the table is never even queried
+        assert "hashrates-tablerows" not in queried_ids, (
+            "hashrates-tablerows should be skipped when API fills all hashrate intervals"
         )

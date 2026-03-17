@@ -596,20 +596,31 @@ class MiningDashboardService:
             url = f"{api_base}/user_hashrate/{self.wallet}"
             resp = self.session.get(url, timeout=10)
             if resp.ok:
-                hr_data = resp.json()
+                hr_data = resp.json().get("result", {}) or {}
             result["hashrate_60sec"] = hr_data.get("hashrate_60s")
             result["hashrate_5min"] = hr_data.get("hashrate_300s")
             result["hashrate_10min"] = hr_data.get("hashrate_600s")
-            result["hashrate_24hr"] = hr_data.get("hashrate_86400")
+            result["hashrate_24hr"] = hr_data.get("hashrate_86400s")
             # Try several keys for a ~3hr interval
             result["hashrate_3hr"] = (
-                hr_data.get("hashrate_10800") or hr_data.get("hashrate_7200") or hr_data.get("hashrate_3600")
+                hr_data.get("hashrate_10800s") or hr_data.get("hashrate_7200s") or hr_data.get("hashrate_3600s")
             )
-            result["hashrate_60sec_unit"] = "H/s"
-            result["hashrate_5min_unit"] = "H/s"
-            result["hashrate_10min_unit"] = "H/s"
-            result["hashrate_24hr_unit"] = "H/s"
-            result["hashrate_3hr_unit"] = "H/s"
+            # API returns raw H/s — convert to TH/s for dashboard display
+            for key in ("hashrate_60sec", "hashrate_5min", "hashrate_10min", "hashrate_24hr", "hashrate_3hr"):
+                raw = result.get(key)
+                if raw is not None:
+                    try:
+                        result[key] = convert_to_ths(float(raw), "H/s")
+                    except (ValueError, TypeError):
+                        pass
+            result["hashrate_60sec_unit"] = "th/s"
+            result["hashrate_5min_unit"] = "th/s"
+            result["hashrate_10min_unit"] = "th/s"
+            result["hashrate_24hr_unit"] = "th/s"
+            result["hashrate_3hr_unit"] = "th/s"
+            # active_worker_count lives in user_hashrate response
+            if hr_data.get("active_worker_count") is not None:
+                result["workers_hashing"] = hr_data["active_worker_count"]
         except Exception as e:
             logging.error(f"Error fetching user_hashrate API: {e}")
         finally:
@@ -625,13 +636,16 @@ class MiningDashboardService:
             url = f"{api_base}/statsnap/{self.wallet}"
             resp = self.session.get(url, timeout=10)
             if resp.ok:
-                snap = resp.json()
-                result["unpaid_earnings"] = snap.get("unpaid")
-                result["estimated_earnings_next_block"] = snap.get("estimated_earn_next_block")
-                result["estimated_rewards_in_window"] = snap.get("shares_in_tides")
+                snap = resp.json().get("result", {}) or {}
+                unpaid = snap.get("unpaid")
+                result["unpaid_earnings"] = float(unpaid) if unpaid is not None else None
+                earn_next = snap.get("estimated_earn_next_block")
+                result["estimated_earnings_next_block"] = float(earn_next) if earn_next is not None else None
+                rewards = snap.get("estimated_total_earn_next_block")
+                result["estimated_rewards_in_window"] = float(rewards) if rewards is not None else None
                 ts = snap.get("lastest_share_ts")
                 if ts:
-                    dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                    dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
         except Exception as e:
             logging.error(f"Error fetching statsnap API: {e}")
@@ -666,7 +680,7 @@ class MiningDashboardService:
             url = f"{api_base}/pool_stat"
             resp = self.session.get(url, timeout=10)
             if resp.ok:
-                stat = resp.json()
+                stat = resp.json().get("result", {}) or {}
                 data["pool_total_hashrate"] = stat.get("hashrate_60s") or stat.get("hashrate")
                 data["pool_total_hashrate_unit"] = "H/s"
                 data["workers_hashing"] = stat.get("workers") or stat.get("active_workers")

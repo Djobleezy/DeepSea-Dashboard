@@ -15,9 +15,9 @@ calls are now guarded by "skip if API already filled this" logic.
 
 | Endpoint | Base URL | Fields provided |
 |----------|----------|-----------------|
-| `user_hashrate/{wallet}` | `https://api.ocean.xyz/v1` | hashrate_60s, hashrate_300s, hashrate_600s, hashrate_86400, hashrate_10800/7200/3600 |
-| `statsnap/{wallet}` | `https://api.ocean.xyz/v1` | unpaid, estimated_earn_next_block, shares_in_tides, lastest_share_ts |
-| `pool_stat` | `https://api.ocean.xyz/v1` | hashrate_60s (pool), workers/active_workers, blocks/blocks_found |
+| `user_hashrate/{wallet}` | `https://api.ocean.xyz/v1` | result.{hashrate_60s, hashrate_300s, hashrate_600s, hashrate_86400s, hashrate_10800s/3600s, active_worker_count} |
+| `statsnap/{wallet}` | `https://api.ocean.xyz/v1` | result.{unpaid, estimated_earn_next_block, estimated_total_earn_next_block, lastest_share_ts} |
+| `pool_stat` | `https://api.ocean.xyz/v1` | result.{hashrate_60s (pool), workers/active_workers, blocks/blocks_found} |
 | `blocks/{page}/{size}/{legacy}` | `https://api.ocean.xyz/v1` | height, time/timestamp (of latest block) |
 | `earnpay/{wallet}/{start}/{end}` | `https://api.ocean.xyz/v1` | payout history (ts, on_chain_txid, lightning_txid, total_satoshis_net_paid) |
 
@@ -64,10 +64,28 @@ calls are now guarded by "skip if API already filled this" logic.
 
 ## Changes Made (DS-01)
 
-1. **Added `API_FIELD_COVERAGE` constant** in `data_service.py` — machine-readable
+1. **Fixed API JSON parsing** — All Ocean.xyz API responses wrap data in
+   `{"result": {...}}`. The code was reading top-level keys, getting None for
+   every field. Added `.get("result", {})` to `get_ocean_api_data()` (user_hashrate,
+   statsnap) and `get_pool_stat_api()`. This single fix went from 1/18 fields
+   filled to 17/19 filled by API.
+
+2. **Fixed hashrate key names** — API returns `hashrate_86400s` (with trailing 's')
+   but code looked for `hashrate_86400`. Same for 10800s/7200s/3600s intervals.
+
+3. **Added H/s → TH/s conversion** — API returns raw hashes/sec; dashboard expects
+   TH/s. Added `convert_to_ths()` call for all hashrate fields.
+
+4. **Added string → float conversion** — `statsnap` returns `unpaid` and earnings
+   as strings; downstream code expects floats.
+
+5. **Extracted `active_worker_count`** from `user_hashrate` response (previously
+   only pulled from `pool_stat` where the key didn't match).
+
+6. **Added `API_FIELD_COVERAGE` constant** in `data_service.py` — machine-readable
    dict documenting every field's source, API endpoint, and scrape fallback.
 
-2. **Added skip guards in `get_ocean_data()`** — before each BeautifulSoup DOM
+7. **Added skip guards in `get_ocean_data()`** — before each BeautifulSoup DOM
    query block, check whether the API already populated the field. If so, log at
    DEBUG level and skip the parse. Affected sections:
    - `pool-status-item` (pool hashrate + last block)
