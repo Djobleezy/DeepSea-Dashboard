@@ -57,25 +57,26 @@ API_FIELD_COVERAGE = {
         "status": "api-primary",
     },
     "hashrate_24hr": {
-        "api_endpoint": "user_hashrate (hashrate_86400)",
+        "api_endpoint": "user_hashrate (hashrate_86400s)",
         "scrape_source": "hashrates-tablerows",
         "status": "api-primary",
     },
     # ---- Pool-level stats ----
     "pool_total_hashrate": {
-        "api_endpoint": "pool_stat (hashrate_60s)",
+        "api_endpoint": "pool_hashrate (pool_60s)",
         "scrape_source": "pool-status-item",
         "status": "api-primary",
     },
     "workers_hashing": {
-        "api_endpoint": "pool_stat (workers/active_workers)",
+        "api_endpoint": "pool_stat (active_workers) + user_hashrate (active_worker_count)",
         "scrape_source": "usersnap-statcards",
         "status": "api-primary",
     },
     "blocks_found": {
-        "api_endpoint": "pool_stat (blocks/blocks_found)",
+        "api_endpoint": None,
         "scrape_source": "blocks-found div",
-        "status": "api-primary",
+        "status": "scrape-only",
+        "notes": "pool_stat does not expose blocks_found",
     },
     # ---- Last block ----
     "last_block_height": {
@@ -191,6 +192,7 @@ class MiningDashboardService:
             wallet (str): Bitcoin wallet address for Ocean.xyz
             network_fee (float): Additional network fee percentage
         """
+        self.API_BASE = "https://api.ocean.xyz/v1"
         self.power_cost = power_cost
         self.power_usage = power_usage
         self.wallet = wallet
@@ -586,7 +588,7 @@ class MiningDashboardService:
 
     def get_ocean_api_data(self):
         """Fetch mining data using the official Ocean.xyz API."""
-        api_base = "https://api.ocean.xyz/v1"
+        api_base = self.API_BASE
         result = {}
 
         # Fetch hashrate info
@@ -672,8 +674,8 @@ class MiningDashboardService:
         return result
 
     def get_pool_stat_api(self):
-        """Fetch overall pool statistics using /pool_stat."""
-        api_base = "https://api.ocean.xyz/v1"
+        """Fetch overall pool statistics using /pool_stat and /pool_hashrate."""
+        api_base = self.API_BASE
         data = {}
         resp = None
         try:
@@ -681,12 +683,33 @@ class MiningDashboardService:
             resp = self.session.get(url, timeout=10)
             if resp.ok:
                 stat = resp.json().get("result", {}) or {}
-                data["pool_total_hashrate"] = stat.get("hashrate_60s") or stat.get("hashrate")
-                data["pool_total_hashrate_unit"] = "H/s"
-                data["workers_hashing"] = stat.get("workers") or stat.get("active_workers")
-                data["blocks_found"] = stat.get("blocks") or stat.get("blocks_found")
+                # pool_stat uses "active_workers" (not "workers")
+                data["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                data["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
+                data["network_difficulty"] = stat.get("network_difficulty")
+                # pool_stat does NOT contain hashrate or blocks_found
         except Exception as e:
             logging.error(f"Error fetching pool_stat API: {e}")
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+        # Pool hashrate lives in a separate endpoint
+        resp = None
+        try:
+            url = f"{api_base}/pool_hashrate"
+            resp = self.session.get(url, timeout=10)
+            if resp.ok:
+                ph = resp.json().get("result", {}) or {}
+                raw_hashrate = ph.get("pool_60s") or ph.get("pool_300s")
+                if raw_hashrate is not None:
+                    data["pool_total_hashrate"] = convert_to_ths(float(raw_hashrate), "H/s")
+                    data["pool_total_hashrate_unit"] = "th/s"
+        except Exception as e:
+            logging.error(f"Error fetching pool_hashrate API: {e}")
         finally:
             if resp is not None:
                 try:
@@ -697,7 +720,7 @@ class MiningDashboardService:
 
     def get_blocks_api(self, page=0, page_size=20, include_legacy=0):
         """Fetch recent block data using /blocks."""
-        api_base = "https://api.ocean.xyz/v1"
+        api_base = self.API_BASE
         resp = None
         try:
             url = f"{api_base}/blocks/{page}/{page_size}/{include_legacy}"
@@ -1136,8 +1159,8 @@ class MiningDashboardService:
 
     def get_payment_history_api(self, days=360, btc_price=None):
         """Fetch payout history using the Ocean.xyz API."""
-        api_base = "https://api.ocean.xyz/v1"
-        end_date = datetime.utcnow()
+        api_base = self.API_BASE
+        end_date = datetime.now(ZoneInfo("UTC"))
         start_date = end_date - timedelta(days=days)
 
         start_str = start_date.strftime("%Y-%m-%d")
@@ -2210,7 +2233,7 @@ class MiningDashboardService:
 
     def get_worker_data_api(self):
         """Fetch worker data using the Ocean.xyz API."""
-        api_base = "https://api.ocean.xyz/v1"
+        api_base = self.API_BASE
         resp = None
         try:
             url = f"{api_base}/user_hashrate_full/{self.wallet}"

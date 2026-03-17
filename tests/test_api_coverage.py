@@ -53,7 +53,7 @@ class TestApiFieldCoverage:
 
     def test_known_scrape_only_fields_present(self):
         scrape_only = {f for f, i in API_FIELD_COVERAGE.items() if i["status"] == "scrape-only"}
-        expected = {"pool_fees_percentage", "last_block_earnings", "estimated_earnings_per_day", "est_time_to_payout"}
+        expected = {"pool_fees_percentage", "last_block_earnings", "estimated_earnings_per_day", "est_time_to_payout", "blocks_found"}
         assert expected.issubset(scrape_only), (
             f"Missing scrape-only fields: {expected - scrape_only}"
         )
@@ -62,7 +62,7 @@ class TestApiFieldCoverage:
         api_primary = {f for f, i in API_FIELD_COVERAGE.items() if i["status"] == "api-primary"}
         expected = {
             "hashrate_60sec", "hashrate_5min", "hashrate_10min", "hashrate_3hr", "hashrate_24hr",
-            "pool_total_hashrate", "workers_hashing", "blocks_found",
+            "pool_total_hashrate", "workers_hashing",
             "last_block_height", "last_block_time",
             "unpaid_earnings", "estimated_earnings_next_block", "estimated_rewards_in_window",
             "total_last_share",
