@@ -35,6 +35,8 @@ def client(monkeypatch):
     monkeypatch.setattr(cfg, "save_config", lambda c: True)
     monkeypatch.setattr(config_routes, "load_config", lambda: sample_cfg)
     monkeypatch.setattr(config_routes, "save_config", lambda c: True)
+    # Also patch the module-level reference that config_routes.py uses internally
+    monkeypatch.setattr(config_routes, "_update_metrics_job", lambda force=False: None)
 
     return App.app.test_client()
 

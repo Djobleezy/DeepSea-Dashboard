@@ -533,20 +533,26 @@ def test_get_worker_data_fallback(monkeypatch):
 def test_get_pool_stat_api(monkeypatch):
     svc = MiningDashboardService(0, 0, "w")
 
-    sample = {"hashrate_60s": 1000, "workers": 5, "blocks": 10}
+    # Mock both /pool_stat and /pool_hashrate responses
+    pool_stat_resp = {"result": {"active_workers": "5", "network_difficulty": "145e12"}}
+    pool_hashrate_resp = {"result": {"pool_60s": "12000000000000000000"}}  # 12 EH/s
 
     def fake_get(url, timeout=10):
         resp = MagicMock()
         resp.ok = True
-        resp.json.return_value = sample
+        if "pool_hashrate" in url:
+            resp.json.return_value = pool_hashrate_resp
+        else:
+            resp.json.return_value = pool_stat_resp
         return resp
 
     monkeypatch.setattr(svc.session, "get", fake_get)
     data = svc.get_pool_stat_api()
 
-    assert data["workers_hashing"] == 5
-    assert data["blocks_found"] == 10
-    assert data["pool_total_hashrate"] == 1000
+    assert data["workers_hashing"] == "5"
+    assert data["pool_total_hashrate"] == 12000000.0  # 12 EH/s in TH/s
+    assert data["pool_total_hashrate_unit"] == "th/s"
+    assert data["network_difficulty"] == "145e12"
 
 
 def test_get_blocks_api(monkeypatch):
