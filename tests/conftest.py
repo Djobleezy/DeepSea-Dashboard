@@ -1,4 +1,5 @@
 import sys
+import logging
 from pathlib import Path
 
 import pytest
@@ -29,34 +30,50 @@ def clear_ttl_caches():
     try:
         from ocean_scraper import OceanScraperMixin
         from ocean_api_client import OceanApiClientMixin
+        from metrics_calculator import MetricsCalculatorMixin
 
         for method_name in ("get_ocean_data",):
             m = getattr(OceanScraperMixin, method_name, None)
             if m and hasattr(m, "cache_clear"):
                 m.cache_clear()
 
-        for method_name in ("get_ocean_api_data", "get_bitcoin_stats",
-                             "get_block_reward", "get_average_fee_per_block"):
+        for method_name in ("get_ocean_api_data", "get_bitcoin_stats"):
             m = getattr(OceanApiClientMixin, method_name, None)
             if m and hasattr(m, "cache_clear"):
                 m.cache_clear()
-    except Exception:
-        pass
+
+        for method_name in ("get_block_reward", "get_average_fee_per_block"):
+            m = getattr(MetricsCalculatorMixin, method_name, None)
+            if m and hasattr(m, "cache_clear"):
+                m.cache_clear()
+    except (ImportError, ModuleNotFoundError) as e:
+        logging.warning(f"Failed to import modules for cache clearing: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error clearing caches: {e}")
+        raise
     yield
     # Optionally clear after too, for test ordering independence
     try:
         from ocean_scraper import OceanScraperMixin
         from ocean_api_client import OceanApiClientMixin
+        from metrics_calculator import MetricsCalculatorMixin
 
         for method_name in ("get_ocean_data",):
             m = getattr(OceanScraperMixin, method_name, None)
             if m and hasattr(m, "cache_clear"):
                 m.cache_clear()
 
-        for method_name in ("get_ocean_api_data", "get_bitcoin_stats",
-                             "get_block_reward", "get_average_fee_per_block"):
+        for method_name in ("get_ocean_api_data", "get_bitcoin_stats"):
             m = getattr(OceanApiClientMixin, method_name, None)
             if m and hasattr(m, "cache_clear"):
                 m.cache_clear()
-    except Exception:
-        pass
+
+        for method_name in ("get_block_reward", "get_average_fee_per_block"):
+            m = getattr(MetricsCalculatorMixin, method_name, None)
+            if m and hasattr(m, "cache_clear"):
+                m.cache_clear()
+    except (ImportError, ModuleNotFoundError) as e:
+        logging.warning(f"Failed to import modules for cache clearing: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error clearing caches: {e}")
+        raise

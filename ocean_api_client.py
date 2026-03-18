@@ -109,43 +109,72 @@ class OceanApiClientMixin:
     def get_ocean_api_data(self):
         """Fetch mining data using the official Ocean.xyz API.
 
-        All five Ocean.xyz endpoints are fetched concurrently using the shared
-        ``ThreadPoolExecutor`` to eliminate serial round-trip latency.  Results
-        are cached for 30 s via ``@ttl_cache`` so that ``get_ocean_data()`` and
-        ``fetch_metrics()`` calling this in quick succession share the same data.
+        All five Ocean.xyz endpoints are fetched concurrently to eliminate 
+        serial round-trip latency. Uses a separate thread pool when called from
+        within the service's main executor to avoid potential deadlocks.
+        Results are cached for 30 s via ``@ttl_cache`` so that ``get_ocean_data()`` 
+        and ``fetch_metrics()`` calling this in quick succession share the same data.
         """
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+        
         api_base = self.API_BASE
         result = {}
 
-        # --- Fire all Ocean.xyz API calls concurrently ---
-        futures = {}
-        try:
-            futures["user_hashrate"] = self.executor.submit(
-                self._fetch_ocean_api, f"{api_base}/user_hashrate/{self.wallet}", 10
-            )
-            futures["statsnap"] = self.executor.submit(
-                self._fetch_ocean_api, f"{api_base}/statsnap/{self.wallet}", 10
-            )
-            futures["pool_stat"] = self.executor.submit(
-                self._fetch_ocean_api, f"{api_base}/pool_stat", 10
-            )
-            futures["pool_hashrate"] = self.executor.submit(
-                self._fetch_ocean_api, f"{api_base}/pool_hashrate", 10
-            )
-            futures["blocks"] = self.executor.submit(
-                self._fetch_ocean_api, f"{api_base}/blocks/0/1/0", 10
-            )
-        except Exception as e:
-            logging.error(f"Error submitting Ocean API futures: {e}")
+        # Check if we're running in a worker thread; if so, use a separate pool
+        # to prevent deadlock. Otherwise, use the main executor for consistency.
+        current_thread = threading.current_thread()
+        use_separate_pool = (
+            hasattr(current_thread, 'name') and 
+            'ThreadPoolExecutor' in current_thread.name
+        )
+        
+        if use_separate_pool:
+            # Use a separate thread pool to avoid deadlock when called from within
+            # the service's main executor (e.g., from fetch_metrics)
+            executor_context = ThreadPoolExecutor(max_workers=5, thread_name_prefix="ocean-api")
+            use_executor = executor_context
+        else:
+            # Use the main service executor for normal operation
+            executor_context = None
+            use_executor = self.executor
 
-        # --- Collect responses (with individual timeouts) ---
-        responses = {}
-        for key, fut in futures.items():
+        try:
+            if executor_context:
+                executor_context.__enter__()
+                
+            # --- Fire all Ocean.xyz API calls concurrently ---
+            futures = {}
             try:
-                responses[key] = fut.result(timeout=12)
+                futures["user_hashrate"] = use_executor.submit(
+                    self._fetch_ocean_api, f"{api_base}/user_hashrate/{self.wallet}", 10
+                )
+                futures["statsnap"] = use_executor.submit(
+                    self._fetch_ocean_api, f"{api_base}/statsnap/{self.wallet}", 10
+                )
+                futures["pool_stat"] = use_executor.submit(
+                    self._fetch_ocean_api, f"{api_base}/pool_stat", 10
+                )
+                futures["pool_hashrate"] = use_executor.submit(
+                    self._fetch_ocean_api, f"{api_base}/pool_hashrate", 10
+                )
+                futures["blocks"] = use_executor.submit(
+                    self._fetch_ocean_api, f"{api_base}/blocks/0/1/0", 10
+                )
             except Exception as e:
-                logging.error(f"Error collecting {key} future: {e}")
-                responses[key] = None
+                logging.error(f"Error submitting Ocean API futures: {e}")
+
+            # --- Collect responses (with individual timeouts) ---
+            responses = {}
+            for key, fut in futures.items():
+                try:
+                    responses[key] = fut.result(timeout=12)
+                except Exception as e:
+                    logging.error(f"Error collecting {key} future: {e}")
+                    responses[key] = None
+        finally:
+            if executor_context:
+                executor_context.__exit__(None, None, None)
 
         # --- Parse user_hashrate ---
         hr_data = {}
