@@ -87,6 +87,8 @@ class TestOceanApiDataConcurrency:
     def test_cached_on_second_call(self, monkeypatch):
         """Second call within TTL should return cached data (no new requests)."""
         svc = MiningDashboardService(0, 0, "test_wallet")
+        executor = FakeExecutor()
+        svc.executor = executor
         call_count = 0
 
         def counting_fetch(url, timeout=10):
