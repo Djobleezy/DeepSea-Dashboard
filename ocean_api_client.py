@@ -105,16 +105,52 @@ class OceanApiClientMixin:
 
         return retry_request(_do_get, retries=2, backoff=1.0)
 
+    @ttl_cache(ttl_seconds=30, maxsize=1)
     def get_ocean_api_data(self):
-        """Fetch mining data using the official Ocean.xyz API."""
+        """Fetch mining data using the official Ocean.xyz API.
+
+        All five Ocean.xyz endpoints are fetched concurrently using the shared
+        ``ThreadPoolExecutor`` to eliminate serial round-trip latency.  Results
+        are cached for 30 s via ``@ttl_cache`` so that ``get_ocean_data()`` and
+        ``fetch_metrics()`` calling this in quick succession share the same data.
+        """
         api_base = self.API_BASE
         result = {}
 
-        # Fetch hashrate info
+        # --- Fire all Ocean.xyz API calls concurrently ---
+        futures = {}
+        try:
+            futures["user_hashrate"] = self.executor.submit(
+                self._fetch_ocean_api, f"{api_base}/user_hashrate/{self.wallet}", 10
+            )
+            futures["statsnap"] = self.executor.submit(
+                self._fetch_ocean_api, f"{api_base}/statsnap/{self.wallet}", 10
+            )
+            futures["pool_stat"] = self.executor.submit(
+                self._fetch_ocean_api, f"{api_base}/pool_stat", 10
+            )
+            futures["pool_hashrate"] = self.executor.submit(
+                self._fetch_ocean_api, f"{api_base}/pool_hashrate", 10
+            )
+            futures["blocks"] = self.executor.submit(
+                self._fetch_ocean_api, f"{api_base}/blocks/0/1/0", 10
+            )
+        except Exception as e:
+            logging.error(f"Error submitting Ocean API futures: {e}")
+
+        # --- Collect responses (with individual timeouts) ---
+        responses = {}
+        for key, fut in futures.items():
+            try:
+                responses[key] = fut.result(timeout=12)
+            except Exception as e:
+                logging.error(f"Error collecting {key} future: {e}")
+                responses[key] = None
+
+        # --- Parse user_hashrate ---
         hr_data = {}
         try:
-            url = f"{api_base}/user_hashrate/{self.wallet}"
-            resp = self._fetch_ocean_api(url, timeout=10)
+            resp = responses.get("user_hashrate")
             if resp is not None and resp.ok:
                 hr_data = resp.json().get("result", {}) or {}
                 try:
@@ -146,12 +182,11 @@ class OceanApiClientMixin:
             if hr_data.get("active_worker_count") is not None:
                 result["workers_hashing"] = hr_data["active_worker_count"]
         except Exception as e:
-            logging.error(f"Error fetching user_hashrate API: {e}")
+            logging.error(f"Error parsing user_hashrate API: {e}")
 
-        # Fetch latest statsnap data
+        # --- Parse statsnap ---
         try:
-            url = f"{api_base}/statsnap/{self.wallet}"
-            resp = self._fetch_ocean_api(url, timeout=10)
+            resp = responses.get("statsnap")
             if resp is not None and resp.ok:
                 snap = resp.json().get("result", {}) or {}
                 try:
@@ -169,20 +204,63 @@ class OceanApiClientMixin:
                     dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
         except Exception as e:
-            logging.error(f"Error fetching statsnap API: {e}")
+            logging.error(f"Error parsing statsnap API: {e}")
 
-        # Merge additional data from other endpoints
-        result.update(self.get_pool_stat_api())
+        # --- Parse pool_stat + pool_hashrate (replaces get_pool_stat_api) ---
+        try:
+            resp = responses.get("pool_stat")
+            if resp is not None and resp.ok:
+                stat = resp.json().get("result", {}) or {}
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+                result["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                result["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
+                result["network_difficulty"] = stat.get("network_difficulty")
+        except Exception as e:
+            logging.error(f"Error parsing pool_stat API: {e}")
 
-        # Pull latest block information using /blocks
-        blocks = self.get_blocks_api(page=0, page_size=1)
-        if blocks:
-            block = blocks[0]
-            result["last_block_height"] = block.get("height")
-            ts = block.get("time") or block.get("timestamp")
-            if ts:
-                dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
-                result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+        try:
+            resp = responses.get("pool_hashrate")
+            if resp is not None and resp.ok:
+                ph = resp.json().get("result", {}) or {}
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+                raw_hashrate = ph.get("pool_60s") or ph.get("pool_300s")
+                if raw_hashrate is not None:
+                    result["pool_total_hashrate"] = convert_to_ths(float(raw_hashrate), "H/s")
+                    result["pool_total_hashrate_unit"] = "th/s"
+        except Exception as e:
+            logging.error(f"Error parsing pool_hashrate API: {e}")
+
+        # --- Parse blocks ---
+        try:
+            resp = responses.get("blocks")
+            if resp is not None and resp.ok:
+                data = resp.json()
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+                blocks = data.get("blocks")
+                if blocks is None:
+                    r = data.get("result")
+                    if isinstance(r, dict):
+                        blocks = r.get("blocks")
+                    elif isinstance(r, list):
+                        blocks = r
+                if isinstance(blocks, list) and blocks:
+                    block = blocks[0]
+                    result["last_block_height"] = block.get("height")
+                    ts = block.get("time") or block.get("timestamp")
+                    if ts:
+                        dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
+                        result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+        except Exception as e:
+            logging.error(f"Error parsing blocks API: {e}")
 
         return result
 
@@ -506,31 +584,41 @@ class OceanApiClientMixin:
     def get_bitcoin_stats(self):
         """
         Fetch Bitcoin network statistics with improved error handling and caching.
-        Uses mempool.guide APIs for more accurate network hashrate, block height, and multi-currency price data.
+
+        Uses a **primary-then-fallback** strategy to eliminate redundant
+        requests:
+
+        1. Fire the three mempool.guide endpoints concurrently (hashrate,
+           prices, block_height).
+        2. If any mempool.guide request fails, try mempool.space for that
+           specific endpoint.
+        3. Only if the mempool tier still has gaps, fire the corresponding
+           blockchain.info fallback — and only for the missing data.
 
         Returns:
             tuple: (difficulty, network_hashrate, btc_price, block_count)
         """
-        # Base URLs for API endpoints
-        blockchain_info_urls = {
-            "difficulty": "https://blockchain.info/q/getdifficulty",
-            "hashrate": "https://blockchain.info/q/hashrate",  # Keep as fallback
-            "ticker": "https://blockchain.info/ticker",  # Keep as fallback
-            "blockcount": "https://blockchain.info/q/getblockcount",  # Keep as fallback
-        }
-
-        # Add mempool.guide APIs
+        # Primary mempool.guide URLs
         mempool_urls = {
-            "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d",  # Includes network difficulty
+            "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d",
             "prices": "https://mempool.guide/api/v1/prices",
-            "block_height": "https://mempool.guide/api/blocks/tip/height",  # New API endpoint for block height
+            "block_height": "https://mempool.guide/api/blocks/tip/height",
         }
 
-        # Fallback mempool.space APIs (same format as mempool.guide)
+        # Tier-2 fallback: mempool.space (same API format)
         mempool_space_urls = {
             "hashrate": "https://mempool.space/api/v1/mining/hashrate/3d",
             "prices": "https://mempool.space/api/v1/prices",
             "block_height": "https://mempool.space/api/blocks/tip/height",
+        }
+
+        # Tier-3 fallback: blockchain.info (different format, used only if
+        # both mempool tiers fail for a given data point)
+        blockchain_fallbacks = {
+            "difficulty": "https://blockchain.info/q/getdifficulty",
+            "hashrate": "https://blockchain.info/q/hashrate",
+            "ticker": "https://blockchain.info/ticker",
+            "blockcount": "https://blockchain.info/q/getblockcount",
         }
 
         # Use previous cached values as defaults if available
@@ -540,31 +628,29 @@ class OceanApiClientMixin:
         block_count = self.cache.get("block_count")
 
         responses = {}
+        bc_responses = {}
         try:
-            # Add all API endpoints to futures using the shared executor
+            # ---- Tier 1: mempool.guide (concurrent) ----
             futures = {}
-
-            # Add blockchain.info endpoints
-            for key, url in blockchain_info_urls.items():
-                futures[key] = self.executor.submit(self.fetch_url, url)
-
-            # Add mempool.guide endpoints
             for key, url in mempool_urls.items():
                 futures[f"mempool_{key}"] = self.executor.submit(self.fetch_url, url)
 
-            # Get all responses
-            responses = {key: futures[key].result(timeout=5) for key in futures}
+            for fkey, fut in futures.items():
+                try:
+                    responses[fkey] = fut.result(timeout=5)
+                except Exception as e:
+                    logging.warning(f"mempool.guide {fkey} timed out: {e}")
+                    responses[fkey] = None
 
-            # Fallback to mempool.space if any mempool.guide request failed
+            # ---- Tier 2: mempool.space for any failed mempool.guide calls ----
             for key, url in mempool_space_urls.items():
                 mempool_key = f"mempool_{key}"
                 resp = responses.get(mempool_key)
                 if not resp or not resp.ok:
-                    logging.warning(f"mempool.guide {key} API failed, falling back to mempool.space")
+                    logging.warning(f"mempool.guide {key} failed, trying mempool.space")
                     responses[mempool_key] = self.fetch_url(url)
 
-            # Process mempool.guide price data (primary source)
-            price_data = {}
+            # ---- Process price data ----
             mempool_price_response = responses.get("mempool_prices")
             if mempool_price_response and mempool_price_response.ok:
                 try:
@@ -573,100 +659,114 @@ class OceanApiClientMixin:
                         btc_price = float(price_data.get("USD"))
                         self.cache["btc_price"] = btc_price
                         self.cache["btc_price_USD"] = btc_price
-                        logging.info(f"Successfully fetched USD price from mempool.guide: {btc_price}")
+                        logging.info(f"Fetched USD price from mempool tier: {btc_price}")
                     for curr, value in price_data.items():
                         if curr != "time":
                             self.cache[f"btc_price_{curr}"] = float(value)
-
                 except (ValueError, TypeError, json.JSONDecodeError) as e:
-                    logging.error(f"Error parsing mempool.guide price data: {e}")
-            else:
-                logging.warning(
-                    "Could not fetch price data from mempool.guide or mempool.space, falling back to blockchain.info"
-                )
+                    logging.error(f"Error parsing mempool price data: {e}")
 
-            # Fall back to blockchain.info for price if mempool.guide failed or currency not available
-            if btc_price is None and responses["ticker"] and responses["ticker"].ok:
-                try:
-                    ticker_data = responses["ticker"].json()
-                    btc_price = float(ticker_data.get("USD", {}).get("last", 0))
-                    self.cache["btc_price"] = btc_price
-                    self.cache["btc_price_USD"] = btc_price
-                    logging.info(f"Using blockchain.info price: {btc_price}")
-                except (ValueError, TypeError, json.JSONDecodeError) as e:
-                    logging.error(f"Error parsing blockchain.info price: {e}")
+            # ---- Process block height ----
             block_height_response = responses.get("mempool_block_height")
             if block_height_response and block_height_response.ok:
                 try:
-                    # The API returns just the block height as a simple integer value
                     block_count = int(block_height_response.text)
                     self.cache["block_count"] = block_count
-                    logging.info(f"Successfully fetched latest block height from mempool.guide: {block_count}")
+                    logging.info(f"Fetched block height from mempool tier: {block_count}")
                 except (ValueError, TypeError) as e:
-                    logging.error(f"Error parsing block height from mempool.guide: {e}")
-                    # Will fall back to blockchain.info below if this fails
-            else:
-                logging.warning(
-                    "Could not fetch block height from mempool.guide or mempool.space, falling back to blockchain.info"
-                )
+                    logging.error(f"Error parsing mempool block height: {e}")
 
-            # Process mempool.guide hashrate data (primary source)
+            # ---- Process hashrate + difficulty ----
             mempool_hashrate_response = responses.get("mempool_hashrate")
             if mempool_hashrate_response and mempool_hashrate_response.ok:
                 try:
                     hashrate_data = mempool_hashrate_response.json()
-                    # Use currentHashrate from the API (already in H/s)
                     network_hashrate = hashrate_data.get("currentHashrate")
-
-                    # Also update difficulty if available in the response
                     if "currentDifficulty" in hashrate_data:
                         difficulty = hashrate_data.get("currentDifficulty")
-
-                    # Cache the updated values
                     self.cache["network_hashrate"] = network_hashrate
                     self.cache["difficulty"] = difficulty
-
                     logging.info(
-                        f"Successfully fetched network hashrate from mempool.guide: {network_hashrate/1e18:.2f} EH/s"
+                        f"Fetched network hashrate from mempool tier: {network_hashrate/1e18:.2f} EH/s"
                     )
                 except (ValueError, TypeError, json.JSONDecodeError) as e:
-                    logging.error(f"Error parsing mempool.guide hashrate data: {e}")
-            else:
-                logging.warning(
-                    "Could not fetch hashrate from mempool.guide or mempool.space, falling back to blockchain.info"
+                    logging.error(f"Error parsing mempool hashrate data: {e}")
+
+            # ---- Tier 3: blockchain.info ONLY for gaps ----
+            # Only fire requests for data points that both mempool tiers missed.
+            bc_futures = {}
+            if btc_price is None:
+                bc_futures["ticker"] = self.executor.submit(
+                    self.fetch_url, blockchain_fallbacks["ticker"]
+                )
+            if network_hashrate is None:
+                bc_futures["hashrate"] = self.executor.submit(
+                    self.fetch_url, blockchain_fallbacks["hashrate"]
+                )
+            if difficulty is None:
+                bc_futures["difficulty"] = self.executor.submit(
+                    self.fetch_url, blockchain_fallbacks["difficulty"]
+                )
+            if block_count is None:
+                bc_futures["blockcount"] = self.executor.submit(
+                    self.fetch_url, blockchain_fallbacks["blockcount"]
                 )
 
-                # Process blockchain.info hashrate as fallback
-            if network_hashrate is None and responses["hashrate"] and responses["hashrate"].ok:
+            bc_responses = {}
+            for bkey, bfut in bc_futures.items():
                 try:
-                    # blockchain.info returns hashrate in GH/s, convert to H/s for consistency
-                    network_hashrate = float(responses["hashrate"].text) * 1e9
-                    self.cache["network_hashrate"] = network_hashrate
-                    logging.info(f"Using blockchain.info network hashrate: {network_hashrate/1e18:.2f} EH/s")
-                except (ValueError, TypeError) as e:
-                    logging.error(f"Error parsing network hashrate from blockchain.info: {e}")
+                    bc_responses[bkey] = bfut.result(timeout=5)
+                except Exception as e:
+                    logging.warning(f"blockchain.info {bkey} timed out: {e}")
+                    bc_responses[bkey] = None
 
-            # Handle difficulty (if not already set by mempool.guide)
-            if difficulty is None and responses["difficulty"] and responses["difficulty"].ok:
-                try:
-                    difficulty = float(responses["difficulty"].text)
-                    self.cache["difficulty"] = difficulty
-                except (ValueError, TypeError) as e:
-                    logging.error(f"Error parsing difficulty: {e}")
+            if btc_price is None:
+                resp = bc_responses.get("ticker")
+                if resp and resp.ok:
+                    try:
+                        ticker_data = resp.json()
+                        btc_price = float(ticker_data.get("USD", {}).get("last", 0))
+                        self.cache["btc_price"] = btc_price
+                        self.cache["btc_price_USD"] = btc_price
+                        logging.info(f"Using blockchain.info price: {btc_price}")
+                    except (ValueError, TypeError, json.JSONDecodeError) as e:
+                        logging.error(f"Error parsing blockchain.info price: {e}")
 
-            # Handle blockchain.info block count as fallback if mempool.guide failed
-            if block_count is None and responses["blockcount"] and responses["blockcount"].ok:
-                try:
-                    block_count = int(responses["blockcount"].text)
-                    self.cache["block_count"] = block_count
-                    logging.info(f"Using blockchain.info block height: {block_count}")
-                except (ValueError, TypeError) as e:
-                    logging.error(f"Error parsing block count: {e}")
+            if network_hashrate is None:
+                resp = bc_responses.get("hashrate")
+                if resp and resp.ok:
+                    try:
+                        network_hashrate = float(resp.text) * 1e9
+                        self.cache["network_hashrate"] = network_hashrate
+                        logging.info(f"Using blockchain.info hashrate: {network_hashrate/1e18:.2f} EH/s")
+                    except (ValueError, TypeError) as e:
+                        logging.error(f"Error parsing blockchain.info hashrate: {e}")
+
+            if difficulty is None:
+                resp = bc_responses.get("difficulty")
+                if resp and resp.ok:
+                    try:
+                        difficulty = float(resp.text)
+                        self.cache["difficulty"] = difficulty
+                    except (ValueError, TypeError) as e:
+                        logging.error(f"Error parsing blockchain.info difficulty: {e}")
+
+            if block_count is None:
+                resp = bc_responses.get("blockcount")
+                if resp and resp.ok:
+                    try:
+                        block_count = int(resp.text)
+                        self.cache["block_count"] = block_count
+                        logging.info(f"Using blockchain.info block height: {block_count}")
+                    except (ValueError, TypeError) as e:
+                        logging.error(f"Error parsing blockchain.info block count: {e}")
 
         except Exception as e:
             logging.error(f"Error fetching Bitcoin stats: {e}")
         finally:
-            for resp in responses.values():
+            # Close all response objects to avoid memory leaks
+            all_responses = list(responses.values()) + list(bc_responses.values())
+            for resp in all_responses:
                 if resp:
                     try:
                         resp.close()
