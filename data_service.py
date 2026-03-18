@@ -15,7 +15,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 
-import requests
+import requests  # noqa: F401 — used by connection_pool consumers
 from bs4 import BeautifulSoup  # noqa: F401 — kept for backward compat
 
 from models import OceanData, convert_to_ths  # noqa: F401 — kept for backward compat

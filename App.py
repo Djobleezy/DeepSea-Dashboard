@@ -291,7 +291,7 @@ def api_metrics():
 def api_connection_pools():
     """API endpoint for HTTP connection pool statistics."""
     try:
-        stats = data_service.get_connection_pool_stats()
+        stats = dashboard_service.get_connection_pool_stats()
         return jsonify({
             "status": "success",
             "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
