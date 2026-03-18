@@ -33,14 +33,14 @@ DEFAULT_CONFIG = {
     "extended_history": False,
     # Connection pooling settings
     "connection_pool": {
-        "ocean_pool_size": 25,
+        "ocean_pool_size": 20,
         "ocean_connections": 10,
-        "mempool_pool_size": 15,
-        "mempool_connections": 6,
-        "exchange_pool_size": 8,
-        "exchange_connections": 4,
-        "default_pool_size": 10,
-        "default_connections": 5
+        "mempool_pool_size": 20,
+        "mempool_connections": 10,
+        "exchange_pool_size": 20,
+        "exchange_connections": 10,
+        "default_pool_size": 20,
+        "default_connections": 10
     }
 }
 

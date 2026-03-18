@@ -30,7 +30,8 @@ class PooledHTTPAdapter(HTTPAdapter):
                 read=2,
                 connect=2,
                 backoff_factor=0.3,
-                status_forcelist=(429, 500, 502, 503, 504)
+                status_forcelist=(429, 500, 502, 503, 504),
+                raise_on_status=False
             )
         
         super().__init__(
@@ -59,30 +60,32 @@ def create_optimized_session():
     # Configure different adapters for different services
     
     # Ocean.xyz API - high traffic, needs larger pool
+    # Note: No retries here since ocean_api_client.py already handles retries
     ocean_adapter = PooledHTTPAdapter(
         pool_connections=pool_config["ocean_connections"],
         pool_maxsize=pool_config["ocean_pool_size"],
         max_retries=Retry(
-            total=3,
-            read=2,
-            connect=2,
-            backoff_factor=0.5,
-            status_forcelist=(429, 500, 502, 503, 504)
+            total=0,
+            read=0,
+            connect=0,
+            raise_on_status=False
         )
     )
     session.mount('https://api.ocean.xyz/', ocean_adapter)
     session.mount('https://ocean.xyz/', ocean_adapter)
     
     # Mempool services - medium traffic
+    # Reduced retries to stay within 5s collector deadline
     mempool_adapter = PooledHTTPAdapter(
         pool_connections=pool_config["mempool_connections"],
         pool_maxsize=pool_config["mempool_pool_size"],
         max_retries=Retry(
-            total=2,
-            read=1,
+            total=1,
+            read=0,
             connect=1,
-            backoff_factor=0.3,
-            status_forcelist=(429, 500, 502, 503, 504)
+            backoff_factor=0.1,
+            status_forcelist=(429, 500, 502, 503, 504),
+            raise_on_status=False
         )
     )
     session.mount('https://mempool.guide/', mempool_adapter)
@@ -97,7 +100,8 @@ def create_optimized_session():
             read=1,
             connect=1,
             backoff_factor=0.2,
-            status_forcelist=(429, 500, 502, 503, 504)
+            status_forcelist=(429, 500, 502, 503, 504),
+            raise_on_status=False
         )
     )
     session.mount('https://v6.exchangerate-api.com/', exchange_adapter)
@@ -111,7 +115,8 @@ def create_optimized_session():
             read=1,
             connect=1,
             backoff_factor=0.3,
-            status_forcelist=(500, 502, 503, 504)
+            status_forcelist=(500, 502, 503, 504),
+            raise_on_status=False
         )
     )
     session.mount('https://blockchain.info/', blockchain_adapter)
@@ -125,7 +130,8 @@ def create_optimized_session():
             read=1,
             connect=1,
             backoff_factor=0.3,
-            status_forcelist=(429, 500, 502, 503, 504)
+            status_forcelist=(429, 500, 502, 503, 504),
+            raise_on_status=False
         )
     )
     session.mount('https://', default_adapter)
@@ -139,8 +145,7 @@ def create_optimized_session():
         'Connection': 'keep-alive',
     })
     
-    # Set reasonable timeouts
-    session.timeout = (5, 10)  # (connect_timeout, read_timeout)
+    # Note: session.timeout is not effective - timeouts must be passed per-request
     
     return session
 
