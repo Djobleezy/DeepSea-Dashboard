@@ -80,6 +80,7 @@ MAX_BATCH_REQUESTS = 10
 ALLOWED_BATCH_PATHS = {
     "/api/health",
     "/api/metrics",
+    "/api/connection-pools",
     "/api/time",
     "/api/timezone",
     "/api/available_timezones",
@@ -284,6 +285,24 @@ def api_metrics():
     if cached_metrics is None:
         update_metrics_job()
     return jsonify(convert_deques(cached_metrics))
+
+
+@app.route("/api/connection-pools")
+def api_connection_pools():
+    """API endpoint for HTTP connection pool statistics."""
+    try:
+        stats = dashboard_service.get_connection_pool_stats()
+        return jsonify({
+            "status": "success",
+            "timestamp": datetime.now(ZoneInfo(get_timezone())).isoformat(),
+            "connection_pools": stats
+        })
+    except Exception as e:
+        logging.error(f"Error getting connection pool stats: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 
 
 @app.route("/api/batch", methods=["POST"])

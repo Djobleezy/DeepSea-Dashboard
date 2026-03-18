@@ -79,6 +79,16 @@ def test_validate_config_valid():
         "high_hashrate_threshold_ths": 20.0,
         "EXCHANGE_RATE_API_KEY": "KEY",
         "extended_history": False,
+        "connection_pool": {
+            "ocean_pool_size": 25,
+            "ocean_connections": 10,
+            "mempool_pool_size": 15,
+            "mempool_connections": 6,
+            "exchange_pool_size": 8,
+            "exchange_connections": 4,
+            "default_pool_size": 10,
+            "default_connections": 5
+        }
     }
     assert config_module.validate_config(cfg)
 
