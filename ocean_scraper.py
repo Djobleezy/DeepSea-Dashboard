@@ -30,9 +30,19 @@ def cleanup_soup(soup):
 class OceanScraperMixin:
     """Mixin providing all BeautifulSoup scraping methods for Ocean.xyz."""
 
+    @ttl_cache(ttl_seconds=30, maxsize=1)
     def get_ocean_data(self):
         """
         Get mining data from Ocean.xyz.
+
+        Results are cached for 30 s so that ``fetch_metrics()`` and
+        ``get_earnings_data()`` share the same data when called in quick
+        succession, avoiding duplicate API + scrape round-trips.
+        
+        Note: ttl_cache doesn't prevent concurrent cold cache misses - if two
+        threads hit this method before the first completes, both will fetch
+        from Ocean.xyz. This is a known limitation that could be addressed
+        with request coalescing in a future optimization.
 
         Returns:
             OceanData: Ocean.xyz mining data
