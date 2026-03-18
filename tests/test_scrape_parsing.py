@@ -1,13 +1,10 @@
 """Tests for scrape parsing edge cases and error handling."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 from bs4 import BeautifulSoup
-from datetime import datetime
-from zoneinfo import ZoneInfo
+
 
 from data_service import MiningDashboardService
-from models import OceanData
 import ocean_scraper
 
 
@@ -306,7 +303,7 @@ class TestScrapeParsing:
         monkeypatch.setattr(self.service.session, "get", mock_get)
         
         # Should stop at max_pages=10
-        result = self.service.get_all_worker_rows()
+        self.service.get_all_worker_rows()
         assert call_count == 10  # Reached max_pages limit
 
     def test_get_all_worker_rows_with_error_response(self, monkeypatch):

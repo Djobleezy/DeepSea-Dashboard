@@ -1,10 +1,8 @@
 """Tests for API error handling and edge cases."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 import json
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
 from data_service import MiningDashboardService
 from cache_utils import CircuitBreaker
@@ -111,7 +109,7 @@ class TestApiErrorPaths:
                 mock_context.__enter__.return_value = mock_context
                 mock_context.submit.return_value = MagicMock()
                 
-                result = self.service.get_ocean_api_data()
+                self.service.get_ocean_api_data()
                 
                 # Should have created separate thread pool
                 mock_pool.assert_called_once_with(max_workers=5, thread_name_prefix="ocean-api")

@@ -1,8 +1,6 @@
 """Tests for worker data processing edge cases."""
 
-import pytest
-from unittest.mock import MagicMock, patch
-from bs4 import BeautifulSoup
+from unittest.mock import MagicMock
 
 from data_service import MiningDashboardService
 from worker_service import WorkerService
