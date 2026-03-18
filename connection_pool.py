@@ -60,7 +60,7 @@ def create_optimized_session():
     # Configure different adapters for different services
     
     # Ocean.xyz API - high traffic, needs larger pool
-    # Note: No retries here since ocean_api_client.py already handles retries
+    # No retries here since ocean_api_client.py already handles retries via retry_request()
     ocean_adapter = PooledHTTPAdapter(
         pool_connections=pool_config["ocean_connections"],
         pool_maxsize=pool_config["ocean_pool_size"],
@@ -75,7 +75,7 @@ def create_optimized_session():
     session.mount('https://ocean.xyz/', ocean_adapter)
     
     # Mempool services - medium traffic
-    # Reduced retries to stay within 5s collector deadline
+    # Minimal retries to stay within 5s collector deadline (fetch_network_data timeout)
     mempool_adapter = PooledHTTPAdapter(
         pool_connections=pool_config["mempool_connections"],
         pool_maxsize=pool_config["mempool_pool_size"],

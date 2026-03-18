@@ -31,7 +31,7 @@ DEFAULT_CONFIG = {
     "high_hashrate_threshold_ths": 20.0,
     "EXCHANGE_RATE_API_KEY": "",
     "extended_history": False,
-    # Connection pooling settings
+    # Connection pooling settings - defaults to 10 connections, 20 max pool size
     "connection_pool": {
         "ocean_pool_size": 20,
         "ocean_connections": 10,
