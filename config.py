@@ -31,6 +31,17 @@ DEFAULT_CONFIG = {
     "high_hashrate_threshold_ths": 20.0,
     "EXCHANGE_RATE_API_KEY": "",
     "extended_history": False,
+    # Connection pooling settings
+    "connection_pool": {
+        "ocean_pool_size": 25,
+        "ocean_connections": 10,
+        "mempool_pool_size": 15,
+        "mempool_connections": 6,
+        "exchange_pool_size": 8,
+        "exchange_connections": 4,
+        "default_pool_size": 10,
+        "default_connections": 5
+    }
 }
 
 
@@ -47,6 +58,7 @@ def validate_config(config):
         "high_hashrate_threshold_ths": (int, float),
         "EXCHANGE_RATE_API_KEY": str,
         "extended_history": bool,
+        "connection_pool": dict,
     }
 
     for key, expected in required_types.items():
@@ -191,3 +203,13 @@ def get_exchange_rate_api_key():
 
     config = load_config()
     return config.get("EXCHANGE_RATE_API_KEY", "")
+
+
+def get_connection_pool_config():
+    """Get connection pool configuration with fallback to defaults."""
+    config = load_config()
+    pool_config = config.get("connection_pool", {})
+    
+    # Merge with defaults
+    defaults = DEFAULT_CONFIG["connection_pool"]
+    return {**defaults, **pool_config}

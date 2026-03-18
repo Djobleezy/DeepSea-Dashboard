@@ -19,6 +19,7 @@ import requests
 from bs4 import BeautifulSoup  # noqa: F401 — kept for backward compat
 
 from models import OceanData, convert_to_ths  # noqa: F401 — kept for backward compat
+from connection_pool import create_optimized_session
 from config import get_timezone  # noqa: F401 — kept for backward compat
 from cache_utils import ttl_cache  # noqa: F401 — kept for backward compat
 from miner_specs import parse_worker_name  # noqa: F401 — kept for backward compat
@@ -175,7 +176,8 @@ class MiningDashboardService(OceanApiClientMixin, OceanScraperMixin, MetricsCalc
         self.sats_per_btc = 100_000_000
         self.previous_values = {}
         self.cached_metrics = None
-        self.session = requests.Session()
+        # Use optimized session with connection pooling
+        self.session = create_optimized_session()
         # Persistent executor for concurrent tasks
         self.executor = ThreadPoolExecutor(max_workers=6)
         # Cache for storing fetched currency exchange rates
@@ -190,6 +192,11 @@ class MiningDashboardService(OceanApiClientMixin, OceanScraperMixin, MetricsCalc
     def set_worker_service(self, worker_service):
         """Associate a WorkerService instance for power estimation."""
         self.worker_service = worker_service
+
+    def get_connection_pool_stats(self):
+        """Get statistics about HTTP connection pools."""
+        from connection_pool import get_pool_stats
+        return get_pool_stats(self.session)
 
     def purge_caches(self):
         """Purge or clear ttl_cache caches to free memory."""
