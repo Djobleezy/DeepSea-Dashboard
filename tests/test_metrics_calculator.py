@@ -1,10 +1,7 @@
 """Tests for metrics_calculator module."""
 
-import pytest
-import time
 from unittest.mock import Mock, patch
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from metrics_calculator import MetricsCalculatorMixin, parse_payment_date
 
@@ -187,7 +184,7 @@ def test_get_earnings_data_btc_price_fallback():
     
     # This should use the fallback without crashing
     # The method is incomplete in the original, so we expect it to handle the price fallback
-    result = calc.get_earnings_data()
+    calc.get_earnings_data()  # verify no crash
     # The method doesn't complete in the original file, but we verified the price fallback logic
 
 
