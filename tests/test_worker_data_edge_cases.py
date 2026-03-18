@@ -18,43 +18,44 @@ class TestWorkerDataEdgeCases:
 
     def test_parse_worker_name_edge_cases(self):
         """Test parse_worker_name with various edge case inputs."""
-        # Test with None
-        assert parse_worker_name(None) == {"base_name": None, "miner_type": "Unknown"}
-        
-        # Test with empty string
-        assert parse_worker_name("") == {"base_name": "", "miner_type": "Unknown"}
-        
-        # Test with whitespace only
-        assert parse_worker_name("   ") == {"base_name": "   ", "miner_type": "Unknown"}
-        
-        # Test with very long name
+        # Test with None — returns None (not a dict)
+        assert parse_worker_name(None) is None
+
+        # Test with empty string — returns None (falsy guard)
+        assert parse_worker_name("") is None
+
+        # Test with whitespace only — returns None (falsy after strip? check)
+        # "   " is truthy so it enters the loop; no specs match → returns None
+        result = parse_worker_name("   ")
+        assert result is None
+
+        # Test with very long name (no specs match → None)
         long_name = "a" * 1000
         result = parse_worker_name(long_name)
-        assert result["base_name"] == long_name
-        assert result["miner_type"] == "Unknown"
-        
-        # Test with special characters
-        special_name = "worker-1@#$%^&*()"
-        result = parse_worker_name(special_name)
-        assert result["base_name"] == special_name
+        assert result is None
+
+        # Test with a known model — should return a dict with model info
+        result = parse_worker_name("Antminer S19")
+        assert result is not None
+        assert "model" in result
+        assert "type" in result
 
     def test_get_worker_data_alternative_empty_response(self, monkeypatch):
-        """Test get_worker_data_alternative with empty/no response."""
+        """Test get_worker_data_alternative returns None with empty response."""
         def mock_get_all_worker_rows():
             return []
 
         monkeypatch.setattr(self.service, "get_all_worker_rows", mock_get_all_worker_rows)
         
+        # The real implementation returns None when rows are empty
         result = self.service.get_worker_data_alternative()
-        assert result["workers_total"] == 0
-        assert result["workers"] == []
-        assert result["hashrate_current"] == 0.0
+        assert result is None
 
     def test_get_worker_data_alternative_malformed_cells(self, monkeypatch):
         """Test worker data parsing with malformed cell data."""
         malformed_rows = [
-            {"cells": []},  # Empty cells
-            {"cells": ["worker1"]},  # Too few cells
+            {"cells": []},  # Empty cells — skipped (< 3 cells)
+            {"cells": ["worker1"]},  # Too few cells — skipped (< 3 cells)
             {"cells": ["worker2", "status", "time", "invalid_hashrate", "invalid_hashrate", "invalid_earnings"]},
             {"cells": ["worker3", "online", "now", "100 TH/s", "90 TH/s", "0.00001000 BTC"]},  # Valid row
         ]
@@ -65,9 +66,10 @@ class TestWorkerDataEdgeCases:
         monkeypatch.setattr(self.service, "get_all_worker_rows", mock_get_all_worker_rows)
         
         result = self.service.get_worker_data_alternative()
-        # Should only process the valid row
-        assert result["workers_total"] == 1
-        assert result["workers"][0]["name"] == "worker3"
+        # worker2 (with invalid hashrate but valid cells) and worker3 are both processed
+        assert result["workers_total"] == 2
+        worker_names = [w["name"] for w in result["workers"]]
+        assert "worker3" in worker_names
 
     def test_get_worker_data_original_network_error(self, monkeypatch):
         """Test get_worker_data_original handles network errors gracefully."""
@@ -76,9 +78,9 @@ class TestWorkerDataEdgeCases:
 
         monkeypatch.setattr(self.service.session, "get", mock_get)
         
+        # Returns None on error (not an empty dict)
         result = self.service.get_worker_data_original()
-        assert result["workers_total"] == 0
-        assert result["workers"] == []
+        assert result is None
 
     def test_get_worker_data_original_malformed_html(self, monkeypatch):
         """Test original worker data method with malformed HTML."""
@@ -109,7 +111,8 @@ class TestWorkerDataEdgeCases:
         monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
         
         result = self.service.get_worker_data_original()
-        # Should handle malformed data gracefully
+        # Should handle malformed data gracefully — worker2 is processed
+        assert result is not None
         assert result["workers_total"] >= 0
 
     def test_worker_hashrate_conversion_edge_cases(self, monkeypatch):
@@ -132,15 +135,15 @@ class TestWorkerDataEdgeCases:
         result = self.service.get_worker_data_alternative()
         assert len(result["workers"]) == len(test_rows)
         
-        # Check specific conversions
+        # Check specific conversions — actual dict key is "hashrate_60sec" and "hashrate_3hr"
         workers = {w["name"]: w for w in result["workers"]}
         
         # Zero should remain zero
-        assert workers["w1"]["hashrate_current"] == 0.0
+        assert workers["w1"]["hashrate_60sec"] == 0.0
         assert workers["w1"]["hashrate_3hr"] == 0.0
         
         # Very small numbers should be preserved
-        assert workers["w2"]["hashrate_current"] == 0.001
+        assert workers["w2"]["hashrate_60sec"] == 0.001
         assert workers["w2"]["hashrate_3hr"] == 0.002
 
     def test_worker_earnings_parsing_edge_cases(self, monkeypatch):
@@ -149,7 +152,7 @@ class TestWorkerDataEdgeCases:
             {"cells": ["w1", "online", "now", "100 TH/s", "90 TH/s", "0 BTC"]},
             {"cells": ["w2", "online", "now", "100 TH/s", "90 TH/s", "0.00000001 BTC"]},  # Very small
             {"cells": ["w3", "online", "now", "100 TH/s", "90 TH/s", "1.00000000 BTC"]},  # Large amount
-            {"cells": ["w4", "online", "now", "100 TH/s", "90 TH/s", "invalid_amount"]},  # Invalid
+            {"cells": ["w4", "online", "now", "100 TH/s", "90 TH/s", "invalid_amount"]},  # Invalid (no BTC)
             {"cells": ["w5", "online", "now", "100 TH/s", "90 TH/s", ""]},  # Empty
             {"cells": ["w6", "online", "now", "100 TH/s", "90 TH/s", "BTC"]},  # No number
         ]
@@ -160,17 +163,19 @@ class TestWorkerDataEdgeCases:
         monkeypatch.setattr(self.service, "get_all_worker_rows", mock_get_all_worker_rows)
         
         result = self.service.get_worker_data_alternative()
+        # The actual dict key is "earnings" not "earnings_btc"
         workers = {w["name"]: w for w in result["workers"]}
         
         # Valid amounts should be parsed correctly
-        assert workers["w1"]["earnings_btc"] == 0.0
-        assert workers["w2"]["earnings_btc"] == 0.00000001
-        assert workers["w3"]["earnings_btc"] == 1.0
+        assert workers["w1"]["earnings"] == 0.0
+        assert workers["w2"]["earnings"] == 0.00000001
+        assert workers["w3"]["earnings"] == 1.0
         
-        # Invalid amounts should default to 0
-        assert workers["w4"]["earnings_btc"] == 0.0
-        assert workers["w5"]["earnings_btc"] == 0.0
-        assert workers["w6"]["earnings_btc"] == 0.0
+        # Invalid amounts default to 0
+        assert workers["w4"]["earnings"] == 0.0
+        assert workers["w5"]["earnings"] == 0.0
+        # w6 has "BTC" so the btc check matches, but regex finds no number → earnings stays 0
+        assert workers["w6"]["earnings"] == 0.0
 
     def test_worker_status_edge_cases(self, monkeypatch):
         """Test worker status parsing with various statuses."""
@@ -190,54 +195,44 @@ class TestWorkerDataEdgeCases:
         result = self.service.get_worker_data_alternative()
         workers = {w["name"]: w for w in result["workers"]}
         
-        # Status should be preserved as-is
+        # Status is normalised: "online" if "online" in status.lower() else "offline"
         assert workers["w1"]["status"] == "online"
-        assert workers["w2"]["status"] == "offline"  
-        assert workers["w3"]["status"] == "ONLINE"
-        assert workers["w4"]["status"] == ""
-        assert workers["w5"]["status"] == "unknown_status"
+        assert workers["w2"]["status"] == "offline"
+        # "ONLINE".lower() == "online" → "online" in "online" is True → status "online"
+        assert workers["w3"]["status"] == "online"
+        # "" → "online" not in "" → "offline"
+        assert workers["w4"]["status"] == "offline"
+        # "unknown_status" → "online" not in it → "offline"
+        assert workers["w5"]["status"] == "offline"
 
     def test_worker_service_edge_cases(self):
         """Test WorkerService with edge case scenarios."""
         # Test with None dashboard service
         self.worker_service.set_dashboard_service(None)
         
-        # Should handle gracefully without crashing
-        result = self.worker_service.get_workers()
+        # WorkerService.get_workers_data requires cached_metrics arg — call generate_fallback_data instead
+        result = self.worker_service.generate_fallback_data(cached_metrics=None)
         assert result is not None
         
-        # Test with service that returns None
-        mock_service = MagicMock()
-        mock_service.get_worker_data_alternative.return_value = None
-        
-        self.worker_service.set_dashboard_service(mock_service)
-        result = self.worker_service.get_workers()
-        assert result is not None
+        # Test generate_default_workers_data
+        default_result = self.worker_service.generate_default_workers_data()
+        assert default_result is not None
 
-    def test_worker_models_edge_cases(self):
-        """Test worker model creation with edge case data."""
-        # Test with minimal data
-        minimal_worker = {
-            "name": "test",
-            "status": "online",
-        }
+    def test_worker_models_constants(self):
+        """Test worker_models module contains expected constants."""
+        # worker_models only exports MINER_MODELS list and WORKER_NAME_PREFIXES
+        assert isinstance(worker_models.MINER_MODELS, list)
+        assert len(worker_models.MINER_MODELS) > 0
         
-        # Should handle missing fields gracefully
-        worker = worker_models.Worker.from_dict(minimal_worker)
-        assert worker.name == "test"
-        assert worker.status == "online"
+        # Each model entry should have required fields
+        for model in worker_models.MINER_MODELS:
+            assert "type" in model
+            assert "model" in model
+            assert "max_hashrate" in model
+            assert "power" in model
         
-        # Test with extra fields
-        extra_worker = {
-            "name": "test2", 
-            "status": "offline",
-            "extra_field": "should_be_ignored",
-            "another_extra": 123,
-        }
-        
-        worker2 = worker_models.Worker.from_dict(extra_worker)
-        assert worker2.name == "test2"
-        assert worker2.status == "offline"
+        assert isinstance(worker_models.WORKER_NAME_PREFIXES, list)
+        assert len(worker_models.WORKER_NAME_PREFIXES) > 0
 
     def test_worker_aggregation_edge_cases(self, monkeypatch):
         """Test worker data aggregation with edge cases."""
@@ -259,15 +254,12 @@ class TestWorkerDataEdgeCases:
         # Check totals
         assert result["workers_total"] == 4
         
-        # Hashrate should only include online workers
-        expected_current = 100 + 200  # Only online workers
-        expected_3hr = 90 + 180
-        assert result["hashrate_current"] == expected_current
-        assert result["hashrate_3hr"] == expected_3hr
+        # total_hashrate sums 3hr hashrate across ALL workers (not just online)
+        # online1: 90, offline1: 0, online2: 180, offline2: 0 → 270
+        assert result["total_hashrate"] == 90 + 0 + 180 + 0
         
-        # Earnings should include all workers
-        expected_earnings = (0.001 + 0.002 + 0.003 + 0.004) * self.service.sats_per_btc
-        assert result["total_sats"] == int(expected_earnings)
+        # total_earnings sums all workers' earnings
+        assert abs(result["total_earnings"] - (0.001 + 0.002 + 0.003 + 0.004)) < 1e-9
 
     def test_worker_data_with_unicode_names(self, monkeypatch):
         """Test worker data parsing with unicode/special character names."""

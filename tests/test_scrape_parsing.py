@@ -121,6 +121,8 @@ class TestScrapeParsing:
 
         monkeypatch.setattr(self.service.session, "get", mock_get)
         monkeypatch.setattr("ocean_scraper.get_timezone", lambda: "UTC")
+        # Prevent the API call from overwriting total_last_share with a cached/epoch value
+        monkeypatch.setattr(self.service, "get_ocean_api_data", lambda: {})
         
         result = self.service.get_ocean_data()
         assert result is not None
@@ -209,8 +211,13 @@ class TestScrapeParsing:
         
         def mock_get(url, headers=None, timeout=10):
             response = MagicMock()
-            response.ok = True
-            response.text = malformed_html
+            # Return 404 for pages after page 0 to stop pagination
+            if "ppage=0" in url or "ppage=" not in url:
+                response.ok = True
+                response.text = malformed_html
+            else:
+                response.ok = False
+                response.status_code = 404
             return response
 
         monkeypatch.setattr(self.service.session, "get", mock_get)
@@ -218,7 +225,7 @@ class TestScrapeParsing:
         
         payments = self.service.get_payment_history_scrape()
         assert payments is not None
-        # Should only include the last valid row
+        # Should only include the last valid row (third row — only one with parseable amount)
         assert len(payments) == 1
         assert payments[0]["amount_btc"] == 0.00001000
 
@@ -236,8 +243,13 @@ class TestScrapeParsing:
         
         def mock_get(url, headers=None, timeout=10):
             response = MagicMock()
-            response.ok = True
-            response.text = lightning_html
+            # Return 404 for pages after page 0 to stop pagination
+            if "ppage=0" in url or "ppage=" not in url:
+                response.ok = True
+                response.text = lightning_html
+            else:
+                response.ok = False
+                response.status_code = 404
             return response
 
         monkeypatch.setattr(self.service.session, "get", mock_get)
