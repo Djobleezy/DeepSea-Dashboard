@@ -5,6 +5,7 @@ import { HashrateChart } from '../components/HashrateChart';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { Sparkline } from '../components/Sparkline';
+import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import type { DashboardMetrics } from '../types';
 
 // Rolling sparkline history (in-memory)
@@ -37,6 +38,7 @@ export const Dashboard: React.FC = () => {
   const prevMetrics = useAppStore((s) => s.prevMetrics);
   const [chartData60s, setChartData60s] = useState<{ label: string; value: number }[]>([]);
   const [chartData3hr, setChartData3hr] = useState<{ label: string; value: number }[]>([]);
+  const { annotations: blockAnnotations } = useBlockAnnotations();
 
   useEffect(() => {
     if (!metrics) return;
@@ -126,6 +128,7 @@ export const Dashboard: React.FC = () => {
             data60s={chartData60s}
             data3hr={chartData3hr}
             avg24hr={metrics.hashrate_24hr}
+            blockAnnotations={blockAnnotations}
           />
         </div>
       )}

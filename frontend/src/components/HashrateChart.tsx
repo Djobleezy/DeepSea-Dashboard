@@ -11,6 +11,9 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import Annotation from 'chartjs-plugin-annotation';
+import type { AnnotationOptions } from 'chartjs-plugin-annotation';
+import type { AnnotationEntry } from '../hooks/useBlockAnnotations';
 
 Chart.register(
   LineController,
@@ -22,6 +25,7 @@ Chart.register(
   Filler,
   Tooltip,
   Legend,
+  Annotation,
 );
 
 interface DataPoint {
@@ -33,9 +37,10 @@ interface Props {
   data60s: DataPoint[];
   data3hr: DataPoint[];
   avg24hr?: number;
+  blockAnnotations?: AnnotationEntry[];
 }
 
-export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) => {
+export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -48,6 +53,9 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
     const primary = getComputedStyle(document.documentElement)
       .getPropertyValue('--primary')
       .trim() || '#0088cc';
+    const textDim = getComputedStyle(document.documentElement)
+      .getPropertyValue('--text-dim')
+      .trim() || '#4a8fa8';
 
     if (chartRef.current) {
       chartRef.current.destroy();
@@ -56,10 +64,66 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
     const labels = data60s.map((d) => d.label);
     const values60s = data60s.map((d) => d.value);
     const values3hr = data3hr.map((d) => d.value);
+    const labelSet = new Set(labels);
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 200);
     gradient.addColorStop(0, `${primary}44`);
     gradient.addColorStop(1, `${primary}00`);
+
+    // --- Block annotation vertical lines ---
+    const BLOCK_COLOR = '#f7931a'; // Bitcoin orange — CRT warm accent
+    const annotationDefs: Record<string, AnnotationOptions> = {};
+
+    blockAnnotations.forEach((entry, idx) => {
+      if (!labelSet.has(entry.label)) return; // only draw if label is on current chart
+      annotationDefs[`blockEvent${idx}`] = {
+        type: 'line',
+        xMin: entry.label,
+        xMax: entry.label,
+        borderColor: BLOCK_COLOR,
+        borderWidth: 2,
+        borderDash: [4, 2],
+        label: {
+          display: true,
+          content: '⛏️ BLOCK',
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          color: BLOCK_COLOR,
+          font: {
+            family: "'VT323', monospace",
+            size: 14,
+            weight: 'bold',
+          },
+          padding: { top: 4, bottom: 4, left: 6, right: 6 },
+          borderRadius: 0,
+          position: 'start',
+        },
+      };
+    });
+
+    // --- 24hr average annotation ---
+    if (avg24hr !== undefined && avg24hr > 0) {
+      annotationDefs['avg24hr'] = {
+        type: 'line',
+        yMin: avg24hr,
+        yMax: avg24hr,
+        borderColor: `${primary}66`,
+        borderWidth: 1,
+        borderDash: [6, 3],
+        label: {
+          display: true,
+          content: `24H AVG: ${avg24hr.toFixed(2)} TH/s`,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          color: `${primary}cc`,
+          font: {
+            family: "'Share Tech Mono', monospace",
+            size: 10,
+          },
+          padding: { top: 2, bottom: 2, left: 6, right: 6 },
+          borderRadius: 0,
+          position: 'end',
+        },
+      };
+    }
 
     chartRef.current = new Chart(ctx, {
       type: 'line',
@@ -98,9 +162,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
         plugins: {
           legend: {
             labels: {
-              color: getComputedStyle(document.documentElement)
-                .getPropertyValue('--text-dim')
-                .trim(),
+              color: textDim,
               font: { family: 'Share Tech Mono', size: 11 },
             },
           },
@@ -115,13 +177,14 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
               label: (ctx) => ` ${(ctx.parsed.y ?? 0).toFixed(2)} TH/s`,
             },
           },
+          annotation: {
+            annotations: annotationDefs,
+          },
         },
         scales: {
           x: {
             ticks: {
-              color: getComputedStyle(document.documentElement)
-                .getPropertyValue('--text-dim')
-                .trim(),
+              color: textDim,
               font: { family: 'Share Tech Mono', size: 10 },
               maxTicksLimit: 8,
             },
@@ -129,9 +192,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
           },
           y: {
             ticks: {
-              color: getComputedStyle(document.documentElement)
-                .getPropertyValue('--text-dim')
-                .trim(),
+              color: textDim,
               font: { family: 'Share Tech Mono', size: 10 },
               callback: (v) => `${Number(v).toFixed(1)} TH`,
             },
@@ -144,7 +205,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr }) =>
     return () => {
       chartRef.current?.destroy();
     };
-  }, [data60s, data3hr, avg24hr]);
+  }, [data60s, data3hr, avg24hr, blockAnnotations]);
 
   return (
     <div style={{ position: 'relative', height: '220px' }}>
