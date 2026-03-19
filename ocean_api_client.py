@@ -293,7 +293,23 @@ class OceanApiClientMixin:
                         except (ValueError, TypeError):
                             # Fall back to unix timestamp
                             dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC"))
-                        result["last_block_time"] = dt.astimezone(ZoneInfo(get_timezone())).strftime("%Y-%m-%d %I:%M %p")
+                        now = datetime.now(tz=ZoneInfo("UTC"))
+                        delta = now - dt
+                        total_seconds = int(delta.total_seconds())
+                        if total_seconds < 60:
+                            result["last_block_time"] = f"{total_seconds} secs ago"
+                        elif total_seconds < 3600:
+                            mins = total_seconds // 60
+                            result["last_block_time"] = f"{mins} {'min' if mins == 1 else 'mins'} ago"
+                        else:
+                            hours = total_seconds // 3600
+                            mins = (total_seconds % 3600) // 60
+                            h_label = "hour" if hours == 1 else "hours"
+                            if mins > 0:
+                                m_label = "min" if mins == 1 else "mins"
+                                result["last_block_time"] = f"{hours} {h_label}, {mins} {m_label} ago"
+                            else:
+                                result["last_block_time"] = f"{hours} {h_label} ago"
         except Exception as e:
             logging.error(f"Error parsing blocks API: {e}")
 
