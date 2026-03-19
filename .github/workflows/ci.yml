@@ -7,24 +7,25 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  # ── v1 legacy (remove after v1 cleanup PR) ──────────────────────────
+  v1-tests:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    - name: Install dependencies
+    - name: Install v1 dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Run ruff
-      run: ruff check .
-    - name: Run tests
+    - name: Ruff (v1)
+      run: ruff check . --exclude frontend --exclude backend
+    - name: Tests (v1)
       run: pytest -q
-    - name: Run front-end tests
+    - name: JS tests (v1)
       run: |
         node tests/js/formatCurrency.test.js
         node tests/js/formatDuration.test.js
@@ -38,3 +39,60 @@ jobs:
         node tests/js/notificationsTimestamp.test.js
         node tests/js/workerUtils.test.js
         node tests/js/themeToggle.test.js
+
+  # ── v2 backend ──────────────────────────────────────────────────────
+  v2-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install v2 backend dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+    - name: Ruff (v2 backend)
+      run: ruff check backend/
+    - name: Tests (v2 backend)
+      env:
+        PYTHONPATH: backend
+      run: pytest backend/ -q
+
+  # ── v2 frontend ─────────────────────────────────────────────────────
+  v2-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install frontend dependencies
+      working-directory: frontend
+      run: npm ci
+    - name: TypeScript check
+      working-directory: frontend
+      run: npx tsc --noEmit
+    - name: Build
+      working-directory: frontend
+      run: npm run build
+
+  # ── Docker build ────────────────────────────────────────────────────
+  v2-docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build Docker image
+      run: docker build -t deepsea-dashboard:test .
+    - name: Verify container starts
+      run: |
+        docker run -d --name test-app -p 8000:8000 deepsea-dashboard:test
+        sleep 10
+        curl -f http://localhost:8000/api/health || (docker logs test-app && exit 1)
+        docker stop test-app
