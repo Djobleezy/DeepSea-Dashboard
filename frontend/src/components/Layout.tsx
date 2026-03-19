@@ -9,11 +9,11 @@ import { UnderwaterBubbles } from './UnderwaterBubbles';
 
 const NAV_LINKS = [
   { to: '/dashboard', icon: '◈', label: 'DASHBOARD' },
-  { to: '/workers', icon: '⚙', label: 'WORKERS' },
+  { to: '/workers', icon: '⛭', label: 'WORKERS' },
   { to: '/blocks', icon: '⛏', label: 'BLOCKS' },
   { to: '/earnings', icon: '₿', label: 'EARNINGS' },
-  { to: '/notifications', icon: '🔔', label: 'ALERTS' },
-  { to: '/config', icon: '⚡', label: 'CONFIG' },
+  { to: '/notifications', icon: '⚑', label: 'ALERTS' },
+  { to: '/config', icon: '⚙', label: 'CONFIG' },
 ];
 
 interface Props {
