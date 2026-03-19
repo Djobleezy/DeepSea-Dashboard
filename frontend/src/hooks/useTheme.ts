@@ -1,11 +1,15 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../stores/store';
 import { applyTheme } from '../theme/themes';
+import { useCrossTabSync } from './useCrossTabSync';
 import type { Theme } from '../types';
 
 export function useTheme() {
   const theme = useAppStore((s) => s.theme);
   const setTheme = useAppStore((s) => s.setTheme);
+
+  // Sync theme changes from other tabs
+  useCrossTabSync();
 
   useEffect(() => {
     applyTheme(theme);

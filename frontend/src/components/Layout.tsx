@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAppStore } from '../stores/store';
 import { ThemeToggle } from './ThemeToggle';
+import { AudioPlayer } from './AudioPlayer';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_LINKS = [
@@ -131,6 +132,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
               {fmtTime(lastUpdated)}
             </span>
           )}
+          <AudioPlayer />
           <ThemeToggle />
         </div>
       </header>
