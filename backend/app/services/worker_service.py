@@ -25,27 +25,62 @@ from typing import Any, Optional
 
 _log = logging.getLogger(__name__)
 
-# ASIC model patterns for name-based detection
+# ASIC model patterns for name-based detection.
+# Order matters — most-specific patterns first to avoid premature matches.
+# Last verified: 2026-03-19 from manufacturer specs.
 _MINER_PATTERNS = [
-    (re.compile(r"s19\s*pro\+\s*hyd", re.I), "Antminer S19 Pro+ Hyd", 27.5),
-    (re.compile(r"s19\s*xp", re.I), "Antminer S19 XP", 21.5),
-    (re.compile(r"s19\s*pro\+", re.I), "Antminer S19 Pro+", 23.0),
-    (re.compile(r"s19\s*pro", re.I), "Antminer S19 Pro", 29.5),
-    (re.compile(r"s19j\s*pro\+", re.I), "Antminer S19j Pro+", 22.0),
-    (re.compile(r"s19j\s*pro", re.I), "Antminer S19j Pro", 30.0),
-    (re.compile(r"s19j", re.I), "Antminer S19j", 34.5),
-    (re.compile(r"s19", re.I), "Antminer S19", 34.5),
-    (re.compile(r"s21\s*xp", re.I), "Antminer S21 XP", 12.0),
+    # ── Bitmain Antminer S21 generation ──
+    (re.compile(r"s21\s*xp\s*hyd", re.I), "Antminer S21 XP Hyd", 12.0),
+    (re.compile(r"s21\s*xp", re.I), "Antminer S21 XP", 13.5),
+    (re.compile(r"s21\s*pro", re.I), "Antminer S21 Pro", 15.0),
+    (re.compile(r"s21\s*\+", re.I), "Antminer S21+", 16.5),
+    (re.compile(r"s21\s*hyd", re.I), "Antminer S21 Hyd", 16.0),
     (re.compile(r"s21", re.I), "Antminer S21", 17.5),
     (re.compile(r"t21", re.I), "Antminer T21", 19.0),
+    # ── Bitmain Antminer S19 generation ──
+    (re.compile(r"s19\s*pro\+?\s*hyd", re.I), "Antminer S19 Pro+ Hyd", 27.5),
+    (re.compile(r"s19\s*xp", re.I), "Antminer S19 XP", 21.5),
+    (re.compile(r"s19k\s*pro", re.I), "Antminer S19k Pro", 23.0),
+    (re.compile(r"s19j\s*pro\+", re.I), "Antminer S19j Pro+", 22.0),
+    (re.compile(r"s19j\s*pro", re.I), "Antminer S19j Pro", 30.0),
+    (re.compile(r"s19\s*pro\+", re.I), "Antminer S19 Pro+", 23.0),
+    (re.compile(r"s19\s*pro", re.I), "Antminer S19 Pro", 29.5),
+    (re.compile(r"s19j", re.I), "Antminer S19j", 34.5),
+    (re.compile(r"s19", re.I), "Antminer S19", 34.5),
+    # ── MicroBT Whatsminer M66/M63/M60 (current gen) ──
+    (re.compile(r"m66s\s*\+\+", re.I), "Whatsminer M66S++", 15.5),
+    (re.compile(r"m66s", re.I), "Whatsminer M66S", 18.5),
+    (re.compile(r"m66", re.I), "Whatsminer M66", 19.9),
+    (re.compile(r"m63s", re.I), "Whatsminer M63S", 16.5),
+    (re.compile(r"m63", re.I), "Whatsminer M63", 17.5),
     (re.compile(r"m60s", re.I), "Whatsminer M60S", 18.5),
+    (re.compile(r"m60", re.I), "Whatsminer M60", 19.9),
+    # ── MicroBT Whatsminer M56/M50/M30 (previous gen) ──
     (re.compile(r"m56s\+", re.I), "Whatsminer M56S+", 22.0),
-    (re.compile(r"m50s\+", re.I), "Whatsminer M50S+", 26.0),
-    (re.compile(r"m50s", re.I), "Whatsminer M50S", 29.0),
+    (re.compile(r"m50s\+", re.I), "Whatsminer M50S+", 23.0),
+    (re.compile(r"m50s", re.I), "Whatsminer M50S", 25.0),
+    (re.compile(r"m50", re.I), "Whatsminer M50", 29.0),
     (re.compile(r"m30s\+\+", re.I), "Whatsminer M30S++", 31.0),
     (re.compile(r"m30s\+", re.I), "Whatsminer M30S+", 34.0),
     (re.compile(r"m30s", re.I), "Whatsminer M30S", 38.0),
-    (re.compile(r"bitaxe|nerdqaxe", re.I), "BitAxe Gamma 601", 14.0),
+    # ── Canaan Avalon ──
+    (re.compile(r"a16\s*xp", re.I), "Avalon A16 XP", 12.8),
+    (re.compile(r"a16", re.I), "Avalon A16", 13.8),
+    (re.compile(r"a15\s*pro", re.I), "Avalon A15 Pro", 16.8),
+    (re.compile(r"a15", re.I), "Avalon A15", 18.5),
+    (re.compile(r"a14\s*pro", re.I), "Avalon A14 Pro", 21.0),
+    (re.compile(r"a1466|avalon\s*1466", re.I), "Avalon A1466", 25.0),
+    # ── Bitdeer SealMiner ──
+    (re.compile(r"seal\s*a2\s*pro\s*hyd", re.I), "SealMiner A2 Pro Hyd", 16.5),
+    (re.compile(r"seal\s*a2|sealminer\s*a2", re.I), "SealMiner A2", 16.5),
+    # ── Fluminer ──
+    (re.compile(r"fluminer\s*t3", re.I), "Fluminer T3", 14.8),
+    # ── Open-source solo miners ──
+    (re.compile(r"bitaxe\s*supra\s*hex", re.I), "BitAxe Supra Hex", 21.4),
+    (re.compile(r"bitaxe\s*gamma\s*602", re.I), "BitAxe Gamma 602", 14.0),
+    (re.compile(r"bitaxe\s*gamma", re.I), "BitAxe Gamma 601", 14.0),
+    (re.compile(r"bitaxe\s*ultra", re.I), "BitAxe Ultra", 18.0),
+    (re.compile(r"bitaxe|nerdqaxe", re.I), "BitAxe", 14.0),
 ]
 
 

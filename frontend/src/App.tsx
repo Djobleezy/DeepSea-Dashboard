@@ -11,6 +11,7 @@ import { Notifications } from './pages/Notifications';
 import { Boot } from './pages/Boot';
 import { useSSE } from './hooks/useSSE';
 import { useMetrics } from './hooks/useMetrics';
+import { useServerTime } from './hooks/useServerTime';
 import { useTheme } from './hooks/useTheme';
 import { applyTheme } from './theme/themes';
 import { useAppStore } from './stores/store';
@@ -20,6 +21,7 @@ const BOOT_SHOWN_KEY = 'deepsea_boot_shown';
 function AppInner() {
   useSSE();
   useMetrics();
+  useServerTime();
   useTheme();
 
   const [showBoot, setShowBoot] = useState(() => {

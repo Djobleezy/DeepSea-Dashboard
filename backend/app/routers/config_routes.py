@@ -16,8 +16,13 @@ _log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/config", response_model=AppConfig)
+@router.get("/config", response_model=AppConfig, tags=["config"])
 async def get_config() -> AppConfig:
+    """Return the current dashboard configuration.
+
+    Reads from ``config.json`` at the repo root. All fields have safe defaults
+    so this endpoint always returns a valid response even if the file is missing.
+    """
     cfg = await run_in_threadpool(load_config)
     return AppConfig(
         wallet=cfg.get("wallet", ""),
@@ -30,8 +35,14 @@ async def get_config() -> AppConfig:
     )
 
 
-@router.post("/config", response_model=AppConfig)
+@router.post("/config", response_model=AppConfig, tags=["config"])
 async def update_config(payload: ConfigUpdate) -> AppConfig:
+    """Update dashboard configuration and trigger a background metrics refresh.
+
+    Only provided (non-null) fields are updated — omitted fields retain their
+    current values. The config is saved atomically and a metrics refresh is
+    fired in the background so new data reflects the new wallet/settings.
+    """
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await run_in_threadpool(save_config, update)
 
@@ -49,6 +60,7 @@ async def _safe_refresh() -> None:
         _log.warning("Config refresh failed after save: %s", e)
 
 
-@router.get("/timezones")
+@router.get("/timezones", response_model=dict, tags=["config"])
 async def list_timezones() -> dict[str, list[str]]:
+    """Return all valid IANA timezone strings for the config timezone field."""
     return {"timezones": sorted(pytz.all_timezones)}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchConfig, fetchTimezones, updateConfig } from '../api/client';
+import { invalidateCurrencyCache } from '../hooks/useCurrency';
 import type { AppConfig } from '../types';
 
 export const Boot: React.FC = () => {
@@ -36,6 +37,7 @@ export const Boot: React.FC = () => {
     setError(null);
     try {
       await updateConfig(config);
+      invalidateCurrencyCache(); // push new currency to all useCurrency consumers
       setSaved(true);
       setTimeout(() => navigate('/dashboard'), 1500);
     } catch (e) {

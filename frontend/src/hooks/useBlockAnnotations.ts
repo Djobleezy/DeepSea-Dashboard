@@ -75,6 +75,55 @@ function showBlockToast(blockHeight: number) {
   }, 5000);
 }
 
+/** Launch animated confetti particles for 3-4 seconds when a new block is found */
+function showBlockCelebration() {
+  // Inject CSS if needed (keyframes defined in global.css)
+  const CONFETTI_COLORS = [
+    '#f7931a', // bitcoin orange
+    '#00cc66', // green
+    '#0088cc', // deepsea blue
+    '#ffaa00', // gold
+    '#ff4444', // red
+    '#ffffff',
+  ];
+
+  const isMobile = window.innerWidth < 768;
+  const count = isMobile ? 30 : 60;
+  const container = document.body;
+  const particles: HTMLElement[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-particle';
+
+    const left  = Math.random() * 100;                    // 0-100% horizontal start
+    const color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    const size  = Math.floor(Math.random() * 8) + 5;      // 5-13px
+    const dur   = (Math.random() * 1.5 + 2.5).toFixed(2); // 2.5-4s
+    const delay = (Math.random() * 0.8).toFixed(2);        // 0-0.8s stagger
+    const drift = Math.round(Math.random() * 100 - 50);   // -50 to +50px
+
+    el.style.left       = `${left}%`;
+    el.style.width      = `${size}px`;
+    el.style.height     = `${size}px`;
+    el.style.background = color;
+    el.style.boxShadow  = `0 0 4px ${color}`;
+    (el.style as unknown as Record<string, string>)['--duration'] = `${dur}s`;
+    (el.style as unknown as Record<string, string>)['--delay']    = `${delay}s`;
+    (el.style as unknown as Record<string, string>)['--drift']    = `${drift}px`;
+
+    container.appendChild(el);
+    particles.push(el);
+  }
+
+  // Cleanup after longest possible animation (4.8s = 4s + 0.8s max delay)
+  setTimeout(() => {
+    particles.forEach((p) => {
+      if (p.parentNode) p.parentNode.removeChild(p);
+    });
+  }, 4800);
+}
+
 export interface AnnotationEntry {
   /** Unix ms timestamp when the block was detected */
   timestamp: number;
@@ -149,19 +198,35 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     const label = new Date().toLocaleTimeString();
     const newEntry: AnnotationEntry = { timestamp: now, label };
 
-    // 🔊 Play block found sound
+    // 🔊 Play block found sound with background music ducking (v1 behavior)
     try {
-      const audio = new Audio('/audio/block.mp3');
-      audio.volume = 0.7;
-      audio.play().catch(() => {
-        // ignore autoplay restrictions
-      });
+      const blockAudio = new Audio('/audio/block.mp3');
+      blockAudio.volume = 0.7;
+
+      // Duck background audio to 30% during block sound
+      const bgAudio = document.getElementById('backgroundAudio') as HTMLAudioElement | null;
+      let originalVolume: number | null = null;
+      if (bgAudio && !bgAudio.muted && !bgAudio.paused) {
+        originalVolume = bgAudio.volume;
+        bgAudio.volume = Math.max(0, bgAudio.volume * 0.3);
+      }
+      const restoreVolume = () => {
+        if (originalVolume !== null && bgAudio) {
+          bgAudio.volume = originalVolume as number;
+        }
+      };
+      blockAudio.addEventListener('ended', restoreVolume);
+      blockAudio.addEventListener('error', restoreVolume);
+      blockAudio.play().catch(restoreVolume);
     } catch (_err) {
       // ignore missing/blocked audio
     }
 
     // 🎉 Show congrats toast
     showBlockToast(metrics.last_block_height);
+
+    // 🎊 Full-screen confetti celebration (3-4 seconds)
+    showBlockCelebration();
 
     setAnnotations((prev) => {
       const pruned = pruneEntries(prev, windowMinutes);

@@ -7,6 +7,8 @@ interface Props {
   unit?: string;
   previous?: number;
   current?: number;
+  /** Metric key for per-metric threshold lookup in ArrowIndicator */
+  metricKey?: string;
   subtext?: string;
   className?: string;
   large?: boolean;
@@ -19,6 +21,7 @@ export const MetricCard: React.FC<Props> = ({
   unit,
   previous,
   current,
+  metricKey,
   subtext,
   className = '',
   large = false,
@@ -36,7 +39,7 @@ export const MetricCard: React.FC<Props> = ({
         <span className="glow">{value}</span>
         {unit && <span className="unit">{unit}</span>}
         {numVal !== undefined && (
-          <ArrowIndicator current={numVal} previous={previous} />
+          <ArrowIndicator current={numVal} previous={previous} metricKey={metricKey} />
         )}
       </div>
       {subtext && (

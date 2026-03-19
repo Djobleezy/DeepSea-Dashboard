@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
+import { useCurrency } from '../hooks/useCurrency';
 import { StaggerChildren } from '../components/StaggerChildren';
 import { ASIC_MODELS, groupedModels } from '../data/asicModels';
 import type { Worker } from '../types';
@@ -100,6 +101,7 @@ const WorkerCard: React.FC<{
   onOverride: (name: string, o: WorkerOverride | undefined) => void;
 }> = ({ worker, maxHashrate, btcPrice, powerCost, override, onOverride }) => {
   const [editing, setEditing] = useState(false);
+  const { formatFiat } = useCurrency();
   const efficiencyInputId = `worker-efficiency-${worker.name.replace(/\s+/g, '-').toLowerCase()}`;
   const powerInputId = `worker-power-${worker.name.replace(/\s+/g, '-').toLowerCase()}`;
   const isOnline = worker.status === 'online';
@@ -196,7 +198,7 @@ const WorkerCard: React.FC<{
                 <optgroup key={brand} label={brand}>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.model} — {m.efficiency} J/TH
+                      {m.model} — {m.efficiency} J/TH · {m.typicalThs} TH/s · {m.cooling}
                     </option>
                   ))}
                 </optgroup>
@@ -298,7 +300,7 @@ const WorkerCard: React.FC<{
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Fiat Value</div>
-          <div style={{ color: 'var(--color-success)' }}>${earningsFiat.toFixed(2)}</div>
+          <div style={{ color: 'var(--color-success)' }}>{formatFiat(earningsFiat)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
@@ -308,12 +310,12 @@ const WorkerCard: React.FC<{
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Cost/Day</div>
-          <div style={{ color: 'var(--color-error)' }}>${dailyPowerCost.toFixed(2)}</div>
+          <div style={{ color: 'var(--color-error)' }}>{formatFiat(dailyPowerCost)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Profit/Day</div>
           <div style={{ color: dailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
-            {dailyProfit >= 0 ? '+' : ''}${dailyProfit.toFixed(2)}
+            {dailyProfit >= 0 ? '+' : '-'}{formatFiat(Math.abs(dailyProfit))}
           </div>
         </div>
         <div>
@@ -333,6 +335,7 @@ export const Workers: React.FC = () => {
   const [showPowerSettings, setShowPowerSettings] = useState(false);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
+  const { formatFiat: formatFiatMain } = useCurrency();
 
   const { workers, loading, error, refresh } = useWorkers(status, 'hashrate_3hr', true);
 
@@ -465,7 +468,7 @@ export const Workers: React.FC = () => {
               {fmtPower(totalPower)}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              ~${totalDailyCost.toFixed(2)}/day @ ${powerCost.toFixed(2)}/kWh
+              ~{formatFiatMain(totalDailyCost)}/day @ ${powerCost.toFixed(2)}/kWh
             </div>
           </div>
 
@@ -541,7 +544,7 @@ export const Workers: React.FC = () => {
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Daily Cost</div>
                 <div style={{ fontSize: '22px', color: 'var(--color-error)', fontFamily: 'var(--font-vt323)', marginTop: '4px' }}>
-                  ${totalDailyCost.toFixed(2)}
+                  {formatFiatMain(totalDailyCost)}
                 </div>
               </div>
               <div>
@@ -551,7 +554,7 @@ export const Workers: React.FC = () => {
                   color: totalDailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)',
                   textShadow: totalDailyProfit >= 0 ? '0 0 8px rgba(0,204,102,0.3)' : '0 0 8px rgba(255,68,68,0.3)',
                 }}>
-                  {totalDailyProfit >= 0 ? '+' : ''}${totalDailyProfit.toFixed(2)}
+                  {totalDailyProfit >= 0 ? '+' : '-'}{formatFiatMain(Math.abs(totalDailyProfit))}
                 </div>
               </div>
             </div>

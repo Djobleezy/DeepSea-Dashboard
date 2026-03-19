@@ -18,7 +18,7 @@ module.exports = {
     "plugin:@typescript-eslint/recommended",
     "plugin:react-hooks/recommended",
   ],
-  ignorePatterns: ["dist", "node_modules"],
+  ignorePatterns: ["vitest.config.ts", "dist", "node_modules"],
   rules: {
     "react-refresh/only-export-components": [
       "warn",

@@ -92,6 +92,18 @@ async def init_db() -> None:
                 unpaid_earnings REAL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS client_errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message TEXT,
+                source TEXT,
+                lineno INTEGER,
+                colno INTEGER,
+                stack TEXT,
+                url TEXT,
+                ts REAL NOT NULL
+            )
+        """)
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_notifications_timestamp ON notifications(timestamp)"
         )
