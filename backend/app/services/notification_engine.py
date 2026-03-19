@@ -99,11 +99,11 @@ async def check_and_fire(
     prev_block = _prev_state.get("last_block_height")
     curr_block = metrics.get("last_block_height")
     if (
-        prev_block
-        and curr_block
+        prev_block is not None
+        and curr_block is not None
         and isinstance(prev_block, (int, float))
         and isinstance(curr_block, (int, float))
-        and int(curr_block) != int(prev_block)
+        and int(curr_block) > int(prev_block)
     ):
         msg = f"⛏️ New block found! Height #{curr_block}"
         n = await create_notification(db, msg, "block", "success", is_block=True)
