@@ -115,7 +115,25 @@ async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
 
     try:
         metrics = await fetch_full_metrics(_client)
-        _current_metrics = metrics.model_dump()
+        metrics_dict = metrics.model_dump()
+
+        # Guard against broadcasting zeroed-out hashrates from transient API
+        # failures.  If the new metrics have all-zero hashrates but we already
+        # have good data, keep the previous snapshot (stale > zero).
+        hr_keys = ("hashrate_60sec", "hashrate_3hr", "hashrate_24hr")
+        all_zero = all(metrics_dict.get(k, 0) == 0 for k in hr_keys)
+        had_good = _current_metrics and any(
+            (_current_metrics.get(k) or 0) > 0 for k in hr_keys
+        )
+        if all_zero and had_good:
+            _log.warning(
+                "Skipping metrics broadcast — all hashrates zero (likely API blip). "
+                "Keeping previous snapshot."
+            )
+            _last_refresh = time.time()
+            return
+
+        _current_metrics = metrics_dict
         await cache_set(get_cache_key("metrics", wallet), _current_metrics, ttl=120)
 
         # Save historical snapshot

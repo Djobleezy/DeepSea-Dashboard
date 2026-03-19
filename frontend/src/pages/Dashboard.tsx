@@ -44,7 +44,11 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!metrics) return;
     addHistory(metrics);
-    addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr);
+    // Skip chart points when hashrate is zero — likely a transient API failure,
+    // not a real drop.  Avoids visual dips to 0 on the chart.
+    if (metrics.hashrate_60sec > 0 || metrics.hashrate_3hr > 0) {
+      addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr);
+    }
   }, [metrics, addChartPoint]);
 
   if (!metrics) {

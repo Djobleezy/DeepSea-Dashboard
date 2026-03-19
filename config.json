@@ -1,9 +1,0 @@
-{
-  "wallet": "your-bitcoin-wallet-address",
-  "power_cost": 0.12,
-  "power_usage": 3000,
-  "currency": "USD",
-  "timezone": "America/Los_Angeles",
-  "network_fee": 2.0,
-  "extended_history": false
-}

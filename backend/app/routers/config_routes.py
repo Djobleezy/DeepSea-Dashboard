@@ -1,5 +1,6 @@
 """Config GET/POST and timezone list endpoints."""
 
+import asyncio
 import logging
 
 import pytz
@@ -34,12 +35,18 @@ async def update_config(payload: ConfigUpdate) -> AppConfig:
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await run_in_threadpool(save_config, update)
 
+    # Fire-and-forget: don't block the response waiting for Ocean API calls
+    asyncio.ensure_future(_safe_refresh())
+
+    return await get_config()
+
+
+async def _safe_refresh() -> None:
+    """Trigger a background metrics refresh, swallowing errors."""
     try:
         await background.trigger_refresh()
     except Exception as e:
         _log.warning("Config refresh failed after save: %s", e)
-
-    return await get_config()
 
 
 @router.get("/timezones")
