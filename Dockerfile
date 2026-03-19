@@ -34,6 +34,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
+# Copy example config as fallback (overridden by bind mount at runtime)
+COPY config.json.example /config/config.json
+
 # Create non-root runtime user and writable app directories
 RUN addgroup --system app && adduser --system --ingroup app app \
     && mkdir -p /data /config \

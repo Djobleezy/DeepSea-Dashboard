@@ -30,3 +30,4 @@ logs/
 
 # OS
 .DS_Store
+config.json

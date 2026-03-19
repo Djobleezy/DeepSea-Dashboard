@@ -17,14 +17,14 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5000:8000"
+      - "5050:8000"
     environment:
       - CONFIG_PATH=/config/config.json
       - REDIS_PASSWORD=${REDIS_PASSWORD:-change-me-in-production}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-change-me-in-production}@redis:6379/0
       - DB_PATH=/data/deepsea.db
     volumes:
-      - ./config.json:/config/config.json:ro
+      - ./config.json:/config/config.json
       - deepsea-data:/data
     depends_on:
       redis:
