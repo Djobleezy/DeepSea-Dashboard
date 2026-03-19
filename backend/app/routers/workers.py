@@ -35,7 +35,7 @@ def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
 @router.get("/workers", response_model=WorkerSummary)
 async def get_workers(
     status: Literal["all", "online", "offline"] = Query(default="all", description="Filter: all|online|offline"),
-    sort_by: Literal["name", "status", "hashrate", "hashrate_60sec", "earnings", "efficiency", "last_share"] = Query(
+    sort_by: Literal["name", "status", "hashrate", "hashrate_3hr", "hashrate_60sec", "earnings", "efficiency", "last_share"] = Query(
         default="name", description="Sort column"
     ),
     descending: bool = Query(default=False),
