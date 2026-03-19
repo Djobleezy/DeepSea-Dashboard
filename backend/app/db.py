@@ -10,7 +10,7 @@ from typing import Optional
 
 import aiosqlite
 
-DB_PATH = Path("/data/deepsea.db")
+DB_PATH = Path("/app/data/deepsea.db")
 
 
 async def _configure_connection(db: aiosqlite.Connection) -> None:

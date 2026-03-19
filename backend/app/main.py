@@ -88,7 +88,16 @@ app.include_router(earnings.router, prefix=api_prefix, tags=["earnings"])
 app.include_router(notifications.router, prefix=api_prefix, tags=["notifications"])
 app.include_router(config_routes.router, prefix=api_prefix, tags=["config"])
 
-# Serve built frontend (if present)
-_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+# Serve built frontend (if present) with SPA fallback
+_frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if _frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="static")
+    _index_html = _frontend_dist / "index.html"
+
+    # SPA catch-all: any non-API path that isn't a real file → index.html
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        from fastapi.responses import FileResponse
+        static_file = _frontend_dist / full_path
+        if full_path and static_file.exists() and static_file.is_file():
+            return FileResponse(str(static_file))
+        return FileResponse(str(_index_html))

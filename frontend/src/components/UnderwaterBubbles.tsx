@@ -91,10 +91,10 @@ export const UnderwaterBubbles: React.FC = () => {
         @keyframes bubble-rise {
           0% {
             transform: translateY(0) translateX(0) scale(1);
-            opacity: 0.6;
+            opacity: 0.15;
           }
           50% {
-            opacity: 0.4;
+            opacity: 0.1;
           }
           100% {
             transform: translateY(-100vh) translateX(var(--bubble-drift)) scale(0.7);
@@ -113,10 +113,10 @@ export const UnderwaterBubbles: React.FC = () => {
             width: `${b.size}px`,
             height: `${b.size}px`,
             background:
-              'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.2))',
+              'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05))',
             borderRadius: '50%',
-            opacity: 0.6,
-            boxShadow: '0 0 4px rgba(0, 136, 204, 0.4), 0 0 8px rgba(0, 136, 204, 0.2)',
+            opacity: 0.15,
+            boxShadow: '0 0 3px rgba(0, 136, 204, 0.15)',
             animation: `bubble-rise ${b.duration}s linear ${b.delay}s 1 forwards`,
             // CSS custom property for drift
             ['--bubble-drift' as string]: `${b.drift}px`,
