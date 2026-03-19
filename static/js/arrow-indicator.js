@@ -171,19 +171,16 @@ class ArrowIndicator {
 
                 if (pctChange > threshold) {
                     if (newValue > prevValue) {
-                        // Single chevron for small moves, double for big moves
                         const big = pctChange > threshold * 3;
                         const icon = big ? 'fa-angle-double-up' : 'fa-angle-up';
-                        const anim = big ? 'bounce-up' : '';
                         this.arrowStates[key] =
-                            `<i class='arrow chevron fa-solid ${icon} ${anim}' ` +
+                            `<i class='arrow chevron fa-solid ${icon} bounce-up' ` +
                             `style='color: #00ff00; display: inline-block !important;'></i>`;
                     } else {
                         const big = pctChange > threshold * 3;
                         const icon = big ? 'fa-angle-double-down' : 'fa-angle-down';
-                        const anim = big ? 'bounce-down' : '';
                         this.arrowStates[key] =
-                            `<i class='arrow chevron fa-solid ${icon} ${anim}' ` +
+                            `<i class='arrow chevron fa-solid ${icon} bounce-down' ` +
                             `style='color: #ff0000; display: inline-block !important;'></i>`;
                     }
                     this.arrowTimestamps[key] = now;
