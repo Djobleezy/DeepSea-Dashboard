@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { postClientError } from '../api/client';
 
 interface Props {
   children: ReactNode;
@@ -120,6 +121,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[DeepSea ErrorBoundary]', error, info.componentStack);
+    // Report to backend (fire-and-forget)
+    postClientError({
+      message: error.message,
+      stack: `${error.stack ?? ''}\n\nComponent Stack:\n${info.componentStack ?? ''}`,
+      url: window.location.href,
+    });
   }
 
   componentDidMount() {
