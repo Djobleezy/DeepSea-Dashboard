@@ -1,5 +1,47 @@
 # DeepSea Dashboard
 
+## v2 Rebuild (Current)
+
+> The `v2-rebuild` branch is the actively maintained version.
+> It uses a **FastAPI backend** (`backend/`) and **React + Vite frontend** (`frontend/`).
+>
+> Legacy v1 files remain in the repository during migration, but new work should target v2.
+
+### Quick start (v2)
+
+#### Local development
+
+```bash
+# Backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+
+# Frontend
+cd frontend
+npm ci
+npm run build
+cd ..
+
+# Run API + SPA host
+PYTHONPATH=backend python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+#### Docker Compose (v2)
+
+```bash
+# Set a real password outside local dev
+export REDIS_PASSWORD="change-this"
+docker compose up --build
+```
+
+- App health: `http://localhost:5051/api/health`
+- UI: `http://localhost:5051/`
+
+`config.json` is mounted read-only at `/config/config.json` and the SQLite DB persists in the `deepsea-data` volume.
+
+---
+
 ## A Retro Mining Monitoring Solution
 
 This open-source dashboard monitors Ocean.xyz pool miners in real time.
@@ -214,11 +256,13 @@ See the [Testing guide](docs/TESTING.md) for more details.
 ## Technical Architecture
 
 Built with a modern stack for reliability and performance:
-- **Backend**: Flask with Server-Sent Events for real-time updates
-- **Frontend**: Vanilla JavaScript with Chart.js for visualization
+- **Backend (v2)**: FastAPI + Uvicorn with API-first routing and health checks
+- **Frontend (v2)**: React + TypeScript + Vite
 - **Data Processing**: Concurrent API calls with smart caching
 - **Resilience**: Automatic recovery mechanisms and state persistence
 - **Configuration**: Environment variables and JSON-based settings
+
+> Note: Flask/vanilla JS architecture references in older sections describe v1 behavior retained for migration context.
 
 ## Historical Data Retention
 

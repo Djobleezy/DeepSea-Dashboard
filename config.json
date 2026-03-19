@@ -1,12 +1,13 @@
 {
-    "power_cost": 0.0,
-    "power_usage": 0.0,
-    "wallet": "yourwallethere",
-    "timezone": "America/Los_Angeles",
-    "network_fee": 0.0,
-    "currency": "USD",
-    "low_hashrate_threshold_ths": 3.0,
-    "high_hashrate_threshold_ths": 20.0,
-    "EXCHANGE_RATE_API_KEY": "",
-    "extended_history": false
+  "wallet": "bc1qnd2e0tg8nevqj649v2qcgacevzw9qcgc7ex0l7",
+  "power_cost": 0.0,
+  "power_usage": 0.0,
+  "currency": "USD",
+  "timezone": "America/Los_Angeles",
+  "network_fee": 0.0,
+  "extended_history": true,
+  "exchange_rate_api_key": "",
+  "low_hashrate_threshold_ths": 3.0,
+  "high_hashrate_threshold_ths": 20.0,
+  "EXCHANGE_RATE_API_KEY": ""
 }

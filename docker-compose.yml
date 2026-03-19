@@ -1,31 +1,43 @@
-version: '3'
-
 services:
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
+    command: >
+      sh -c 'redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+      --requirepass "${REDIS_PASSWORD:-change-me-in-production}"'
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:-change-me-in-production}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  dashboard:
-    build: .
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5051:8000"
     environment:
-      - REDIS_URL=redis://redis:6379
-      - LOG_LEVEL=INFO
+      - CONFIG_PATH=/config/config.json
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-change-me-in-production}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-change-me-in-production}@redis:6379/0
+      - DB_PATH=/data/deepsea.db
     volumes:
-        - ./config.json:/app/config.json
-        - ./logs:/app/logs
-        - ./static/audio:/app/static/audio
-        - ./static/vendor:/app/static/vendor
-        - ./static/css:/app/static/css
-        - ./static/js:/app/static/js
-        - ./static/favicon:/app/static/favicon
-        - ./templates:/app/templates
+      - ./config.json:/config/config.json:ro
+      - deepsea-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 volumes:
-  redis_data:
+  deepsea-data:
+    driver: local

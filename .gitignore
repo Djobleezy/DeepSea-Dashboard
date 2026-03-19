@@ -1,29 +1,45 @@
-# Python cache files
+# Python caches and artifacts
 __pycache__/
 *.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage_html/
 
-# Test cache
-tests/__pycache__/
+# Virtual environments
+.venv/
+.venv-test/
 
-# IDE settings
-*.swp
-*.swo
-*.idea/
-.vscode/
+# Frontend artifacts
+frontend/node_modules/
+frontend/dist/
 
-# MacOS
-.DS_Store
-
-# Static asset build outputs
+# Build/minified static outputs
 static/js/min/
 static/css/min/
 templates/min/
-/.vs
+
+# Environment and local secrets
+.env
+.env.*
+*.env
+
+# Logs
+logs/
+/logs/dashboard.log
 /logs/dashboard.log.1
 /logs/dashboard.log.2
 /logs/dashboard.log.3
 /logs/dashboard.log.4
 /logs/dashboard.log.5
-/logs/dashboard.log
-logs/
-.coverage
+
+# IDE / editor
+*.swp
+*.swo
+.idea/
+.vscode/
+.vs/
+
+# OS files
+.DS_Store

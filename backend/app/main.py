@@ -1,0 +1,141 @@
+"""FastAPI application entry point."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import time
+from collections import defaultdict, deque
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+
+from app import background
+from app.db import init_db
+from app.routers import (
+    blocks,
+    config_routes,
+    earnings,
+    health,
+    metrics,
+    notifications,
+    workers,
+)
+from app.services.cache import init_cache
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+_bg_task: asyncio.Task | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _bg_task
+    # Initialize DB and cache
+    await init_db()
+    redis_url = os.environ.get("REDIS_URL", "redis://redis:6379")
+    await init_cache(redis_url)
+
+    # Start background refresh loop
+    _bg_task = asyncio.create_task(background.background_loop())
+
+    yield
+
+    # Cleanup on shutdown
+    if _bg_task:
+        _bg_task.cancel()
+        try:
+            await _bg_task
+        except asyncio.CancelledError:
+            pass
+
+    if background._client:
+        await background._client.close()
+
+
+app = FastAPI(
+    title="DeepSea Dashboard API",
+    version="2.0.0",
+    description="Ocean.xyz mining monitoring dashboard",
+    lifespan=lifespan,
+)
+
+# Simple in-process API rate limiting (per client IP, fixed 60s window).
+_RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "120"))
+_rate_limit_hits: dict[str, deque[float]] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if _RATE_LIMIT_PER_MIN > 0 and request.url.path.startswith("/api") and request.url.path != "/api/health":
+        client_ip = request.client.host if request.client else "unknown"
+        key = f"{client_ip}:{request.url.path}"
+        now = time.time()
+        window = _rate_limit_hits[key]
+
+        while window and now - window[0] > 60.0:
+            window.popleft()
+
+        if len(window) >= _RATE_LIMIT_PER_MIN:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded"},
+                headers={"Retry-After": "60"},
+            )
+
+        window.append(now)
+
+    return await call_next(request)
+
+
+# CORS — configurable via CORS_ORIGINS (comma-separated)
+# Default is permissive for local/dev but does not claim credentialed wildcard support.
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+_allow_credentials = "*" not in _cors_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# API routes
+api_prefix = "/api"
+app.include_router(health.router, prefix=api_prefix, tags=["health"])
+app.include_router(metrics.router, prefix=api_prefix, tags=["metrics"])
+app.include_router(workers.router, prefix=api_prefix, tags=["workers"])
+app.include_router(blocks.router, prefix=api_prefix, tags=["blocks"])
+app.include_router(earnings.router, prefix=api_prefix, tags=["earnings"])
+app.include_router(notifications.router, prefix=api_prefix, tags=["notifications"])
+app.include_router(config_routes.router, prefix=api_prefix, tags=["config"])
+
+# Serve built frontend (if present) with SPA fallback
+_frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    _index_html = _frontend_dist / "index.html"
+
+    # SPA catch-all: any non-API path that isn't a real file → index.html
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        from fastapi.responses import FileResponse
+
+        dist_root = _frontend_dist.resolve()
+        requested = (dist_root / full_path).resolve()
+
+        # Prevent path traversal outside frontend/dist.
+        if full_path and not requested.is_relative_to(dist_root):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        if full_path and requested.exists() and requested.is_file():
+            return FileResponse(str(requested))
+        return FileResponse(str(_index_html))
