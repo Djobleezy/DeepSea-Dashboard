@@ -137,8 +137,17 @@ export const ArrowIndicator: React.FC<Props> = ({
     : (up ? '↑' : '↓');
 
   // Force re-render when TTL expires so the arrow disappears
-  // We schedule a timeout if tick changed (i.e. a new arrow just appeared)
-  void tick; // suppress unused-var lint
+  useEffect(() => {
+    if (!state) return;
+    const remaining = ARROW_TTL_MS - (Date.now() - state.setAt);
+    if (remaining <= 0) return;
+    const timer = window.setTimeout(() => {
+      setTick((t) => t + 1);
+    }, remaining + 10);
+    return () => window.clearTimeout(timer);
+  }, [state?.setAt, key]);
+
+  void tick; // used to trigger rerender after TTL timeout
 
   return (
     <span
