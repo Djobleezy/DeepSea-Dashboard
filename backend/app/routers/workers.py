@@ -42,14 +42,21 @@ def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
     return workers
 
 
-@router.get("/workers", response_model=WorkerSummary)
+@router.get("/workers", response_model=WorkerSummary, tags=["workers"])
 async def get_workers(
     status: Literal["all", "online", "offline"] = Query(default="all", description="Filter: all|online|offline"),
     sort_by: Literal["name", "status", "hashrate", "hashrate_3hr", "hashrate_60sec", "earnings", "efficiency", "last_share"] = Query(
         default="name", description="Sort column"
     ),
-    descending: bool = Query(default=False),
+    descending: bool = Query(default=False, description="Sort descending"),
 ) -> WorkerSummary:
+    """Return the worker fleet with per-worker metrics and earnings distribution.
+
+    Hashrates, status, efficiency, power consumption, and ASIC model are enriched
+    by the worker service. Unpaid earnings are distributed proportionally by
+    hashrate across all workers. Supports filtering by status and sorting by
+    any metric column.
+    """
     cached = await cache_get(background.get_cache_key("workers"))
     if not cached:
         live = background.get_current_workers()
