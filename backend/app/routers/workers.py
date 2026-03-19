@@ -13,8 +13,18 @@ router = APIRouter()
 
 
 def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
-    """Distribute unpaid earnings across workers proportionally by hashrate (like v1)."""
-    if not workers or unpaid_btc <= 0:
+    """Distribute unpaid earnings across workers proportionally by hashrate (like v1).
+
+    Always sets an ``earnings`` field on every worker — even when
+    ``unpaid_btc`` is zero or unavailable — so the frontend never
+    sees the field disappear between refreshes.
+    """
+    if not workers:
+        return workers
+
+    if unpaid_btc <= 0:
+        for w in workers:
+            w.setdefault("earnings", 0.0)
         return workers
 
     total_hr = sum(float(w.get("hashrate_60sec", 0)) for w in workers)
