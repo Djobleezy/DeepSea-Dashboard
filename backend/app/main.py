@@ -17,6 +17,7 @@ from app import background
 from app.db import init_db
 from app.logging_config import configure_logging, get_request_middleware, log_startup_banner
 from app.routers import (
+    batch,
     blocks,
     client_errors,
     config_routes,
@@ -133,6 +134,7 @@ app.include_router(notifications.router, prefix=api_prefix, tags=["notifications
 app.include_router(config_routes.router, prefix=api_prefix, tags=["config"])
 app.include_router(exchange.router, prefix=api_prefix, tags=["exchange"])
 app.include_router(client_errors.router, prefix=api_prefix, tags=["client-errors"])
+app.include_router(batch.router, prefix=api_prefix, tags=["system"])
 
 # Serve built frontend (if present) with SPA fallback
 _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
