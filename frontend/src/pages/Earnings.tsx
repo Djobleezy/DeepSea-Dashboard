@@ -66,7 +66,7 @@ export const Earnings: React.FC = () => {
 
       {/* Summary cards — always show, even while loading new period */}
       {data && (
-        <div className="grid-4">
+        <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
           <div className="card">
             <div className="label">TOTAL EARNED</div>
             <div className="value glow" style={{ color: 'var(--color-success)' }}>
@@ -103,7 +103,7 @@ export const Earnings: React.FC = () => {
 
       {/* Monthly summary */}
       {data && data.monthly_summary.length > 0 && (
-        <div className="card">
+        <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '12px' }}>MONTHLY BREAKDOWN</div>
           <div style={{ overflowX: 'auto' }}>
             <table>
@@ -156,7 +156,7 @@ export const Earnings: React.FC = () => {
       )}
 
       {/* Payment history */}
-      <div className="card">
+      <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.25s both' }}>
         <div className="label" style={{ marginBottom: '12px' }}>PAYMENT HISTORY</div>
         {loading && !data ? (
           <div className="text-center" style={{ padding: '40px', color: 'var(--text-dim)' }}>

@@ -298,7 +298,7 @@ export const Blocks: React.FC = () => {
 
       {/* Donut chart — last 100 blocks pool distribution */}
       {donutSlices.length > 0 && (
-        <div className="card">
+        <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.05s both' }}>
           <div className="label" style={{ marginBottom: '12px' }}>
             POOL DISTRIBUTION — LAST {donutBlocks.length} BLOCKS
           </div>
@@ -308,7 +308,7 @@ export const Blocks: React.FC = () => {
 
       {/* Summary cards */}
       {metrics && (
-        <div className="grid-4">
+        <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.15s both' }}>
           <MetricCardSimple label="LAST BLOCK" value={`#${metrics.last_block_height.toLocaleString()}`} sub={metrics.last_block_time} />
           <MetricCardSimple label="BLOCKS FOUND" value={String(metrics.blocks_found)} />
           <MetricCardSimple label="PAGE REWARDS" value={`₿ ${blocks.reduce((s, b) => s + b.reward_btc, 0).toFixed(3)}`}

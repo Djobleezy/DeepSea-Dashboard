@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
 import { ArrowIndicator } from '../components/ArrowIndicator';
+import { StaggerChildren } from '../components/StaggerChildren';
 import type { Worker } from '../types';
 
 type StatusFilter = 'all' | 'online' | 'offline';
@@ -315,7 +316,7 @@ export const Workers: React.FC = () => {
 
       {/* Summary cards */}
       {workers && (
-        <div className="grid-4">
+        <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
           <div className="card" style={{ textAlign: 'center' }}>
             {/* Online ring */}
             <div
@@ -388,7 +389,7 @@ export const Workers: React.FC = () => {
 
       {/* Fleet composition */}
       {modelCounts.length > 1 && (
-        <div className="card">
+        <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '10px' }}>FLEET COMPOSITION</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {modelCounts.map(([model, { count, totalHr }]) => {
@@ -411,7 +412,7 @@ export const Workers: React.FC = () => {
       )}
 
       {/* Fleet Power Settings */}
-      <div className="card">
+      <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.25s both' }}>
         <div className="flex justify-between items-center" style={{ cursor: 'pointer' }} onClick={() => setShowPowerSettings(!showPowerSettings)}>
           <div className="label">
             ⚡ FLEET POWER SETTINGS
@@ -508,7 +509,9 @@ export const Workers: React.FC = () => {
           ERROR: {error}
         </div>
       ) : (
-        <div
+        <StaggerChildren
+          stagger={40}
+          duration={350}
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
@@ -526,7 +529,7 @@ export const Workers: React.FC = () => {
               onOverride={handleOverride}
             />
           ))}
-        </div>
+        </StaggerChildren>
       )}
     </div>
   );

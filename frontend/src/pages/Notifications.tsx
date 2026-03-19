@@ -58,7 +58,7 @@ export const Notifications: React.FC = () => {
       </div>
 
       {/* Category filter */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
         {CATEGORIES.map((c) => (
           <button
             key={c.value}

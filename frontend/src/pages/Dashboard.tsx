@@ -102,7 +102,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Hashrate row — auto-scaled */}
-      <div className="grid-4">
+      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
         <MetricCard
           label="60 SEC"
           value={hr60.display}
@@ -141,7 +141,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Chart — data from Zustand store, persists across route changes */}
       {chartData60s.length > 1 && (
-        <div className="card">
+        <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
           <Suspense
             fallback={
@@ -164,7 +164,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Second row: workers, BTC price, daily sats, unpaid */}
-      <div className="grid-4">
+      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.25s both' }}>
         <MetricCard
           label="WORKERS HASHING"
           value={metrics.workers_hashing}
@@ -201,7 +201,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Bitcoin progress bar + payout */}
-      <div className="grid-2">
+      <div className="grid-2" style={{ animation: 'stagger-in 0.4s ease-out 0.35s both' }}>
         <div className="card">
           <div className="label" style={{ marginBottom: '12px' }}>BITCOIN BLOCK TIMER</div>
           <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
@@ -221,7 +221,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Network stats row */}
-      <div className="grid-4">
+      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.45s both' }}>
         <MetricCard
           label="NETWORK HASHRATE"
           value={fmtHashrate(metrics.network_hashrate, metrics.network_hashrate_unit)}
@@ -242,7 +242,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Profitability row */}
-      <div className="grid-4">
+      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.55s both' }}>
         <MetricCard
           label="DAILY REVENUE"
           value={`$${metrics.daily_revenue.toFixed(2)}`}
