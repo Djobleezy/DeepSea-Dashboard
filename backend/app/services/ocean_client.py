@@ -187,8 +187,8 @@ class OceanClient:
                         ZoneInfo(get_timezone())
                     )
                     result["total_last_share"] = dt.strftime("%Y-%m-%d %I:%M %p")
-                except Exception:
-                    pass
+                except (ValueError, TypeError, OSError) as e:
+                    _log.debug("Could not parse last share timestamp: %s", e)
 
             return result
         except Exception as e:
@@ -272,8 +272,8 @@ class OceanClient:
                 except (ValueError, TypeError):
                     dt = datetime.fromtimestamp(float(ts), tz=ZoneInfo("UTC"))
                 result["last_block_time"] = _elapsed_str(dt.timestamp())
-            except Exception:
-                pass
+            except (ValueError, TypeError, OSError) as e:
+                _log.debug("Could not parse latest block timestamp %r: %s", ts, e)
 
         return result
 
@@ -307,8 +307,8 @@ class OceanClient:
                         local_dt = dt.astimezone(ZoneInfo(tz))
                         date_iso = local_dt.isoformat()
                         date_str = local_dt.strftime("%Y-%m-%d %H:%M")
-                    except Exception:
-                        pass
+                    except (ValueError, TypeError, OSError) as e:
+                        _log.debug("Could not parse payout timestamp %r: %s", ts, e)
 
                 payment = {
                     "date": date_str,
@@ -546,7 +546,8 @@ class OceanClient:
                     return int(text)
                 except ValueError:
                     return float(text)
-            except Exception:
+            except (ValueError, TypeError) as e:
+                _log.debug("Could not decode response from %s: %s", url, e)
                 return None
 
         for key in ["hashrate", "prices", "height"]:

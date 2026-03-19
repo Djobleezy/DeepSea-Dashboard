@@ -12,6 +12,7 @@ from typing import Optional
 import aiosqlite
 
 DB_PATH = Path(os.environ.get("DB_PATH", "/data/deepsea.db"))
+MAX_NOTIFICATIONS = int(os.environ.get("MAX_NOTIFICATIONS", "1000"))
 
 
 async def _configure_connection(db: aiosqlite.Connection) -> None:
@@ -121,6 +122,44 @@ async def create_notification(
            VALUES (?, ?, ?, ?, ?, 0, ?, ?)""",
         (nid, message, category, level, ts, int(is_block), meta_json),
     )
+
+    # Prevent unbounded growth: keep newest MAX_NOTIFICATIONS rows, preferentially
+    # pruning oldest non-block notifications first.
+    if MAX_NOTIFICATIONS > 0:
+        async with db.execute("SELECT COUNT(*) AS cnt FROM notifications") as cur:
+            row = await cur.fetchone()
+        total = int(row["cnt"]) if row else 0
+        overflow = total - MAX_NOTIFICATIONS
+        if overflow > 0:
+            async with db.execute(
+                """SELECT id FROM notifications
+                   WHERE is_block = 0
+                   ORDER BY timestamp ASC
+                   LIMIT ?""",
+                (overflow,),
+            ) as cur:
+                prune_rows = await cur.fetchall()
+            prune_ids = [r["id"] for r in prune_rows]
+            if prune_ids:
+                placeholders = ",".join("?" for _ in prune_ids)
+                await db.execute(f"DELETE FROM notifications WHERE id IN ({placeholders})", prune_ids)
+
+            # If overflow remains (e.g., mostly block notifications), hard-cap by
+            # pruning the oldest remaining rows.
+            async with db.execute("SELECT COUNT(*) AS cnt FROM notifications") as cur:
+                row = await cur.fetchone()
+            remaining_overflow = (int(row["cnt"]) if row else 0) - MAX_NOTIFICATIONS
+            if remaining_overflow > 0:
+                await db.execute(
+                    """DELETE FROM notifications
+                       WHERE id IN (
+                         SELECT id FROM notifications
+                         ORDER BY timestamp ASC
+                         LIMIT ?
+                       )""",
+                    (remaining_overflow,),
+                )
+
     await db.commit()
     return {
         "id": nid,

@@ -86,7 +86,8 @@ def sort_workers(
     fn = key_map.get(sort_by, key_map["name"])
     try:
         return sorted(workers, key=fn, reverse=descending)
-    except Exception:
+    except (TypeError, ValueError) as e:
+        _log.warning("Failed to sort workers by '%s': %s", sort_by, e)
         return workers
 
 

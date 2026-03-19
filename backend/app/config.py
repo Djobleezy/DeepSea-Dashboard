@@ -26,7 +26,7 @@ def load_config() -> dict[str, Any]:
             with CONFIG_PATH.open() as f:
                 data = json.load(f)
             return {**_DEFAULTS, **data}
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
         logging.warning(f"Could not load config from {CONFIG_PATH}: {e}")
     return dict(_DEFAULTS)
 
@@ -36,24 +36,30 @@ def save_config(data: dict[str, Any]) -> None:
 
     Tries atomic rename first; falls back to in-place write for
     Docker bind-mounted files where cross-device rename fails.
+    Ensures restrictive file permissions (0600).
     """
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     merged = {**load_config(), **data}
 
     tmp_path = CONFIG_PATH.with_suffix(f"{CONFIG_PATH.suffix}.tmp")
     try:
-        with tmp_path.open("w") as f:
+        # Create temp file with owner-only permissions.
+        fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(merged, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
         tmp_path.replace(CONFIG_PATH)
+        os.chmod(CONFIG_PATH, 0o600)
     except OSError:
         # Bind-mounted files can't be atomically replaced — write in place
         tmp_path.unlink(missing_ok=True)
-        with CONFIG_PATH.open("w") as f:
+        fd = os.open(CONFIG_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(merged, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
+        os.chmod(CONFIG_PATH, 0o600)
 
 
 def get_wallet() -> str:

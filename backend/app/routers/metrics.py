@@ -7,7 +7,7 @@ import json
 import time
 from typing import AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app import background
@@ -31,7 +31,7 @@ async def get_metrics():
 
 
 @router.get("/stream")
-async def metrics_stream():
+async def metrics_stream(request: Request):
     """SSE endpoint — streams metrics + worker updates in real-time."""
 
     async def event_generator() -> AsyncGenerator[dict, None]:
@@ -47,6 +47,8 @@ async def metrics_stream():
 
             # Stream future updates
             while True:
+                if await request.is_disconnected():
+                    break
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=30.0)
                     yield {
@@ -54,6 +56,8 @@ async def metrics_stream():
                         "data": json.dumps(event["data"], default=str),
                     }
                 except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
                     # Heartbeat to keep connection alive
                     yield {"event": "heartbeat", "data": json.dumps({"ts": time.time()})}
         finally:

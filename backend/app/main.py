@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import background
@@ -63,6 +65,36 @@ app = FastAPI(
     description="Ocean.xyz mining monitoring dashboard",
     lifespan=lifespan,
 )
+
+# Simple in-process API rate limiting (per client IP, fixed 60s window).
+_RATE_LIMIT_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "120"))
+_rate_limit_hits: dict[str, deque[float]] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if _RATE_LIMIT_PER_MIN > 0 and request.url.path.startswith("/api") and request.url.path != "/api/health":
+        client_ip = request.client.host if request.client else "unknown"
+        key = f"{client_ip}:{request.url.path}"
+        now = time.time()
+        window = _rate_limit_hits[key]
+
+        while window and now - window[0] > 60.0:
+            window.popleft()
+
+        if len(window) >= _RATE_LIMIT_PER_MIN:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded"},
+                headers={"Retry-After": "60"},
+            )
+
+        window.append(now)
+
+    return await call_next(request)
+
 
 # CORS — configurable via CORS_ORIGINS (comma-separated)
 # Default is permissive for local/dev but does not claim credentialed wildcard support.
