@@ -15,6 +15,20 @@ from app.services.ocean_client import OceanClient
 router = APIRouter()
 
 
+def _parse_ts_utc(ts_raw: object) -> datetime:
+    ts_str = str(ts_raw)
+    try:
+        # Handle ISO strings (including trailing 'Z') and preserve timezone if present.
+        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        else:
+            dt = dt.astimezone(ZoneInfo("UTC"))
+        return dt
+    except (ValueError, TypeError):
+        return datetime.fromtimestamp(float(ts_raw), tz=ZoneInfo("UTC"))
+
+
 def _parse_block(raw: dict) -> Block:
     height = int(raw.get("height") or 0)
     ts_raw = raw.get("ts") or raw.get("time") or raw.get("timestamp")
@@ -22,10 +36,7 @@ def _parse_block(raw: dict) -> Block:
     time_ago = ""
     if ts_raw:
         try:
-            try:
-                dt = datetime.fromisoformat(str(ts_raw)).replace(tzinfo=ZoneInfo("UTC"))
-            except (ValueError, TypeError):
-                dt = datetime.fromtimestamp(float(ts_raw), tz=ZoneInfo("UTC"))
+            dt = _parse_ts_utc(ts_raw)
             ts_str = dt.isoformat()
             delta = int(time.time() - dt.timestamp())
             if delta < 60:

@@ -212,8 +212,13 @@ class OceanClient:
         ts = block.get("ts") or block.get("time") or block.get("timestamp")
         if ts:
             try:
+                ts_str = str(ts)
                 try:
-                    dt = datetime.fromisoformat(str(ts)).replace(tzinfo=ZoneInfo("UTC"))
+                    dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                    else:
+                        dt = dt.astimezone(ZoneInfo("UTC"))
                 except (ValueError, TypeError):
                     dt = datetime.fromtimestamp(float(ts), tz=ZoneInfo("UTC"))
                 result["last_block_time"] = _elapsed_str(dt.timestamp())

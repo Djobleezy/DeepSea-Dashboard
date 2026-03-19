@@ -3,7 +3,8 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/store';
 import type { DashboardMetrics, WorkerSummary } from '../types';
 
-const SSE_URL = '/api/stream';
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const SSE_URL = `${API_BASE}/stream`;
 const INITIAL_BACKOFF = 1000;
 const MAX_BACKOFF = 30000;
 

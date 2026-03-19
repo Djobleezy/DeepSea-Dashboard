@@ -77,7 +77,7 @@ class Worker(BaseModel):
 
 
 class WorkerSummary(BaseModel):
-    workers: list[Worker] = []
+    workers: list[Worker] = Field(default_factory=list)
     total_hashrate: float = 0.0
     hashrate_unit: str = "TH/s"
     workers_total: int = 0
@@ -105,7 +105,7 @@ class Block(BaseModel):
 
 
 class BlocksResponse(BaseModel):
-    blocks: list[Block] = []
+    blocks: list[Block] = Field(default_factory=list)
     page: int = 0
     page_size: int = 20
     total: int = 0
@@ -128,10 +128,10 @@ class Payment(BaseModel):
 
 
 class EarningsResponse(BaseModel):
-    payments: list[Payment] = []
+    payments: list[Payment] = Field(default_factory=list)
     total_btc: float = 0.0
     total_sats: int = 0
-    monthly_summary: list[dict] = []
+    monthly_summary: list[dict] = Field(default_factory=list)
     currency: str = "USD"
 
 
@@ -162,7 +162,7 @@ class Notification(BaseModel):
     timestamp: str = ""
     read: bool = False
     is_block: bool = False
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict)
 
 
 class NotificationCreate(BaseModel):
@@ -170,7 +170,7 @@ class NotificationCreate(BaseModel):
     category: NotificationCategory = NotificationCategory.SYSTEM
     level: NotificationLevel = NotificationLevel.INFO
     is_block: bool = False
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

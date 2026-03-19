@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,7 +38,6 @@ async def lifespan(app: FastAPI):
     global _bg_task
     # Initialize DB and cache
     await init_db()
-    import os
     redis_url = os.environ.get("REDIS_URL", "redis://redis:6379")
     await init_cache(redis_url)
 
@@ -65,11 +65,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow all origins in development, tighten for production via env
+# CORS — configurable via CORS_ORIGINS (comma-separated)
+# Default is permissive for local/dev but does not claim credentialed wildcard support.
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+_allow_credentials = "*" not in _cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
