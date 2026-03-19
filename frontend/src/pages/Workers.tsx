@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
 import { StaggerChildren } from '../components/StaggerChildren';
+import { ASIC_MODELS, groupedModels } from '../data/asicModels';
 import type { Worker } from '../types';
 
 type StatusFilter = 'all' | 'online' | 'offline';
@@ -14,6 +15,7 @@ const MAX_OVERRIDE_BYTES = 256 * 1024;
 interface WorkerOverride {
   efficiency?: number; // W/TH
   powerConsumption?: number; // watts
+  asicId?: string; // selected ASIC model ID
 }
 type OverrideMap = Record<string, WorkerOverride>;
 
@@ -168,6 +170,41 @@ const WorkerCard: React.FC<{
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>
             POWER SETTINGS {hasOverride && <span style={{ color: 'var(--primary)' }}>(CUSTOM)</span>}
           </div>
+          {/* ASIC model selector */}
+          <div style={{ marginBottom: '10px' }}>
+            <label htmlFor={`${efficiencyInputId}-asic`} style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ASIC Model</label>
+            <select
+              id={`${efficiencyInputId}-asic`}
+              value={override?.asicId ?? ''}
+              onChange={(e) => {
+                const model = ASIC_MODELS.find((m) => m.id === e.target.value);
+                if (model) {
+                  const pw = Math.round(worker.hashrate_3hr * model.efficiency);
+                  onOverride(worker.name, { efficiency: model.efficiency, powerConsumption: pw, asicId: model.id });
+                }
+              }}
+              style={{
+                width: '100%', fontSize: '14px', padding: '4px 8px', marginTop: '2px',
+                background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)',
+                borderRadius: '4px', fontFamily: 'var(--font-mono)',
+              }}
+            >
+              <option value="">— Auto-detect —</option>
+              {Object.entries(groupedModels()).map(([brand, models]) => (
+                <optgroup key={brand} label={brand}>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.model} — {m.efficiency} J/TH
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          {/* Manual overrides */}
+          <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>
+            Or set manually:
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div>
               <label htmlFor={efficiencyInputId} style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Efficiency (W/TH)</label>
@@ -181,7 +218,7 @@ const WorkerCard: React.FC<{
                   const v = parseFloat(e.target.value);
                   if (!isNaN(v) && v > 0) {
                     const newPower = Math.round(worker.hashrate_3hr * v);
-                    onOverride(worker.name, { efficiency: v, powerConsumption: newPower });
+                    onOverride(worker.name, { efficiency: v, powerConsumption: newPower, asicId: undefined });
                   }
                 }}
                 style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}
@@ -202,7 +239,7 @@ const WorkerCard: React.FC<{
                   const v = parseFloat(e.target.value);
                   if (!isNaN(v) && v >= 0) {
                     const newEff = worker.hashrate_3hr > 0 ? v / worker.hashrate_3hr : 0;
-                    onOverride(worker.name, { powerConsumption: v, efficiency: Math.round(newEff * 10) / 10 });
+                    onOverride(worker.name, { powerConsumption: v, efficiency: Math.round(newEff * 10) / 10, asicId: undefined });
                   }
                 }}
                 style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}

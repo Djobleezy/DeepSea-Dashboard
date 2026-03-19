@@ -14,6 +14,7 @@ import {
 import Annotation from 'chartjs-plugin-annotation';
 import type { AnnotationOptions } from 'chartjs-plugin-annotation';
 import type { AnnotationEntry } from '../hooks/useBlockAnnotations';
+import { useAppStore } from '../stores/store';
 
 Chart.register(
   LineController,
@@ -52,6 +53,7 @@ function autoScale(ths: number): { divisor: number; unit: string } {
 export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
+  const theme = useAppStore((s) => s.theme);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -59,12 +61,13 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
-    const primary = getComputedStyle(document.documentElement)
-      .getPropertyValue('--primary')
-      .trim() || '#0088cc';
-    const textDim = getComputedStyle(document.documentElement)
-      .getPropertyValue('--text-dim')
-      .trim() || '#4a8fa8';
+    // Read live CSS vars — these update when theme changes
+    const style = getComputedStyle(document.documentElement);
+    const primary = style.getPropertyValue('--primary').trim() || '#0088cc';
+    const primaryDim = style.getPropertyValue('--primary-dim').trim() || '#005580';
+    const textDim = style.getPropertyValue('--text-dim').trim() || '#4a8fa8';
+    const bgCard = style.getPropertyValue('--bg-card').trim() || '#0d1a24';
+    const text = style.getPropertyValue('--text').trim() || '#a0d4f5';
 
     if (chartRef.current) {
       chartRef.current.destroy();
@@ -87,11 +90,11 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     gradient.addColorStop(1, `${primary}00`);
 
     // --- Block annotation vertical lines ---
-    const BLOCK_COLOR = '#f7931a'; // Bitcoin orange — CRT warm accent
+    const BLOCK_COLOR = '#f7931a'; // Bitcoin orange — always stands out
     const annotationDefs: Record<string, AnnotationOptions> = {};
 
     blockAnnotations.forEach((entry, idx) => {
-      if (!labelSet.has(entry.label)) return; // only draw if label is on current chart
+      if (!labelSet.has(entry.label)) return;
       annotationDefs[`blockEvent${idx}`] = {
         type: 'line',
         xMin: entry.label,
@@ -122,13 +125,13 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
         type: 'line',
         yMin: scaledAvg,
         yMax: scaledAvg,
-        borderColor: `${primary}66`,
+        borderColor: `${primaryDim}aa`,
         borderWidth: 1,
         borderDash: [6, 3],
         label: {
           display: true,
           content: `24H AVG: ${scaledAvg.toFixed(2)} ${displayUnit}`,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: `${bgCard}dd`,
           color: `${primary}cc`,
           font: {
             family: "'Share Tech Mono', monospace",
@@ -160,7 +163,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
           {
             label: '3hr Hashrate',
             data: values3hr,
-            borderColor: `${primary}88`,
+            borderColor: `${primaryDim}cc`,
             backgroundColor: 'transparent',
             borderWidth: 1,
             borderDash: [5, 5],
@@ -183,14 +186,14 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
             },
           },
           tooltip: {
-            backgroundColor: '#0d1a24',
+            backgroundColor: bgCard,
             borderColor: primary,
             borderWidth: 1,
             titleColor: primary,
-            bodyColor: '#a0d4f5',
+            bodyColor: text,
             bodyFont: { family: 'Share Tech Mono' },
             callbacks: {
-              label: (ctx) => ` ${(ctx.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
+              label: (c) => ` ${(c.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
             },
           },
           annotation: {
@@ -221,7 +224,8 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     return () => {
       chartRef.current?.destroy();
     };
-  }, [data60s, data3hr, avg24hr, blockAnnotations]);
+    // theme in deps → chart rebuilds with new CSS vars on theme change
+  }, [data60s, data3hr, avg24hr, blockAnnotations, theme]);
 
   return (
     <div className="chart-container">
