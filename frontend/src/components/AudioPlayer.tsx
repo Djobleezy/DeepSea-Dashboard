@@ -279,62 +279,80 @@ export const AudioPlayer: React.FC = () => {
         {muted ? '🔇' : '🔊'}
       </button>
 
-      {/* Volume slider */}
-      <div style={{ position: 'relative', width: '60px', height: '20px', display: 'flex', alignItems: 'center' }}>
-        <style>{`
-          .audio-vol::-webkit-slider-runnable-track {
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-          }
-          .audio-vol::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--primary);
-            box-shadow: 0 0 6px var(--primary-glow);
-            cursor: pointer;
-            margin-top: -4px;
-          }
-          .audio-vol::-moz-range-track {
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-          }
-          .audio-vol::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--primary);
-            box-shadow: 0 0 6px var(--primary-glow);
-            border: none;
-            cursor: pointer;
-          }
-        `}</style>
-        <input
-          className="audio-vol"
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={muted ? 0 : volume}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
+      {/* Volume slider — custom div-based for consistent cross-browser styling */}
+      <div
+        role="slider"
+        aria-label="Volume"
+        aria-valuenow={Math.round((muted ? 0 : volume) * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        tabIndex={0}
+        title={`Volume: ${Math.round(volume * 100)}%`}
+        style={{
+          width: '56px',
+          height: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          cursor: 'pointer',
+          position: 'relative',
+          opacity: muted ? 0.4 : 1,
+          touchAction: 'none',
+        }}
+        onPointerDown={(e) => {
+          const el = e.currentTarget;
+          el.setPointerCapture(e.pointerId);
+          const update = (ev: React.PointerEvent<HTMLDivElement> | PointerEvent) => {
+            const rect = el.getBoundingClientRect();
+            const v = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
             setVolume(v);
             if (muted && v > 0) setMuted(false);
-          }}
+          };
+          update(e);
+          const onMove = (ev: PointerEvent) => update(ev);
+          const onUp = () => {
+            el.removeEventListener('pointermove', onMove);
+            el.removeEventListener('pointerup', onUp);
+          };
+          el.addEventListener('pointermove', onMove);
+          el.addEventListener('pointerup', onUp);
+        }}
+      >
+        {/* Track */}
+        <div
           style={{
-            width: '100%',
-            WebkitAppearance: 'none',
-            appearance: 'none' as any,
-            background: 'transparent',
-            cursor: 'pointer',
-            opacity: muted ? 0.4 : 1,
-            margin: 0,
-            padding: 0,
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: '4px',
+            borderRadius: '2px',
+            background: 'var(--border)',
           }}
-          title={`Volume: ${Math.round(volume * 100)}%`}
+        />
+        {/* Fill */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: `${(muted ? 0 : volume) * 100}%`,
+            height: '4px',
+            borderRadius: '2px',
+            background: 'var(--primary)',
+            boxShadow: '0 0 4px var(--primary-glow)',
+          }}
+        />
+        {/* Thumb */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `calc(${(muted ? 0 : volume) * 100}% - 5px)`,
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: 'var(--primary)',
+            boxShadow: '0 0 6px var(--primary-glow)',
+            border: '1px solid var(--bg)',
+            transition: 'left 0.05s',
+          }}
         />
       </div>
     </div>

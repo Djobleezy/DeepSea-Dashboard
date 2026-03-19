@@ -59,7 +59,7 @@ const PoolDonut: React.FC<{ slices: DonutSlice[]; total: number }> = ({ slices, 
   let cumAngle = -90; // start from top
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
         {slices.map((s, i) => {
           const angle = (s.pct / 100) * 360;
