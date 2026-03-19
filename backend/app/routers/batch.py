@@ -77,6 +77,17 @@ async def batch_requests(payload: BatchPayload, request: Request) -> BatchResult
                     responses.append(BatchResponse(status=405, body={"detail": "Only GET requests supported in batch"}))
                     continue
 
+                # Reject paths that can hang, recurse, or escape API scope
+                if not path.startswith("/"):
+                    responses.append(BatchResponse(status=400, body={"detail": "Path must start with '/'"}))
+                    continue
+                if not path.startswith("/api/"):
+                    responses.append(BatchResponse(status=400, body={"detail": "Only /api/* paths are allowed in batch"}))
+                    continue
+                if path in {"/api/stream", "/api/batch"}:
+                    responses.append(BatchResponse(status=400, body={"detail": "Path not allowed in batch"}))
+                    continue
+
                 # Copy relevant headers from original request
                 headers = {}
                 if "authorization" in request.headers:

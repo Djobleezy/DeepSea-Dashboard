@@ -99,6 +99,18 @@ async def test_batch_invalid_path_returns_non_error_top_level(client):
 
 
 @pytest.mark.asyncio
+async def test_batch_rejects_stream_path(client):
+    """Batch rejects streaming endpoint to avoid hanging sub-requests."""
+    resp = await client.post(
+        "/api/batch",
+        json={"requests": [{"method": "GET", "path": "/api/stream"}]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["responses"][0]["status"] == 400
+
+
+@pytest.mark.asyncio
 async def test_batch_duration_ms_present(client):
     """Batch response includes duration_ms."""
     resp = await client.post(
