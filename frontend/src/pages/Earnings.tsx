@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { fetchEarnings } from '../api/client';
 import { useAppStore } from '../stores/store';
+import { useCurrency } from '../hooks/useCurrency';
 import type { EarningsResponse } from '../types';
 
 export const Earnings: React.FC = () => {
@@ -10,6 +11,7 @@ export const Earnings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
+  const { formatFiat } = useCurrency();
 
   const load = useCallback(async (d: number) => {
     setLoading(true);
@@ -74,7 +76,7 @@ export const Earnings: React.FC = () => {
             <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
               ₿ {totalBtc.toFixed(8)}
               {btcPrice > 0 && (
-                <span> · ${(totalBtc * btcPrice).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                <span> · {formatFiat(totalBtc * btcPrice)}</span>
               )}
             </div>
           </div>
@@ -142,7 +144,7 @@ export const Earnings: React.FC = () => {
                       </td>
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{m.btc.toFixed(8)}</td>
                       <td style={{ textAlign: 'right', color: '#f7931a' }}>
-                        {m.fiat > 0 ? `$${m.fiat.toFixed(2)}` : '—'}
+                        {m.fiat > 0 ? formatFiat(m.fiat) : '—'}
                       </td>
                     </tr>
                   );
@@ -197,7 +199,7 @@ export const Earnings: React.FC = () => {
                       </td>
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{p.amount_btc.toFixed(8)}</td>
                       <td style={{ textAlign: 'right', color: '#f7931a' }}>
-                        {p.fiat_value ? `$${p.fiat_value.toFixed(2)}` : '—'}
+                        {p.fiat_value ? formatFiat(p.fiat_value) : '—'}
                       </td>
                       <td>
                         {link ? (

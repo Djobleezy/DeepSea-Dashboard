@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import { fetchBlocks } from '../api/client';
 import { useAppStore } from '../stores/store';
+import { useCurrency } from '../hooks/useCurrency';
 import type { Block, BlocksResponse } from '../types';
 
 // ── Pool colors ────────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ const BlockCard: React.FC<{ block: Block; btcPrice: number }> = ({ block, btcPri
   const rewardUsd = block.reward_btc * btcPrice;
   const feePct = block.reward_btc > 0 ? (block.fees_btc / block.reward_btc) * 100 : 0;
   const color = poolColor(block.pool);
+  const { formatFiat } = useCurrency();
 
   return (
     <div
@@ -196,7 +198,7 @@ const BlockCard: React.FC<{ block: Block; btcPrice: number }> = ({ block, btcPri
             ₿ {block.reward_btc.toFixed(5)}
           </div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>
-            ${rewardUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatFiat(rewardUsd)}
           </div>
         </div>
         <div>
@@ -243,6 +245,7 @@ export const Blocks: React.FC = () => {
   const [donutBlocks, setDonutBlocks] = useState<Block[]>([]);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
+  const { formatFiat } = useCurrency();
 
   async function load(p: number) {
     setLoading(true);
@@ -311,7 +314,7 @@ export const Blocks: React.FC = () => {
           <MetricCardSimple label="LAST BLOCK" value={`#${metrics.last_block_height.toLocaleString()}`} sub={metrics.last_block_time} />
           <MetricCardSimple label="BLOCKS FOUND" value={String(metrics.blocks_found)} />
           <MetricCardSimple label="PAGE REWARDS" value={`₿ ${blocks.reduce((s, b) => s + b.reward_btc, 0).toFixed(3)}`}
-            sub={`$${(blocks.reduce((s, b) => s + b.reward_btc, 0) * btcPrice).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
+            sub={formatFiat(blocks.reduce((s, b) => s + b.reward_btc, 0) * btcPrice)} />
           <MetricCardSimple label="PAGE FEES" value={`₿ ${blocks.reduce((s, b) => s + b.fees_btc, 0).toFixed(5)}`} />
         </div>
       )}
