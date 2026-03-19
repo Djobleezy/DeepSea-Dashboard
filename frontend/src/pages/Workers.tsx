@@ -298,7 +298,7 @@ export const Workers: React.FC = () => {
   const [search, setSearch] = useState('');
   const [overrides, setOverrides] = useState<OverrideMap>({});
   const [powerCost, setPowerCost] = useState(0.12);
-  const [, setSettingsLoaded] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Load overrides + electricity rate from server on mount
   useEffect(() => {
