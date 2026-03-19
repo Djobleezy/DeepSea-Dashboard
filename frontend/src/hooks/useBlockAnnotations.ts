@@ -77,8 +77,8 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     if (!initialized.current) return;
     // Need both current and previous metrics
     if (!metrics || !prevMetrics) return;
-    // Skip first load (no previous reference)
-    if (prevMetrics.last_block_height === undefined || prevMetrics.last_block_height === null) return;
+    // Skip if previous had no real block height (first load, container restart, etc.)
+    if (!prevMetrics.last_block_height) return;
     // No change
     if (metrics.last_block_height === prevMetrics.last_block_height) return;
 
