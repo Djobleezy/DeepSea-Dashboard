@@ -5,6 +5,7 @@ import type { DashboardMetrics, WorkerSummary, Notification, Theme } from '../ty
 interface ChartPoint {
   label: string;
   value: number;
+  ts: number;
 }
 
 interface AppState {
@@ -54,10 +55,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   chartHydrated: false,
   addChartPoint: (hr60s, hr3hr) =>
     set((s) => {
-      const ts = new Date().toLocaleTimeString();
+      const ts = Date.now();
+      const label = new Date(ts).toLocaleTimeString();
       return {
-        chartData60s: [...s.chartData60s.slice(-59), { label: ts, value: hr60s }],
-        chartData3hr: [...s.chartData3hr.slice(-59), { label: ts, value: hr3hr }],
+        chartData60s: [...s.chartData60s.slice(-59), { label, value: hr60s, ts }],
+        chartData3hr: [...s.chartData3hr.slice(-59), { label, value: hr3hr, ts }],
       };
     }),
   hydrateChart: (points) =>
@@ -65,15 +67,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       const data60s = points.map((p) => ({
         label: new Date(p.timestamp * 1000).toLocaleTimeString(),
         value: p.hashrate_60sec,
+        ts: p.timestamp * 1000,
       }));
       const data3hr = points.map((p) => ({
         label: new Date(p.timestamp * 1000).toLocaleTimeString(),
         value: p.hashrate_3hr,
+        ts: p.timestamp * 1000,
       }));
+
+      const mergeByTimestamp = (historical: ChartPoint[], live: ChartPoint[]) => {
+        const merged = new Map<string, ChartPoint>();
+        [...historical, ...live].forEach((point) => {
+          const key = `ts:${Math.floor(point.ts / 1000)}`;
+          merged.set(key, point);
+        });
+        return Array.from(merged.values())
+          .sort((a, b) => a.ts - b.ts)
+          .slice(-60);
+      };
+
       return {
-        // Keep any points already received via SSE/polling and prepend hydrated history.
-        chartData60s: [...data60s, ...s.chartData60s].slice(-60),
-        chartData3hr: [...data3hr, ...s.chartData3hr].slice(-60),
+        // Merge hydrated history with any already-received live points.
+        chartData60s: mergeByTimestamp(data60s, s.chartData60s),
+        chartData3hr: mergeByTimestamp(data3hr, s.chartData3hr),
         chartHydrated: true,
       };
     }),
