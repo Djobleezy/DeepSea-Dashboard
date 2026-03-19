@@ -187,6 +187,21 @@ export const Layout: React.FC<Props> = ({ children }) => {
         }}
       >
         <span>DEEPSEA DASHBOARD v2.0 — OCEAN.XYZ MINING MONITOR</span>
+        <a
+          href="https://x.com/DJObleezy"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--primary)',
+            textDecoration: 'none',
+            textShadow: '0 0 6px var(--primary-glow)',
+            fontFamily: 'var(--font-vt323)',
+            fontSize: '13px',
+            letterSpacing: '1px',
+          }}
+        >
+          MADE BY @DJO₿LEEZY
+        </a>
         <span style={{ color: sseConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
           {sseConnected ? '● LIVE' : '○ CONNECTING'}
         </span>

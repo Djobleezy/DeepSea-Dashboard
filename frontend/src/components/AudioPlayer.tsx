@@ -18,15 +18,15 @@ import type { Theme } from '../types';
 
 const PLAYLISTS: Record<Theme, string[]> = {
   bitcoin: [
-    '/static/audio/bitcoin.mp3',
-    '/static/audio/bitcoin1.mp3',
-    '/static/audio/bitcoin2.mp3',
+    '/audio/bitcoin.mp3',
+    '/audio/bitcoin1.mp3',
+    '/audio/bitcoin2.mp3',
   ],
-  deepsea: ['/static/audio/ocean.mp3'],
+  deepsea: ['/audio/ocean.mp3'],
   matrix: [
-    '/static/audio/matrix.mp3',
-    '/static/audio/matrix1.mp3',
-    '/static/audio/matrix2.mp3',
+    '/audio/matrix.mp3',
+    '/audio/matrix1.mp3',
+    '/audio/matrix2.mp3',
   ],
 };
 
@@ -280,25 +280,63 @@ export const AudioPlayer: React.FC = () => {
       </button>
 
       {/* Volume slider */}
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={muted ? 0 : volume}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          setVolume(v);
-          if (muted && v > 0) setMuted(false);
-        }}
-        style={{
-          width: '60px',
-          accentColor: 'var(--primary)',
-          cursor: 'pointer',
-          opacity: muted ? 0.4 : 1,
-        }}
-        title={`Volume: ${Math.round(volume * 100)}%`}
-      />
+      <div style={{ position: 'relative', width: '60px', height: '20px', display: 'flex', alignItems: 'center' }}>
+        <style>{`
+          .audio-vol::-webkit-slider-runnable-track {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+          }
+          .audio-vol::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 6px var(--primary-glow);
+            cursor: pointer;
+            margin-top: -4px;
+          }
+          .audio-vol::-moz-range-track {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+          }
+          .audio-vol::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 6px var(--primary-glow);
+            border: none;
+            cursor: pointer;
+          }
+        `}</style>
+        <input
+          className="audio-vol"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={muted ? 0 : volume}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            setVolume(v);
+            if (muted && v > 0) setMuted(false);
+          }}
+          style={{
+            width: '100%',
+            WebkitAppearance: 'none',
+            appearance: 'none' as any,
+            background: 'transparent',
+            cursor: 'pointer',
+            opacity: muted ? 0.4 : 1,
+            margin: 0,
+            padding: 0,
+          }}
+          title={`Volume: ${Math.round(volume * 100)}%`}
+        />
+      </div>
     </div>
   );
 };
