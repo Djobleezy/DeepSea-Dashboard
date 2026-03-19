@@ -1,11 +1,16 @@
 """Config GET/POST and timezone list endpoints."""
 
+import logging
+
 import pytz
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 
+from app import background
 from app.config import load_config, save_config
 from app.models import AppConfig, ConfigUpdate
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,6 +33,12 @@ async def get_config():
 async def update_config(payload: ConfigUpdate):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await run_in_threadpool(save_config, update)
+
+    try:
+        await background.trigger_refresh()
+    except Exception as e:
+        _log.warning("Config refresh failed after save: %s", e)
+
     return await get_config()
 
 

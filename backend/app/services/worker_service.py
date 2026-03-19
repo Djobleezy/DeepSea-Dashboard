@@ -77,6 +77,7 @@ def sort_workers(
         "name": lambda w: w.get("name", ""),
         "status": lambda w: w.get("status", ""),
         "hashrate": lambda w: float(w.get("hashrate_3hr") or 0),
+        "hashrate_3hr": lambda w: float(w.get("hashrate_3hr") or 0),
         "hashrate_60sec": lambda w: float(w.get("hashrate_60sec") or 0),
         "earnings": lambda w: float(w.get("earnings") or 0),
         "efficiency": lambda w: float(w.get("efficiency") or 0),

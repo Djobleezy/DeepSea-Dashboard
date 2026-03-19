@@ -28,6 +28,7 @@ _subscribers: list[asyncio.Queue] = []
 _cache_scope: Optional[str] = None
 
 _client: Optional[OceanClient] = None
+_refresh_lock = asyncio.Lock()
 
 
 def get_uptime() -> float:
@@ -89,6 +90,13 @@ async def _clear_runtime_state(previous_wallet: str | None = None) -> None:
 async def refresh_once(db: aiosqlite.Connection) -> None:
     global _last_refresh, _current_metrics, _current_workers, _client, _cache_scope
 
+    async with _refresh_lock:
+        await _refresh_once_locked(db)
+
+
+async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
+    global _last_refresh, _current_metrics, _current_workers, _client, _cache_scope
+
     wallet = get_wallet().strip()
     if not wallet:
         await _clear_runtime_state(_cache_scope)
@@ -142,6 +150,15 @@ async def refresh_once(db: aiosqlite.Connection) -> None:
             _broadcast({"type": "workers", "data": _current_workers})
     except Exception as e:
         _log.error("Worker refresh error: %s", e)
+
+
+async def trigger_refresh() -> None:
+    """Run an on-demand refresh outside the normal scheduler loop."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        await _configure_connection(db)
+        await refresh_once(db)
 
 
 async def background_loop() -> None:

@@ -5,6 +5,8 @@ import pytest_asyncio
 import aiosqlite
 
 from app.db import (
+    clear_all_notifications,
+    clear_read_notifications,
     create_notification,
     delete_notification,
     list_notifications,
@@ -88,3 +90,36 @@ async def test_cannot_delete_block_notification(db):
     assert result is False
     rows = await list_notifications(db)
     assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_clear_read_preserves_unread_and_block_notifications(db):
+    unread = await create_notification(db, "keep me", "system", "info")
+    read_delete = await create_notification(db, "delete me", "system", "info")
+    read_block = await create_notification(db, "keep block", "block", "success", is_block=True)
+
+    await mark_notification_read(db, read_delete["id"])
+    await mark_notification_read(db, read_block["id"])
+
+    cleared = await clear_read_notifications(db)
+    assert cleared == 1
+
+    rows = await list_notifications(db)
+    ids = {row["id"] for row in rows}
+    assert unread["id"] in ids
+    assert read_block["id"] in ids
+    assert read_delete["id"] not in ids
+
+
+@pytest.mark.asyncio
+async def test_clear_all_preserves_block_notifications(db):
+    normal = await create_notification(db, "normal", "system", "info")
+    block = await create_notification(db, "block", "block", "success", is_block=True)
+
+    cleared = await clear_all_notifications(db)
+    assert cleared == 1
+
+    rows = await list_notifications(db)
+    ids = {row["id"] for row in rows}
+    assert block["id"] in ids
+    assert normal["id"] not in ids
