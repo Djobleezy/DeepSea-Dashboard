@@ -1,30 +1,60 @@
 "use strict";
 
 /**
- * ArrowIndicator - A clean implementation for managing metric value change indicators
+ * ArrowIndicator - Metric change indicators for the dashboard
  * 
- * This module provides a simple, self-contained system for managing arrow indicators
- * that show whether metric values have increased, decreased, or remained stable
- * between refreshes.
+ * Shows arrows when metrics change meaningfully between refreshes.
+ * Uses per-metric thresholds so hashrate noise doesn't trigger,
+ * but real moves do. Arrows auto-expire after 60 seconds.
  */
 class ArrowIndicator {
     constructor() {
         this.previousMetrics = {};
         this.arrowStates = {};
-        this.changeThreshold = 0.00001;
-        this.debug = false;
+        this.arrowTimestamps = {};  // When each arrow was set
+        this.ARROW_TTL_MS = 60000; // Arrows expire after 60s
 
-        // Load saved state immediately
+        // Per-metric thresholds (% change required to show arrow)
+        // Higher for noisy metrics, lower for stable ones
+        this.thresholds = {
+            // Hashrates fluctuate constantly — only show on real moves
+            hashrate_60sec:    0.03,   // 3%
+            hashrate_10min:    0.02,   // 2%
+            hashrate_3hr:      0.01,   // 1%
+            hashrate_24hr:     0.005,  // 0.5%
+            pool_total_hashrate: 0.01, // 1%
+            network_hashrate:  0.005,  // 0.5%
+
+            // Price/earnings — meaningful changes matter
+            btc_price:         0.005,  // 0.5%
+            daily_revenue:     0.02,   // 2%
+            daily_power_cost:  0.02,   // 2%
+            daily_profit_usd:  0.02,   // 2%
+            monthly_profit_usd: 0.02,  // 2%
+
+            // Sats earnings
+            daily_mined_sats:  0.02,   // 2%
+            monthly_mined_sats: 0.02,  // 2%
+            estimated_earnings_per_day_sats: 0.02,
+            estimated_earnings_next_block_sats: 0.02,
+            estimated_rewards_in_window_sats: 0.02,
+            unpaid_earnings:   0.005,  // 0.5%
+
+            // Discrete values — any real change
+            block_number:      0,      // Always show (integer jumps)
+            difficulty:        0.001,  // 0.1%
+            workers_hashing:   0,      // Always show (integer)
+        };
+        this.defaultThreshold = 0.01; // 1% default
+
         this.loadFromStorage();
 
-        // DOM ready handling
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.initializeDOM());
         } else {
             setTimeout(() => this.initializeDOM(), 100);
         }
 
-        // Handle tab visibility changes
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
                 this.loadFromStorage();
@@ -32,156 +62,96 @@ class ArrowIndicator {
             }
         });
 
-        // Handle storage changes for cross-tab sync
         window.addEventListener('storage', this.handleStorageEvent.bind(this));
+
+        // Periodically expire stale arrows
+        setInterval(() => this.expireStaleArrows(), 10000);
     }
 
     initializeDOM() {
-        // First attempt to apply arrows
         this.forceApplyArrows();
-
-        // Set up a detection system to find indicator elements
-        this.detectIndicatorElements();
-    }
-
-    detectIndicatorElements() {
-        // Scan the DOM for all elements that match our indicator pattern
-        const indicatorElements = {};
-
-        // Look for elements with IDs starting with "indicator_"
-        const elements = document.querySelectorAll('[id^="indicator_"]');
-        elements.forEach(element => {
-            const key = element.id.replace('indicator_', '');
-            indicatorElements[key] = element;
-        });
-
-        // Apply arrows to the found elements
-        this.applyArrowsToFoundElements(indicatorElements);
-
-        // Set up a MutationObserver to catch dynamically added elements
         this.setupMutationObserver();
-
-        // Schedule additional attempts with increasing delays
         [500, 1000, 2000].forEach(delay => {
             setTimeout(() => this.forceApplyArrows(), delay);
         });
     }
 
     setupMutationObserver() {
-        // Watch for changes to the DOM that might add indicator elements
         const observer = new MutationObserver(mutations => {
-            let newElementsFound = false;
-
-            mutations.forEach(mutation => {
-                if (mutation.type === 'childList' && mutation.addedNodes.length) {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === 1) { // Element node
-                            // Check the node itself
-                            if (node.id && node.id.startsWith('indicator_')) {
-                                newElementsFound = true;
-                            }
-
-                            // Check children of the node
-                            const childIndicators = node.querySelectorAll('[id^="indicator_"]');
-                            if (childIndicators.length) {
-                                newElementsFound = true;
-                            }
+            let found = false;
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === 1 && (
+                            (node.id && node.id.startsWith('indicator_')) ||
+                            node.querySelector?.('[id^="indicator_"]')
+                        )) {
+                            found = true;
+                            break;
                         }
-                    });
+                    }
                 }
-            });
-
-            if (newElementsFound) {
-                this.forceApplyArrows();
+                if (found) break;
             }
+            if (found) this.forceApplyArrows();
         });
-
-        // Start observing
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 
     forceApplyArrows() {
-        let applied = 0;
-        let missing = 0;
-
-        // Apply arrows to all indicators we know about
-        Object.keys(this.arrowStates).forEach(key => {
-            const element = document.getElementById(`indicator_${key}`);
-            if (element) {
-                // Double-check if the element is visible
-                const arrowValue = this.arrowStates[key] || "";
-
-                // Use direct DOM manipulation instead of innerHTML for better reliability
-                if (arrowValue) {
-                    // Clear existing content
-                    while (element.firstChild) {
-                        element.removeChild(element.firstChild);
-                    }
-
-                    // Create the new icon element
-                    const tmpDiv = document.createElement('div');
-                    tmpDiv.innerHTML = arrowValue;
-                    const iconElement = tmpDiv.firstChild;
-
-                    // Make the arrow more visible
-                    if (iconElement) {
-                        element.appendChild(iconElement);
-
-                        // Force the arrow to be visible
-                        iconElement.style.display = "inline-block";
-                    }
-                }
-
-                applied++;
-            } else {
-                missing++;
+        const now = Date.now();
+        for (const key of Object.keys(this.arrowStates)) {
+            // Skip expired arrows
+            if (this.arrowTimestamps[key] && (now - this.arrowTimestamps[key]) > this.ARROW_TTL_MS) {
+                this.arrowStates[key] = "";
+                continue;
             }
-        });
 
-        return applied;
+            const element = document.getElementById(`indicator_${key}`);
+            if (!element) continue;
+
+            const html = this.arrowStates[key] || "";
+            if (html) {
+                element.innerHTML = html;
+                const icon = element.querySelector('i');
+                if (icon) icon.style.display = "inline-block";
+            } else {
+                element.innerHTML = "";
+            }
+        }
     }
 
-    applyArrowsToFoundElements(elements) {
-        let applied = 0;
+    expireStaleArrows() {
+        const now = Date.now();
+        let changed = false;
+        for (const key of Object.keys(this.arrowStates)) {
+            if (this.arrowStates[key] && this.arrowTimestamps[key] &&
+                (now - this.arrowTimestamps[key]) > this.ARROW_TTL_MS) {
+                this.arrowStates[key] = "";
+                changed = true;
 
-        Object.keys(elements).forEach(key => {
-            if (this.arrowStates[key]) {
-                const element = elements[key];
-                element.innerHTML = this.arrowStates[key];
-                applied++;
+                // Clear the DOM element
+                const el = document.getElementById(`indicator_${key}`);
+                if (el) el.innerHTML = "";
             }
-        });
+        }
+        if (changed) this.saveToStorage();
     }
 
     updateIndicators(newMetrics, forceReset = false) {
         if (!newMetrics) return this.arrowStates;
 
-        // Define metrics that should have indicators
-        const metricKeys = [
-            "pool_total_hashrate", "hashrate_24hr", "hashrate_3hr", "hashrate_10min",
-            "hashrate_60sec", "block_number", "btc_price", "network_hashrate",
-            "difficulty", "daily_revenue", "daily_power_cost", "daily_profit_usd",
-            "monthly_profit_usd", "daily_mined_sats", "monthly_mined_sats", "unpaid_earnings",
-            "estimated_earnings_per_day_sats", "estimated_earnings_next_block_sats",
-            "estimated_rewards_in_window_sats", "workers_hashing"
-        ];
+        const metricKeys = Object.keys(this.thresholds);
 
-        // Clear all arrows if requested
         if (forceReset) {
             metricKeys.forEach(key => {
                 this.arrowStates[key] = "";
+                delete this.arrowTimestamps[key];
             });
         }
 
-        // Current theme affects arrow colors
-        const theme = getCurrentTheme();
-        const upArrowColor = THEME.SHARED.GREEN;
-        const downArrowColor = THEME.SHARED.RED;
+        const now = Date.now();
 
-        // Get normalized values and compare with previous metrics
         for (const key of metricKeys) {
             if (newMetrics[key] === undefined) continue;
 
@@ -190,116 +160,104 @@ class ArrowIndicator {
 
             if (this.previousMetrics[key] !== undefined) {
                 const prevValue = this.previousMetrics[key];
+                const threshold = this.thresholds[key] ?? this.defaultThreshold;
 
-                if (newValue > prevValue * (1 + this.changeThreshold)) {
-                    const upArrow =
-                        "<i class='arrow chevron fa-solid fa-angle-double-up bounce-up' " +
-                        "style='color: #00ff00; display: inline-block !important;'></i>";
-                    this.arrowStates[key] = upArrow;
-                } else if (newValue < prevValue * (1 - this.changeThreshold)) {
-                    const downArrow =
-                        "<i class='arrow chevron fa-solid fa-angle-double-down bounce-down' " +
-                        "style='color: #ff0000; position: relative; top: -2px; display: inline-block !important;'></i>";
-                    this.arrowStates[key] = downArrow;
+                // Skip if no meaningful change
+                if (prevValue === 0 && newValue === 0) continue;
+
+                const pctChange = prevValue !== 0
+                    ? Math.abs((newValue - prevValue) / prevValue)
+                    : (newValue !== 0 ? 1 : 0);
+
+                if (pctChange > threshold) {
+                    if (newValue > prevValue) {
+                        // Single chevron for small moves, double for big moves
+                        const big = pctChange > threshold * 3;
+                        const icon = big ? 'fa-angle-double-up' : 'fa-angle-up';
+                        const anim = big ? 'bounce-up' : '';
+                        this.arrowStates[key] =
+                            `<i class='arrow chevron fa-solid ${icon} ${anim}' ` +
+                            `style='color: #00ff00; display: inline-block !important;'></i>`;
+                    } else {
+                        const big = pctChange > threshold * 3;
+                        const icon = big ? 'fa-angle-double-down' : 'fa-angle-down';
+                        const anim = big ? 'bounce-down' : '';
+                        this.arrowStates[key] =
+                            `<i class='arrow chevron fa-solid ${icon} ${anim}' ` +
+                            `style='color: #ff0000; display: inline-block !important;'></i>`;
+                    }
+                    this.arrowTimestamps[key] = now;
                 }
+                // If change is below threshold, keep previous arrow (it'll expire via TTL)
             }
 
             this.previousMetrics[key] = newValue;
         }
 
-        // Apply arrows to DOM
         this.forceApplyArrows();
-
-        // Save to localStorage for persistence
         this.saveToStorage();
-
         return this.arrowStates;
     }
 
-    // Get a normalized value for a metric to ensure consistent comparisons
     getNormalizedValue(metrics, key) {
         const value = parseFloat(metrics[key]);
         if (isNaN(value)) return null;
 
-        // Special handling for hashrate values to normalize units
-        if (key.includes('hashrate')) {
+        if (key.includes('hashrate') && window.normalizeHashrate) {
             const unit = metrics[key + '_unit'] || 'th/s';
-            return this.normalizeHashrate(value, unit);
+            return window.normalizeHashrate(value, unit);
         }
-
         return value;
     }
 
-    // Normalize hashrate to a common unit (TH/s)
-    normalizeHashrate(value, unit) {
-        // Use the enhanced global normalizeHashrate function
-        return window.normalizeHashrate(value, unit);
-    }
-
-    // Save current state to localStorage
     saveToStorage() {
         try {
-            // Save arrow states
             localStorage.setItem('dashboardArrows', JSON.stringify(this.arrowStates));
-
-            // Save previous metrics for comparison after page reload
+            localStorage.setItem('dashboardArrowTimestamps', JSON.stringify(this.arrowTimestamps));
             localStorage.setItem('dashboardPreviousMetrics', JSON.stringify(this.previousMetrics));
         } catch (e) {
-            console.error("Error saving arrow indicators to localStorage:", e);
+            console.error("Error saving arrow indicators:", e);
         }
     }
 
-    // Load state from localStorage
     loadFromStorage() {
         try {
-            // Load arrow states
             const savedArrows = localStorage.getItem('dashboardArrows');
-            if (savedArrows) {
-                this.arrowStates = JSON.parse(savedArrows);
-            }
+            if (savedArrows) this.arrowStates = JSON.parse(savedArrows);
 
-            // Load previous metrics
+            const savedTimestamps = localStorage.getItem('dashboardArrowTimestamps');
+            if (savedTimestamps) this.arrowTimestamps = JSON.parse(savedTimestamps);
+
             const savedMetrics = localStorage.getItem('dashboardPreviousMetrics');
-            if (savedMetrics) {
-                this.previousMetrics = JSON.parse(savedMetrics);
-            }
+            if (savedMetrics) this.previousMetrics = JSON.parse(savedMetrics);
         } catch (e) {
-            console.error("Error loading arrow indicators from localStorage:", e);
-            // On error, reset to defaults
             this.arrowStates = {};
+            this.arrowTimestamps = {};
             this.previousMetrics = {};
         }
     }
 
-    // Handle storage events for cross-tab synchronization
     handleStorageEvent(event) {
         if (event.key === 'dashboardArrows') {
             try {
-                const newArrows = JSON.parse(event.newValue);
-                this.arrowStates = newArrows;
+                this.arrowStates = JSON.parse(event.newValue);
                 this.forceApplyArrows();
-            } catch (e) {
-                console.error("Error handling storage event:", e);
-            }
+            } catch (e) { /* ignore */ }
         }
     }
 
-    // Reset for new refresh cycle
     prepareForRefresh() {
-        Object.keys(this.arrowStates).forEach(key => {
-            this.arrowStates[key] = "";
-        });
-        this.forceApplyArrows();
+        // Don't clear arrows on refresh — let TTL handle expiry
+        // This prevents the flash of no-arrows between refreshes
     }
 
-    // Clear all indicators
     clearAll() {
         this.arrowStates = {};
+        this.arrowTimestamps = {};
         this.previousMetrics = {};
         this.forceApplyArrows();
         this.saveToStorage();
     }
 }
 
-// Create the singleton instance
 const arrowIndicator = new ArrowIndicator();
