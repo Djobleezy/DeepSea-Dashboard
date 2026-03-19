@@ -6,7 +6,7 @@
  * History stored in localStorage (max 100 entries).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DashboardMetrics } from '../types';
 
 const LS_KEY = 'deepsea_payout_history';
