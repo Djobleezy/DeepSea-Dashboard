@@ -582,7 +582,7 @@ def test_get_pool_stat_api(monkeypatch):
     monkeypatch.setattr(svc.session, "get", fake_get)
     data = svc.get_pool_stat_api()
 
-    assert data["workers_hashing"] == "5"
+    assert data["workers_hashing"] == 5
     assert data["pool_total_hashrate"] == 12000000.0  # 12 EH/s in TH/s
     assert data["pool_total_hashrate_unit"] == "th/s"
     assert data["network_difficulty"] == "145e12"

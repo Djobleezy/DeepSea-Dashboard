@@ -286,7 +286,7 @@ class NotificationService:
             ts = self._get_redis_value("last_payout_notification_ts")
             if ts:
                 self.last_payout_notification_time = datetime.fromisoformat(ts)
-                logging.info(f"[NotificationService] Loaded last_payout_notification_time")
+                logging.info("[NotificationService] Loaded last_payout_notification_time")
 
             wc = self._get_redis_value("last_worker_count")
             if wc:

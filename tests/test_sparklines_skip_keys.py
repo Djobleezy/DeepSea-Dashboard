@@ -1,31 +1,41 @@
-import ast
 import re
 from pathlib import Path
 
 
-def test_sparklines_skip_keys():
+def test_sparklines_allowlist():
+    """Verify sparklines only render for explicitly configured metrics."""
     js_path = Path('static/js/sparklines.js')
     content = js_path.read_text()
-    match = re.search(r"skipKeys = new Set\((\[[^\]]*\])\)", content)
-    assert match, 'skipKeys set not found'
-    keys = ast.literal_eval(match.group(1))
-    required = [
+
+    # SPARKLINE_CONFIG is an object with nested objects — extract top-level keys
+    assert 'SPARKLINE_CONFIG' in content, 'SPARKLINE_CONFIG not found in sparklines.js'
+
+    # Extract keys: lines like "    pool_total_hashrate: {"
+    keys = re.findall(r"^\s+(\w+)\s*:\s*\{", content, re.MULTILINE)
+    assert len(keys) > 0, 'No metric keys found in SPARKLINE_CONFIG'
+
+    # These metrics should have sparklines
+    expected = [
+        'pool_total_hashrate',
+        'hashrate_24hr',
+        'btc_price',
+        'network_hashrate',
+        'daily_mined_sats',
+        'blocks_found',
+    ]
+    for key in expected:
+        assert key in keys, f'{key} missing from SPARKLINE_CONFIG'
+
+    # These metrics should NOT have sparklines
+    forbidden = [
+        'workers_hashing',
         'pool_fees_percentage',
-        'last_block',
         'est_time_to_payout',
-        'daily_revenue',
-        'monthly_mined_sats',
-        'estimated_earnings_per_day_sats',
-        'estimated_earnings_next_block_sats',
-        'estimated_rewards_in_window_sats',
-        'daily_power_cost',
-        'daily_profit_usd',
-        'monthly_profit_usd',
         'difficulty',
         'block_number',
-        'hashrate_3hr',
-        'hashrate_10min',
         'hashrate_60sec',
+        'hashrate_10min',
+        'hashrate_3hr',
     ]
-    for key in required:
-        assert key in keys
+    for key in forbidden:
+        assert key not in keys, f'{key} should not be in SPARKLINE_CONFIG'
