@@ -110,7 +110,10 @@ export const Boot: React.FC = () => {
               step="0.01"
               min="0"
               value={config.power_cost}
-              onChange={(e) => setConfig({ ...config, power_cost: parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setConfig({ ...config, power_cost: Number.isFinite(next) ? next : 0 });
+              }}
             />
           </div>
           <div>
@@ -120,7 +123,10 @@ export const Boot: React.FC = () => {
               step="10"
               min="0"
               value={config.power_usage}
-              onChange={(e) => setConfig({ ...config, power_usage: parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setConfig({ ...config, power_usage: Number.isFinite(next) ? next : 0 });
+              }}
             />
           </div>
           <div>
@@ -142,7 +148,10 @@ export const Boot: React.FC = () => {
               min="0"
               max="10"
               value={config.network_fee}
-              onChange={(e) => setConfig({ ...config, network_fee: parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setConfig({ ...config, network_fee: Number.isFinite(next) ? next : 0 });
+              }}
             />
           </div>
         </div>

@@ -35,13 +35,21 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   }, [load, pollMs]);
 
   const markRead = async (id: string) => {
-    await markNotificationRead(id);
-    await load();
+    try {
+      await markNotificationRead(id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to mark notification read');
+    }
   };
 
   const markAllReadFn = async () => {
-    await markAllRead();
-    await load();
+    try {
+      await markAllRead();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to mark all notifications read');
+    }
   };
 
   const deleteFn = async (id: string) => {
@@ -49,18 +57,26 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await deleteNotification(id);
       await load();
     } catch (e) {
-      console.warn('Cannot delete notification:', e);
+      setError(e instanceof Error ? e.message : 'Failed to delete notification');
     }
   };
 
   const clearRead = async () => {
-    await clearReadNotifications();
-    await load();
+    try {
+      await clearReadNotifications();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to clear read notifications');
+    }
   };
 
   const clearAll = async () => {
-    await clearAllNotifications();
-    await load();
+    try {
+      await clearAllNotifications();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to clear notifications');
+    }
   };
 
   return {

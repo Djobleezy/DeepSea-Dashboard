@@ -10,8 +10,6 @@ import type { Theme } from '../types';
 const THEME_KEY = 'theme';
 
 export function useCrossTabSync() {
-  const setTheme = useAppStore((s) => s.setTheme);
-
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (!e.key || e.newValue === null) return;
@@ -30,5 +28,5 @@ export function useCrossTabSync() {
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [setTheme]);
+  }, []);
 }

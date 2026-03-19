@@ -52,8 +52,9 @@ export const AudioPlayer: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement>(new Audio());
   const nextRef = useRef<HTMLAudioElement>(new Audio());
-  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crossfadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCrossfadingRef = useRef(false);
+  const trackIndexRef = useRef(0);
 
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(() => load('audioMuted', 'false') === 'true');
@@ -69,6 +70,10 @@ export const AudioPlayer: React.FC = () => {
   // Clamp track index whenever playlist changes (theme switch)
   const safeIndex = trackIndex % playlist.length;
 
+  useEffect(() => {
+    trackIndexRef.current = safeIndex;
+  }, [safeIndex]);
+
   // ── helpers ──────────────────────────────────────────────────────────────
   const loadTrack = useCallback(
     (el: HTMLAudioElement, idx: number) => {
@@ -79,7 +84,7 @@ export const AudioPlayer: React.FC = () => {
     [playlist, volume]
   );
 
-  const startCrossfade = useCallback(() => {
+  const startCrossfade = useCallback((nextIdx: number) => {
     if (isCrossfadingRef.current) return;
     isCrossfadingRef.current = true;
 
@@ -93,23 +98,30 @@ export const AudioPlayer: React.FC = () => {
     const stepMs = (CROSSFADE_DURATION * 1000) / steps;
     let step = 0;
 
-    const tick = setInterval(() => {
+    if (crossfadeIntervalRef.current) {
+      clearInterval(crossfadeIntervalRef.current);
+    }
+
+    crossfadeIntervalRef.current = setInterval(() => {
       step++;
       const pct = step / steps;
       cur.volume = Math.max(0, volume * (1 - pct));
       nxt.volume = Math.min(volume, volume * pct);
       if (step >= steps) {
-        clearInterval(tick);
+        if (crossfadeIntervalRef.current) {
+          clearInterval(crossfadeIntervalRef.current);
+          crossfadeIntervalRef.current = null;
+        }
         cur.pause();
         cur.src = nxt.src;
         cur.volume = volume;
         isCrossfadingRef.current = false;
-        // prepare next-next
-        const newIdx = (safeIndex + 2) % playlist.length;
-        loadTrack(nxt, newIdx);
+        // prepare following track
+        const followingIdx = (nextIdx + 1) % playlist.length;
+        loadTrack(nxt, followingIdx);
       }
     }, stepMs);
-  }, [volume, safeIndex, playlist, loadTrack]);
+  }, [volume, playlist, loadTrack]);
 
   // ── initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -121,10 +133,12 @@ export const AudioPlayer: React.FC = () => {
     // End-of-track handler
     const onEnded = () => {
       if (playlist.length === 1) return; // looping, won't fire
-      const nextIdx = (safeIndex + 1) % playlist.length;
+      const currentIdx = trackIndexRef.current;
+      const nextIdx = (currentIdx + 1) % playlist.length;
       setTrackIndex(nextIdx);
+      trackIndexRef.current = nextIdx;
       persist('audioTrackIndex', String(nextIdx));
-      startCrossfade();
+      startCrossfade(nextIdx);
     };
     cur.addEventListener('ended', onEnded);
 
@@ -136,6 +150,10 @@ export const AudioPlayer: React.FC = () => {
 
     return () => {
       cur.removeEventListener('ended', onEnded);
+      if (crossfadeIntervalRef.current) {
+        clearInterval(crossfadeIntervalRef.current);
+        crossfadeIntervalRef.current = null;
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally once on mount
@@ -147,6 +165,7 @@ export const AudioPlayer: React.FC = () => {
     cur.pause();
     const newIdx = 0;
     setTrackIndex(newIdx);
+    trackIndexRef.current = newIdx;
     loadTrack(cur, newIdx);
     loadTrack(nextRef.current, 1 % playlist.length);
     cur.loop = playlist.length === 1;
@@ -182,6 +201,7 @@ export const AudioPlayer: React.FC = () => {
   const prevTrack = useCallback(() => {
     const newIdx = (safeIndex - 1 + playlist.length) % playlist.length;
     setTrackIndex(newIdx);
+    trackIndexRef.current = newIdx;
     persist('audioTrackIndex', String(newIdx));
     const cur = audioRef.current;
     loadTrack(cur, newIdx);
@@ -192,6 +212,7 @@ export const AudioPlayer: React.FC = () => {
   const nextTrack = useCallback(() => {
     const newIdx = (safeIndex + 1) % playlist.length;
     setTrackIndex(newIdx);
+    trackIndexRef.current = newIdx;
     persist('audioTrackIndex', String(newIdx));
     const cur = audioRef.current;
     loadTrack(cur, newIdx);
