@@ -4,6 +4,8 @@ import { useAppStore } from '../stores/store';
 import { ThemeToggle } from './ThemeToggle';
 import { AudioPlayer } from './AudioPlayer';
 import { useTheme } from '../hooks/useTheme';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { EasterEgg } from './EasterEgg';
 
 const NAV_LINKS = [
   { to: '/dashboard', label: '◈ DASHBOARD' },
@@ -20,6 +22,7 @@ interface Props {
 
 export const Layout: React.FC<Props> = ({ children }) => {
   useTheme(); // apply theme on mount
+  useKeyboardShortcuts(); // Alt+1..5 navigation shortcuts
   const sseConnected = useAppStore((s) => s.sseConnected);
   const unreadCount = useAppStore((s) => s.unreadCount);
   const lastUpdated = useAppStore((s) => s.lastUpdated);
@@ -167,6 +170,9 @@ export const Layout: React.FC<Props> = ({ children }) => {
           {sseConnected ? '● LIVE' : '○ CONNECTING'}
         </span>
       </footer>
+
+      {/* Easter egg — keyboard/konami/whale effects */}
+      <EasterEgg />
     </div>
   );
 };

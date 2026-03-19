@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { BootSequence } from './components/BootSequence';
 import { Dashboard } from './pages/Dashboard';
@@ -58,8 +59,10 @@ export default function App() {
   }, [theme]);
 
   return (
-    <BrowserRouter>
-      <AppInner />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppInner />
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

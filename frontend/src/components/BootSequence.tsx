@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { getThemeQuote } from '../utils/themeQuotes';
+import { useAppStore } from '../stores/store';
 
 const BOOT_LINES = [
   'DEEPSEA DASHBOARD v2.0 — INITIALIZING',
@@ -15,6 +17,8 @@ interface Props {
 }
 
 export const BootSequence: React.FC<Props> = ({ onComplete }) => {
+  const theme = useAppStore((s) => s.theme);
+  const quote = useMemo(() => getThemeQuote(theme), [theme]);
   const [lines, setLines] = useState<string[]>([]);
   const [cursor, setCursor] = useState(true);
   const [done, setDone] = useState(false);
@@ -90,6 +94,24 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
           </div>
         ))}
       </div>
+
+      {/* Theme quote */}
+      {done && (
+        <div
+          style={{
+            marginTop: '32px',
+            maxWidth: '500px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12px',
+            color: 'var(--text-dim)',
+            textAlign: 'center',
+            fontStyle: 'italic',
+            opacity: 0.75,
+          }}
+        >
+          "{quote}"
+        </div>
+      )}
     </div>
   );
 };
