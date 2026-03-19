@@ -50,6 +50,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await markNotificationRead(id);
       await load();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to mark notification read');
     }
   };
@@ -59,6 +60,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await markAllRead();
       await load();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to mark all notifications read');
     }
   };
@@ -68,6 +70,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await deleteNotification(id);
       await load();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to delete notification');
     }
   };
@@ -77,6 +80,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await clearReadNotifications();
       await load();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to clear read notifications');
     }
   };
@@ -86,6 +90,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       await clearAllNotifications();
       await load();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to clear notifications');
     }
   };

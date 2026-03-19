@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
-import { HashrateChart } from '../components/HashrateChart';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { Sparkline } from '../components/Sparkline';
@@ -10,6 +9,10 @@ import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import type { DashboardMetrics } from '../types';
 
 // Rolling sparkline history (in-memory, survives re-renders but not full reload)
+const HashrateChart = lazy(() =>
+  import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
+);
+
 const MAX_HISTORY = 60;
 const hrHistory: number[] = [];
 const priceHistory: number[] = [];
@@ -140,12 +143,23 @@ export const Dashboard: React.FC = () => {
       {chartData60s.length > 1 && (
         <div className="card">
           <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
-          <HashrateChart
-            data60s={chartData60s}
-            data3hr={chartData3hr}
-            avg24hr={metrics.hashrate_24hr}
-            blockAnnotations={blockAnnotations}
-          />
+          <Suspense
+            fallback={
+              <div
+                className="text-center"
+                style={{ padding: '32px', color: 'var(--text-dim)', fontSize: '13px' }}
+              >
+                LOADING CHART...
+              </div>
+            }
+          >
+            <HashrateChart
+              data60s={chartData60s}
+              data3hr={chartData3hr}
+              avg24hr={metrics.hashrate_24hr}
+              blockAnnotations={blockAnnotations}
+            />
+          </Suspense>
         </div>
       )}
 

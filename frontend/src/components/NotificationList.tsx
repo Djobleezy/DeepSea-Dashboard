@@ -22,7 +22,7 @@ const CAT_LABELS: Record<string, string> = {
   system: 'SYS',
 };
 
-export const NotificationList: React.FC<Props> = ({
+export const NotificationList: React.FC<Props> = React.memo(({
   notifications,
   onMarkRead,
   onDelete,
@@ -108,4 +108,6 @@ export const NotificationList: React.FC<Props> = ({
       ))}
     </div>
   );
-};
+});
+
+NotificationList.displayName = 'NotificationList';

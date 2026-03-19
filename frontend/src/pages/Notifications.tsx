@@ -3,7 +3,9 @@ import { useNotifications } from '../hooks/useNotifications';
 import { NotificationList } from '../components/NotificationList';
 import type { NotificationCategory } from '../types';
 
-const CATEGORIES: { value: string; label: string }[] = [
+type NotificationFilter = NotificationCategory | 'all';
+
+const CATEGORIES: { value: NotificationFilter; label: string }[] = [
   { value: 'all', label: 'ALL' },
   { value: 'hashrate', label: 'HASH' },
   { value: 'block', label: 'BLOCK' },
@@ -13,7 +15,7 @@ const CATEGORIES: { value: string; label: string }[] = [
 ];
 
 export const Notifications: React.FC = () => {
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState<NotificationFilter>('all');
 
   const {
     notifications,
