@@ -104,13 +104,22 @@ export const MatrixRain: React.FC = () => {
     // -----------------------------------------------------------------------
     let cols: number;
     let rows: number;
+    let logicalWidth = 0;
+    let logicalHeight = 0;
     let columns: Column[] = [];
 
     function resize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      canvas!.width = w;
-      canvas!.height = h;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+      // HiDPI-safe sizing: keep CSS pixels for layout, scale backing store for sharp text.
+      canvas!.width = Math.max(1, Math.floor(w * dpr));
+      canvas!.height = Math.max(1, Math.floor(h * dpr));
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      logicalWidth = w;
+      logicalHeight = h;
 
       const newCols = Math.ceil(w / COLUMN_WIDTH);
       const newRows = Math.ceil(h / FONT_SIZE);
@@ -144,7 +153,7 @@ export const MatrixRain: React.FC = () => {
       // Fade overlay — paints a semi-transparent black over the whole canvas
       // to create the trailing effect. Lower alpha = longer trails.
       ctx.fillStyle = TRAIL_FADE;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
       ctx.font = `${FONT_SIZE}px "MS Gothic", "Noto Sans JP", monospace`;
       ctx.textBaseline = 'top';
