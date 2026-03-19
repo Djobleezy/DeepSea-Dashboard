@@ -60,14 +60,19 @@ class OceanClient:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
-    async def _get(self, url: str, timeout: int | None = None) -> Optional[httpx.Response]:
+    async def _get(
+        self,
+        url: str,
+        timeout: int | float | None = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> Optional[httpx.Response]:
         client = await self._get_client()
         max_attempts = 3
         req_timeout = timeout or self.timeout
 
         for attempt in range(1, max_attempts + 1):
             try:
-                resp = await client.get(url, timeout=req_timeout)
+                resp = await client.get(url, timeout=req_timeout, headers=headers)
 
                 # Transient upstream errors / rate limits: retry with backoff.
                 if resp.status_code in (429, 500, 502, 503, 504):
@@ -403,7 +408,7 @@ class OceanClient:
                 "workers_online": workers_online,
                 "workers_offline": workers_offline,
                 "total_earnings": 0.0,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(ZoneInfo("UTC")).isoformat(),
             }
         except Exception as e:
             _log.error("API worker parse error: %s", e)
@@ -411,18 +416,15 @@ class OceanClient:
 
     async def _get_worker_data_scrape(self) -> Optional[dict]:
         """Scrape worker data from ocean.xyz/stats/<wallet>."""
-        url = f"https://ocean.xyz/stats/{self.wallet}"
+        url = OCEAN_STATS_URL.format(wallet=self.wallet)
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; DeepSea/2.0)",
             "Accept": "text/html",
         }
-        client = await self._get_client()
-        try:
-            resp = await client.get(url, headers=headers, timeout=15)
-            if not resp.is_success:
-                return None
-        except Exception as e:
-            _log.error("Scrape request failed: %s", e)
+
+        resp = await self._get(url, timeout=15, headers=headers)
+        if resp is None:
+            _log.warning("Scrape fetch failed for wallet=%s", self.wallet)
             return None
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -433,10 +435,15 @@ class OceanClient:
         invalid = {"online", "offline", "status", "worker", "total"}
 
         table = soup.find("tbody", id="workers-tablerows")
-        if not table:
+        if table is None:
+            # Fallback selectors for minor Ocean DOM changes
+            table = soup.select_one("table#workers tbody") or soup.select_one("tbody")
+        if table is None:
+            _log.warning("Worker scrape table not found for wallet=%s", self.wallet)
             return None
 
-        for row in table.find_all("tr", class_="table-row"):
+        rows = table.find_all("tr", class_="table-row") or table.find_all("tr")
+        for row in rows:
             cells = row.find_all("td")
             if len(cells) < 3:
                 continue
@@ -459,7 +466,7 @@ class OceanClient:
                 parts = cells[3].get_text(strip=True).split()
                 if parts:
                     try:
-                        hr60 = float(parts[0])
+                        hr60 = float(parts[0].replace(",", ""))
                         hr60_unit = parts[1] if len(parts) > 1 else "TH/s"
                         hr60 = convert_to_ths(hr60, hr60_unit)
                         hr60_unit = "TH/s"
@@ -470,7 +477,7 @@ class OceanClient:
                 parts = cells[4].get_text(strip=True).split()
                 if parts:
                     try:
-                        hr3 = float(parts[0])
+                        hr3 = float(parts[0].replace(",", ""))
                         hr3_unit = parts[1] if len(parts) > 1 else "TH/s"
                         hr3 = convert_to_ths(hr3, hr3_unit)
                         hr3_unit = "TH/s"
@@ -505,7 +512,7 @@ class OceanClient:
             "workers_online": workers_online,
             "workers_offline": workers_offline,
             "total_earnings": 0.0,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(ZoneInfo("UTC")).isoformat(),
         }
 
     # ------------------------------------------------------------------

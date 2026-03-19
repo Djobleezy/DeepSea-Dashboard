@@ -8,7 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models import Block, BlocksResponse
 
@@ -101,6 +101,9 @@ async def get_blocks(
             page_size=page_size,
             total=len(blocks),
         )
+    except httpx.HTTPError as e:
+        _log.warning("Failed to fetch blocks from mempool.space: %s", e)
+        raise HTTPException(status_code=502, detail="Failed to fetch blocks from upstream")
     except Exception as e:
-        _log.error("Failed to fetch blocks from mempool.space: %s", e)
-        return BlocksResponse()
+        _log.exception("Unexpected blocks endpoint error: %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error")

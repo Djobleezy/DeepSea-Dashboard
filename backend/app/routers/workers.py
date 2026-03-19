@@ -1,5 +1,7 @@
 """Workers endpoints."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Query
 
 from app import background
@@ -32,8 +34,10 @@ def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
 
 @router.get("/workers", response_model=WorkerSummary)
 async def get_workers(
-    status: str = Query(default="all", description="Filter: all|online|offline"),
-    sort_by: str = Query(default="name", description="Sort column"),
+    status: Literal["all", "online", "offline"] = Query(default="all", description="Filter: all|online|offline"),
+    sort_by: Literal["name", "status", "hashrate", "hashrate_60sec", "earnings", "efficiency", "last_share"] = Query(
+        default="name", description="Sort column"
+    ),
     descending: bool = Query(default=False),
 ):
     cached = await cache_get(background.get_cache_key("workers"))
@@ -54,13 +58,17 @@ async def get_workers(
     workers = filter_workers(workers, status)
     workers = sort_workers(workers, sort_by, descending)
 
+    workers_online = sum(1 for w in workers if w.get("status") == "online")
+    workers_offline = sum(1 for w in workers if w.get("status") == "offline")
+    total_hashrate = sum(float(w.get("hashrate_3hr", 0) or 0) for w in workers)
+
     return WorkerSummary(
         workers=workers,
-        total_hashrate=cached.get("total_hashrate", 0.0),
+        total_hashrate=total_hashrate,
         hashrate_unit=cached.get("hashrate_unit", "TH/s"),
-        workers_total=cached.get("workers_total", len(workers)),
-        workers_online=sum(1 for w in workers if w.get("status") == "online"),
-        workers_offline=sum(1 for w in workers if w.get("status") == "offline"),
+        workers_total=len(workers),
+        workers_online=workers_online,
+        workers_offline=workers_offline,
         total_earnings=unpaid_btc,
         timestamp=cached.get("timestamp", ""),
     )
