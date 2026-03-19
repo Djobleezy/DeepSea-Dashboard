@@ -4,30 +4,14 @@ import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
-import { Sparkline } from '../components/Sparkline';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import type { DashboardMetrics } from '../types';
 
-// Rolling sparkline history (in-memory, survives re-renders but not full reload)
 const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
 );
-
-const MAX_HISTORY = 60;
-const hrHistory: number[] = [];
-const priceHistory: number[] = [];
-const satsHistory: number[] = [];
-
-function addHistory(metrics: DashboardMetrics) {
-  hrHistory.push(metrics.hashrate_60sec);
-  priceHistory.push(metrics.btc_price);
-  satsHistory.push(metrics.daily_mined_sats);
-  if (hrHistory.length > MAX_HISTORY) hrHistory.shift();
-  if (priceHistory.length > MAX_HISTORY) priceHistory.shift();
-  if (satsHistory.length > MAX_HISTORY) satsHistory.shift();
-}
 
 // DATUM Gateway: pool_fees between 0.9% and 1.3% = connected via DATUM protocol
 function isDatumConnected(poolFeesPct: number): boolean {
@@ -59,7 +43,6 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (!metrics) return;
-    addHistory(metrics);
     // Skip chart points when hashrate is zero — likely a transient API failure,
     // not a real drop.  Avoids visual dips to 0 on the chart.
     if (metrics.hashrate_60sec > 0 || metrics.hashrate_3hr > 0) {
@@ -131,9 +114,7 @@ export const Dashboard: React.FC = () => {
           current={metrics.hashrate_60sec}
           previous={prevMetrics?.hashrate_60sec}
           large
-        >
-          <Sparkline data={[...hrHistory]} width={120} height={24} />
-        </MetricCard>
+        />
         <MetricCard
           label="10 MIN"
           value={hr10.display}
@@ -201,9 +182,7 @@ export const Dashboard: React.FC = () => {
           current={metrics.btc_price}
           previous={prevMetrics?.btc_price}
           large
-        >
-          <Sparkline data={[...priceHistory]} width={120} height={24} />
-        </MetricCard>
+        />
         <MetricCard
           label="DAILY MINED"
           value={fmtSats(metrics.daily_mined_sats)}
@@ -211,9 +190,7 @@ export const Dashboard: React.FC = () => {
           current={metrics.daily_mined_sats}
           previous={prevMetrics?.daily_mined_sats}
           large
-        >
-          <Sparkline data={[...satsHistory]} width={120} height={24} />
-        </MetricCard>
+        />
         <MetricCard
           label="UNPAID EARNINGS"
           value={`${(metrics.unpaid_earnings * 1e8).toFixed(0)}`}
