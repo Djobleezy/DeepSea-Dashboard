@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchMetrics } from '../api/client';
 import { useAppStore } from '../stores/store';
 
@@ -7,9 +7,9 @@ export function useMetrics(pollMs = 60000) {
   const metrics = useAppStore((s) => s.metrics);
   const [loading, setLoading] = useState(!metrics);
   const [error, setError] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const m = await fetchMetrics();
       setMetrics(m);
@@ -19,7 +19,7 @@ export function useMetrics(pollMs = 60000) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [setMetrics]);
 
   useEffect(() => {
     load();
@@ -27,8 +27,7 @@ export function useMetrics(pollMs = 60000) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pollMs]);
+  }, [load, pollMs]);
 
   return { metrics, loading, error, refresh: load };
 }

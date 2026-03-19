@@ -5,7 +5,7 @@
  * Ported from v1 block-annotations.js, rewritten as a typed React hook.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/store';
 
 const STORAGE_KEY = 'blockAnnotations_v2';
@@ -13,6 +13,14 @@ const DEFAULT_WINDOW_MIN = 180;
 const MAX_ENTRIES = 100;
 
 /** Show a celebratory toast when a new block is found */
+type ClearBlockAnnotationsFn = () => void;
+
+declare global {
+  interface Window {
+    clearBlockAnnotations?: ClearBlockAnnotationsFn;
+  }
+}
+
 function showBlockToast(blockHeight: number) {
   // Remove existing toast if any
   const existing = document.getElementById('block-toast');
@@ -20,7 +28,7 @@ function showBlockToast(blockHeight: number) {
 
   const toast = document.createElement('div');
   toast.id = 'block-toast';
-  toast.innerHTML = `⛏️ NEW BLOCK FOUND: #${blockHeight.toLocaleString()}`;
+  toast.textContent = `⛏️ NEW BLOCK FOUND: #${blockHeight.toLocaleString()}`;
   Object.assign(toast.style, {
     position: 'fixed',
     top: '70px',
@@ -119,13 +127,12 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
   const [annotations, setAnnotations] = useState<AnnotationEntry[]>([]);
   const initialized = useRef(false);
 
-  // Load persisted annotations on mount
+  // Load persisted annotations on mount (and when annotation window changes)
   useEffect(() => {
     const loaded = loadFromStorage(windowMinutes);
     setAnnotations(loaded);
     initialized.current = true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [windowMinutes]);
 
   // Detect new block events when last_block_height changes
   useEffect(() => {
@@ -160,27 +167,25 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
       saveToStorage(updated);
       return updated;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metrics?.last_block_height]);
+  }, [metrics, prevMetrics, windowMinutes]);
+
+  const clear = useCallback(() => {
+    setAnnotations([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.error('[BlockAnnotations] Error clearing storage', e);
+    }
+    console.log('[BlockAnnotations] Annotations cleared');
+  }, []);
 
   // Expose clearBlockAnnotations() globally (Alt+W in keyboard shortcuts)
   useEffect(() => {
-    const clear = () => {
-      setAnnotations([]);
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (e) {
-        console.error('[BlockAnnotations] Error clearing storage', e);
-      }
-      console.log('[BlockAnnotations] Annotations cleared');
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).clearBlockAnnotations = clear;
+    window.clearBlockAnnotations = clear;
     return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (window as any).clearBlockAnnotations;
+      delete window.clearBlockAnnotations;
     };
-  }, []);
+  }, [clear]);
 
   return { annotations };
 }

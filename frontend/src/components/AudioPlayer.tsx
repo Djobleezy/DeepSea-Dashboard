@@ -155,8 +155,7 @@ export const AudioPlayer: React.FC = () => {
         crossfadeIntervalRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally once on mount
+  }, [loadTrack, playlist.length, safeIndex, startCrossfade]);
 
   // ── theme change → switch playlist ───────────────────────────────────────
   useEffect(() => {
@@ -172,8 +171,7 @@ export const AudioPlayer: React.FC = () => {
     if (wasPlaying) {
       cur.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
+  }, [loadTrack, playing, playlist.length, theme]);
 
   // ── volume sync ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -297,6 +295,29 @@ export const AudioPlayer: React.FC = () => {
           position: 'relative',
           opacity: muted ? 0.4 : 1,
           touchAction: 'none',
+        }}
+        onKeyDown={(e) => {
+          const step = e.shiftKey ? 0.1 : 0.05;
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            setVolume((v) => Math.max(0, v - step));
+            setMuted(false);
+          }
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            setVolume((v) => Math.min(1, v + step));
+            setMuted(false);
+          }
+          if (e.key === 'Home') {
+            e.preventDefault();
+            setVolume(0);
+            setMuted(true);
+          }
+          if (e.key === 'End') {
+            e.preventDefault();
+            setVolume(1);
+            setMuted(false);
+          }
         }}
         onPointerDown={(e) => {
           const el = e.currentTarget;

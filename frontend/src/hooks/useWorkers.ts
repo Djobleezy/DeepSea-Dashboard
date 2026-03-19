@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchWorkers } from '../api/client';
 import { useAppStore } from '../stores/store';
 
@@ -13,7 +13,7 @@ export function useWorkers(
   const [loading, setLoading] = useState(!workers);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const w = await fetchWorkers(status, sortBy, descending);
       setWorkers(w);
@@ -23,14 +23,13 @@ export function useWorkers(
     } finally {
       setLoading(false);
     }
-  }
+  }, [descending, setWorkers, sortBy, status]);
 
   useEffect(() => {
     load();
     const timer = setInterval(load, pollMs);
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, sortBy, descending, pollMs]);
+  }, [load, pollMs]);
 
   return { workers, loading, error, refresh: load };
 }
