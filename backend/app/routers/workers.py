@@ -10,6 +10,26 @@ from app.services.worker_service import filter_workers, sort_workers
 router = APIRouter()
 
 
+def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
+    """Distribute unpaid earnings across workers proportionally by hashrate (like v1)."""
+    if not workers or unpaid_btc <= 0:
+        return workers
+
+    total_hr = sum(float(w.get("hashrate_60sec", 0)) for w in workers)
+    if total_hr <= 0:
+        # Even split if no hashrate data
+        share = unpaid_btc / len(workers)
+        for w in workers:
+            w["earnings"] = share
+        return workers
+
+    for w in workers:
+        hr = float(w.get("hashrate_60sec", 0))
+        w["earnings"] = (hr / total_hr) * unpaid_btc
+
+    return workers
+
+
 @router.get("/workers", response_model=WorkerSummary)
 async def get_workers(
     status: str = Query(default="all", description="Filter: all|online|offline"),
@@ -25,6 +45,12 @@ async def get_workers(
             return WorkerSummary()
 
     workers = cached.get("workers", [])
+
+    # Distribute unpaid earnings from metrics proportionally by hashrate
+    metrics = background.get_current_metrics()
+    unpaid_btc = float(metrics.get("unpaid_earnings", 0)) if metrics else 0
+    workers = _distribute_earnings(workers, unpaid_btc)
+
     workers = filter_workers(workers, status)
     workers = sort_workers(workers, sort_by, descending)
 
@@ -35,6 +61,6 @@ async def get_workers(
         workers_total=cached.get("workers_total", len(workers)),
         workers_online=sum(1 for w in workers if w.get("status") == "online"),
         workers_offline=sum(1 for w in workers if w.get("status") == "offline"),
-        total_earnings=cached.get("total_earnings", 0.0),
+        total_earnings=unpaid_btc,
         timestamp=cached.get("timestamp", ""),
     )
