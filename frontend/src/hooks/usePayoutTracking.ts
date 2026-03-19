@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { DashboardMetrics } from '../types';
+import { fetchEarnings } from '../api/client';
+import type { DashboardMetrics, EarningsResponse } from '../types';
 
 const LS_KEY = 'deepsea_payout_history';
 const MAX_HISTORY = 100;
@@ -81,9 +82,7 @@ function calcAvgDays(history: PayoutRecord[]): number | null {
 
 async function verifyAgainstEarnings(history: PayoutRecord[]): Promise<PayoutRecord[]> {
   try {
-    const res = await fetch('/api/earnings?days=90');
-    if (!res.ok) return history;
-    const data = await res.json();
+    const data: EarningsResponse = await fetchEarnings(90);
 
     const payments: Array<{
       date_iso?: string;
