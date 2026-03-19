@@ -236,7 +236,7 @@ async def fetch_full_metrics(
     # because 60-sec is unreliable at low hashrates — that's the whole point
     # of the mode.
     hr_3hr = float(merged.get("hashrate_3hr") or 0)
-    merged["low_hashrate_mode"] = hr_3hr < 1.0  # < 1 TH/s on 3hr avg
+    merged["low_hashrate_mode"] = hr_3hr < 3.0  # < 3 TH/s on 3hr avg
 
     merged["server_timestamp"] = time.time()
 
