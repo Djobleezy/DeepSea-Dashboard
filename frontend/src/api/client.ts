@@ -282,3 +282,32 @@ export const postClientError = (payload: ClientErrorPayload) =>
   post<{ ok: boolean }>('/client-errors', payload).catch(() => {
     // Fire-and-forget: never throw from error reporting itself
   });
+
+// Worker settings (ASIC overrides + electricity rate)
+export interface WorkerOverrideData {
+  asicId?: string | null;
+  efficiency?: number | null;
+  power?: number | null;
+}
+
+export interface WorkerSettingsResponse {
+  overrides: Record<string, WorkerOverrideData>;
+  electricity_rate: number;
+}
+
+export const fetchWorkerSettings = () =>
+  request<WorkerSettingsResponse>('/workers/settings');
+
+export const saveWorkerSettings = (overrides: Record<string, WorkerOverrideData>) =>
+  request<WorkerSettingsResponse>('/workers/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overrides }),
+  });
+
+export const saveElectricityRate = (rate: number) =>
+  request<{ electricity_rate: number }>('/workers/settings/electricity-rate', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rate }),
+  });

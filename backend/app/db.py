@@ -113,6 +113,22 @@ async def init_db() -> None:
                 ts REAL NOT NULL
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS worker_overrides (
+                worker_name TEXT PRIMARY KEY,
+                asic_id TEXT,
+                efficiency REAL,
+                power REAL,
+                updated_at REAL NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+        """)
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_notifications_timestamp ON notifications(timestamp)"
         )
@@ -358,6 +374,76 @@ async def get_alert_state(db: aiosqlite.Connection) -> dict:
         except (json.JSONDecodeError, TypeError):
             pass
     return result
+
+
+# ---------------------------------------------------------------------------
+# Worker overrides (ASIC model / efficiency / power per worker)
+# ---------------------------------------------------------------------------
+
+
+async def get_worker_overrides(db: aiosqlite.Connection) -> dict:
+    """Return all worker overrides as {worker_name: {asicId, efficiency, power}}."""
+    async with db.execute("SELECT worker_name, asic_id, efficiency, power FROM worker_overrides") as cur:
+        rows = await cur.fetchall()
+    return {
+        row["worker_name"]: {
+            "asicId": row["asic_id"],
+            "efficiency": row["efficiency"],
+            "power": row["power"],
+        }
+        for row in rows
+    }
+
+
+async def set_worker_overrides(db: aiosqlite.Connection, overrides: dict) -> None:
+    """Replace all worker overrides atomically.
+
+    Args:
+        overrides: {worker_name: {asicId?, efficiency?, power?}, ...}
+    """
+    await db.execute("DELETE FROM worker_overrides")
+    for name, vals in overrides.items():
+        await db.execute(
+            """INSERT INTO worker_overrides (worker_name, asic_id, efficiency, power, updated_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                name,
+                vals.get("asicId") or vals.get("asic_id"),
+                vals.get("efficiency"),
+                vals.get("power"),
+                time.time(),
+            ),
+        )
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# User settings (electricity rate, etc.)
+# ---------------------------------------------------------------------------
+
+
+async def get_user_settings(db: aiosqlite.Connection) -> dict:
+    """Return all user settings as a flat dict."""
+    async with db.execute("SELECT key, value FROM user_settings") as cur:
+        rows = await cur.fetchall()
+    result: dict = {}
+    for row in rows:
+        try:
+            result[row["key"]] = json.loads(row["value"])
+        except (json.JSONDecodeError, TypeError):
+            result[row["key"]] = row["value"]
+    return result
+
+
+async def set_user_setting(db: aiosqlite.Connection, key: str, value) -> None:
+    """Upsert a single user setting."""
+    await db.execute(
+        """INSERT INTO user_settings (key, value, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+        (key, json.dumps(value), time.time()),
+    )
+    await db.commit()
 
 
 async def set_alert_state(db: aiosqlite.Connection, key: str, value) -> None:
