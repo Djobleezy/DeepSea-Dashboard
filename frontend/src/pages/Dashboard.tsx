@@ -4,6 +4,7 @@ import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { Sparkline } from '../components/Sparkline';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import type { DashboardMetrics } from '../types';
@@ -143,23 +144,25 @@ export const Dashboard: React.FC = () => {
       {chartData60s.length > 1 && (
         <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
-          <Suspense
-            fallback={
-              <div
-                className="text-center"
-                style={{ padding: '32px', color: 'var(--text-dim)', fontSize: '13px' }}
-              >
-                LOADING CHART...
-              </div>
-            }
-          >
-            <HashrateChart
-              data60s={chartData60s}
-              data3hr={chartData3hr}
-              avg24hr={metrics.hashrate_24hr}
-              blockAnnotations={blockAnnotations}
-            />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense
+              fallback={
+                <div
+                  className="text-center"
+                  style={{ padding: '32px', color: 'var(--text-dim)', fontSize: '13px' }}
+                >
+                  LOADING CHART...
+                </div>
+              }
+            >
+              <HashrateChart
+                data60s={chartData60s}
+                data3hr={chartData3hr}
+                avg24hr={metrics.hashrate_24hr}
+                blockAnnotations={blockAnnotations}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 

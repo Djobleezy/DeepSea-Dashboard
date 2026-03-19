@@ -9,20 +9,58 @@ type StatusFilter = 'all' | 'online' | 'offline';
 
 // ── Per-worker overrides stored in localStorage ─────────────────────────────
 const OVERRIDES_KEY = 'workerPowerOverrides';
+const MAX_OVERRIDE_ENTRIES = 500;
+const MAX_OVERRIDE_BYTES = 256 * 1024;
+
 interface WorkerOverride {
   efficiency?: number; // W/TH
   powerConsumption?: number; // watts
 }
 type OverrideMap = Record<string, WorkerOverride>;
 
+function sanitizeOverrides(input: unknown): OverrideMap {
+  if (!input || typeof input !== 'object') return {};
+
+  const entries = Object.entries(input as Record<string, unknown>)
+    .filter(([name, value]) => {
+      if (!name || typeof name !== 'string' || typeof value !== 'object' || value === null) return false;
+      const candidate = value as WorkerOverride;
+      const effValid = candidate.efficiency === undefined || (Number.isFinite(candidate.efficiency) && candidate.efficiency > 0 && candidate.efficiency <= 200);
+      const powerValid = candidate.powerConsumption === undefined || (Number.isFinite(candidate.powerConsumption) && candidate.powerConsumption >= 0 && candidate.powerConsumption <= 50_000);
+      return effValid && powerValid;
+    })
+    .slice(-MAX_OVERRIDE_ENTRIES);
+
+  return entries.reduce<OverrideMap>((acc, [name, value]) => {
+    acc[name] = value as WorkerOverride;
+    return acc;
+  }, {});
+}
+
 function loadOverrides(): OverrideMap {
   try {
     const raw = localStorage.getItem(OVERRIDES_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
+    if (!raw) return {};
+    return sanitizeOverrides(JSON.parse(raw));
+  } catch {
+    return {};
+  }
 }
+
 function saveOverrides(m: OverrideMap) {
-  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(m));
+  try {
+    const limited = sanitizeOverrides(m);
+    const serialized = JSON.stringify(limited);
+    if (serialized.length > MAX_OVERRIDE_BYTES) {
+      console.warn('[Workers] Overrides payload exceeded storage cap, dropping oldest entries.');
+      const trimmed = Object.fromEntries(Object.entries(limited).slice(-Math.floor(MAX_OVERRIDE_ENTRIES / 2)));
+      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(trimmed));
+      return;
+    }
+    localStorage.setItem(OVERRIDES_KEY, serialized);
+  } catch (e) {
+    console.warn('[Workers] Failed to persist overrides', e);
+  }
 }
 
 // ── Fleet-level power cost stored in localStorage ───────────────────────────
@@ -59,6 +97,8 @@ const WorkerCard: React.FC<{
   onOverride: (name: string, o: WorkerOverride | undefined) => void;
 }> = ({ worker, maxHashrate, btcPrice, powerCost, override, onOverride }) => {
   const [editing, setEditing] = useState(false);
+  const efficiencyInputId = `worker-efficiency-${worker.name.replace(/\s+/g, '-').toLowerCase()}`;
+  const powerInputId = `worker-power-${worker.name.replace(/\s+/g, '-').toLowerCase()}`;
   const isOnline = worker.status === 'online';
   const hrPct = maxHashrate > 0 ? Math.min(100, (worker.hashrate_3hr / maxHashrate) * 100) : 0;
   const earningsSats = Math.floor(worker.earnings * 1e8);
@@ -99,6 +139,9 @@ const WorkerCard: React.FC<{
             onClick={() => setEditing(!editing)}
             style={{ fontSize: '11px', padding: '2px 8px', opacity: 0.7 }}
             title="Adjust power settings"
+            aria-expanded={editing}
+            aria-controls={`${efficiencyInputId}-panel`}
+            aria-label={editing ? `Close power settings for ${worker.name}` : `Adjust power settings for ${worker.name}`}
           >
             {editing ? '✕' : '⚙'}
           </button>
@@ -116,18 +159,23 @@ const WorkerCard: React.FC<{
 
       {/* Edit panel */}
       {editing && (
-        <div style={{
-          background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '10px',
-          marginBottom: '12px', border: '1px solid var(--border)',
-        }}>
+        <div
+          id={`${efficiencyInputId}-panel`}
+          style={{
+            background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '10px',
+            marginBottom: '12px', border: '1px solid var(--border)',
+          }}
+        >
           <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>
             POWER SETTINGS {hasOverride && <span style={{ color: 'var(--primary)' }}>(CUSTOM)</span>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Efficiency (W/TH)</label>
+              <label htmlFor={efficiencyInputId} style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Efficiency (W/TH)</label>
               <input
+                id={efficiencyInputId}
                 type="number" step="0.5" min="0" max="200"
+                aria-describedby={`${efficiencyInputId}-hint`}
                 value={efficiency > 0 ? efficiency : ''}
                 placeholder={String(worker.efficiency || 30)}
                 onChange={(e) => {
@@ -139,11 +187,16 @@ const WorkerCard: React.FC<{
                 }}
                 style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}
               />
+              <div id={`${efficiencyInputId}-hint`} style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Enter an efficiency value between 0 and 200 W/TH.
+              </div>
             </div>
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Power (Watts)</label>
+              <label htmlFor={powerInputId} style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Power (Watts)</label>
               <input
+                id={powerInputId}
                 type="number" step="10" min="0" max="50000"
+                aria-describedby={`${powerInputId}-hint`}
                 value={powerWatts > 0 ? powerWatts : ''}
                 placeholder={String(worker.power_consumption || 0)}
                 onChange={(e) => {
@@ -155,6 +208,9 @@ const WorkerCard: React.FC<{
                 }}
                 style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}
               />
+              <div id={`${powerInputId}-hint`} style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Enter power consumption between 0 and 50,000 watts.
+              </div>
             </div>
           </div>
           {hasOverride && (
@@ -413,20 +469,27 @@ export const Workers: React.FC = () => {
 
       {/* Fleet Power Settings */}
       <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.25s both' }}>
-        <div className="flex justify-between items-center" style={{ cursor: 'pointer' }} onClick={() => setShowPowerSettings(!showPowerSettings)}>
-          <div className="label">
+        <button
+          type="button"
+          className="flex justify-between items-center"
+          style={{ cursor: 'pointer', width: '100%', background: 'transparent', border: 0, padding: 0, color: 'inherit', textAlign: 'left' }}
+          onClick={() => setShowPowerSettings(!showPowerSettings)}
+          aria-expanded={showPowerSettings}
+          aria-controls="fleet-power-settings-panel"
+        >
+          <span className="label">
             ⚡ FLEET POWER SETTINGS
             {overrideCount > 0 && (
               <span style={{ color: 'var(--primary)', marginLeft: '8px', fontSize: '12px' }}>
                 {overrideCount} custom override{overrideCount !== 1 ? 's' : ''}
               </span>
             )}
-          </div>
+          </span>
           <span style={{ color: 'var(--text-dim)', fontSize: '14px' }}>{showPowerSettings ? '▼' : '▶'}</span>
-        </div>
+        </button>
 
         {showPowerSettings && (
-          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div id="fleet-power-settings-panel" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Electricity Cost ($/kWh)</label>

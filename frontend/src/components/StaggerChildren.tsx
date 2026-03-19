@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface Props {
   children: React.ReactNode;
@@ -26,16 +26,24 @@ export const StaggerChildren: React.FC<Props> = ({
   className,
   style,
 }) => {
+  const hasAnimatedRef = useRef(false);
+
+  useEffect(() => {
+    hasAnimatedRef.current = true;
+  }, []);
+
   return (
     <div className={className} style={style}>
       {React.Children.map(children, (child, i) => {
         if (!React.isValidElement(child)) return child;
+
+        const childKey = child.key ?? `stagger-${i}`;
+        const wrapperStyle = hasAnimatedRef.current
+          ? undefined
+          : ({ animation: `${animation} ${duration}ms ease-out ${i * stagger}ms both` } as React.CSSProperties);
+
         return (
-          <div
-            style={{
-              animation: `${animation} ${duration}ms ease-out ${i * stagger}ms both`,
-            }}
-          >
+          <div key={String(childKey)} style={wrapperStyle}>
             {child}
           </div>
         );
