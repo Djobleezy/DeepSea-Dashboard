@@ -7,10 +7,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchConfig } from '../api/client';
+import { fetchConfig, fetchExchangeRates } from '../api/client';
 import { formatFiat as _formatFiat } from '../utils/format';
-
-const RATES_ENDPOINT = '/api/exchange-rates';
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour — matches backend cache TTL
 
 interface CurrencyState {
@@ -38,7 +36,7 @@ async function refreshCurrencyCache(): Promise<void> {
   try {
     const [config, ratesResp] = await Promise.all([
       fetchConfig(),
-      fetch(RATES_ENDPOINT).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetchExchangeRates().catch(() => null),
     ]);
 
     const currency = (config.currency ?? 'USD').toUpperCase();
