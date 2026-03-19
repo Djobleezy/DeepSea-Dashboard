@@ -23,9 +23,6 @@ const CYCLING_WORDS = ['BITCOIN', 'MATRIX', 'OCEAN', 'HASHRATE', 'SATOSHI'];
 
 // Color constants — classic matrix green
 const HEAD_COLOR = '#ccffcc'; // bright white-green for lead char
-const TRAIL_COLOR_1 = '#39ff14'; // bright green
-const TRAIL_COLOR_2 = '#00cc00'; // mid green
-const TRAIL_COLOR_3 = '#007700'; // dim green
 const TRAIL_FADE = 'rgba(0, 0, 0, 0.12)'; // fade overlay per frame
 
 // Timing — target ~24fps effective (rAF at 60fps, draw every ~2.5 frames)
