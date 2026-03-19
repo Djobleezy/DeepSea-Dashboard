@@ -82,7 +82,16 @@ def _on_cooldown(category: str) -> bool:
     last_fired = _prev_state.get(last_key)
     if last_fired is None:
         return False
-    return (time.time() - float(last_fired)) < cooldown
+
+    # Be resilient to bad/stale DB values: treat non-numeric timestamps as
+    # absent cooldown data instead of crashing the refresh loop.
+    try:
+        last_fired_ts = float(last_fired)
+    except (TypeError, ValueError):
+        _prev_state.pop(last_key, None)
+        return False
+
+    return (time.time() - last_fired_ts) < cooldown
 
 
 async def _record_fired(db: aiosqlite.Connection, category: str) -> None:

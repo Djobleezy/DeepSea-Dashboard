@@ -222,6 +222,24 @@ async def test_cooldown_persists_across_restart(db):
 
 
 @pytest.mark.asyncio
+async def test_invalid_cooldown_state_does_not_crash_engine(db):
+    """Bad persisted cooldown values should be ignored, not crash refresh."""
+    from app.db import set_alert_state
+
+    await set_alert_state(db, "hashrate_3hr", 100.0)
+    await set_alert_state(db, "workers_hashing", 4)
+    await set_alert_state(db, "last_fired_hashrate", "not-a-number")
+
+    notification_engine._prev_state.clear()
+    notification_engine._state_loaded = False
+
+    fired = await notification_engine.check_and_fire(
+        db, {"hashrate_3hr": 60.0, "workers_hashing": 4, "last_block_height": None}
+    )
+    assert any(n["category"] == "hashrate" for n in fired)
+
+
+@pytest.mark.asyncio
 async def test_no_false_positive_on_first_run_after_restart(db):
     """On first call after restart with prev state in DB, no spurious alerts fire."""
     # Directly inject persisted state as if a prior run left it
