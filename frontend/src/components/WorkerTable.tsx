@@ -19,6 +19,26 @@ export const WorkerTable: React.FC<Props> = ({
     return sortDesc ? ' ▼' : ' ▲';
   };
 
+  const renderSortableHeader = (col: string, label: string) => {
+    const isActive = sortCol === col;
+    return (
+      <button
+        type="button"
+        onClick={() => onSort?.(col)}
+        aria-label={`Sort by ${label}${isActive ? (sortDesc ? ', descending' : ', ascending') : ''}`}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          width: '100%',
+        }}
+      >
+        {label}{sortArrow(col)}
+      </button>
+    );
+  };
+
   const fmt = (v: number) =>
     v >= 1000
       ? `${(v / 1000).toFixed(1)} PH/s`
@@ -29,12 +49,12 @@ export const WorkerTable: React.FC<Props> = ({
       <table>
         <thead>
           <tr>
-            <th onClick={() => onSort?.('name')}>WORKER{sortArrow('name')}</th>
-            <th onClick={() => onSort?.('status')}>STATUS{sortArrow('status')}</th>
-            <th onClick={() => onSort?.('hashrate')}>3HR AVG{sortArrow('hashrate')}</th>
-            <th onClick={() => onSort?.('hashrate_60sec')}>60S{sortArrow('hashrate_60sec')}</th>
+            <th>{renderSortableHeader('name', 'WORKER')}</th>
+            <th>{renderSortableHeader('status', 'STATUS')}</th>
+            <th>{renderSortableHeader('hashrate', '3HR AVG')}</th>
+            <th>{renderSortableHeader('hashrate_60sec', '60S')}</th>
             <th>MODEL</th>
-            <th onClick={() => onSort?.('efficiency')}>W/TH{sortArrow('efficiency')}</th>
+            <th>{renderSortableHeader('efficiency', 'W/TH')}</th>
             <th>LAST SHARE</th>
           </tr>
         </thead>

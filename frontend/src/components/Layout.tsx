@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import { useAppStore } from '../stores/store';
 import { ThemeToggle } from './ThemeToggle';
 import { AudioPlayer } from './AudioPlayer';
-import { useTheme } from '../hooks/useTheme';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { EasterEgg } from './EasterEgg';
 
@@ -21,7 +20,6 @@ interface Props {
 }
 
 export const Layout: React.FC<Props> = ({ children }) => {
-  useTheme(); // apply theme on mount
   useKeyboardShortcuts(); // Alt+1..5 navigation shortcuts
   const sseConnected = useAppStore((s) => s.sseConnected);
   const unreadCount = useAppStore((s) => s.unreadCount);

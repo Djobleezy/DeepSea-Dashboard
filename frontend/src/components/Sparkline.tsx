@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface Props {
   data: number[];
@@ -13,6 +13,8 @@ export const Sparkline: React.FC<Props> = ({
   height = 30,
   color = 'var(--primary)',
 }) => {
+  const gradientId = useId();
+
   if (!data || data.length < 2) {
     return <svg width={width} height={height} />;
   }
@@ -34,12 +36,12 @@ export const Sparkline: React.FC<Props> = ({
   return (
     <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
       <defs>
-        <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <polygon points={area} fill="url(#spark-fill)" />
+      <polygon points={area} fill={`url(#${gradientId})`} />
       <polyline
         points={polyline}
         fill="none"

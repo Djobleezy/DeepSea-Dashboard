@@ -25,20 +25,29 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
 
   useEffect(() => {
     let i = 0;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const queueTimeout = (fn: () => void, ms: number) => {
+      const id = setTimeout(fn, ms);
+      timeouts.push(id);
+    };
+
     const addLine = () => {
       if (i < BOOT_LINES.length) {
         setLines((prev) => [...prev, BOOT_LINES[i]]);
         i++;
-        setTimeout(addLine, i === BOOT_LINES.length ? 300 : 200 + Math.random() * 200);
+        queueTimeout(addLine, i === BOOT_LINES.length ? 300 : 200 + Math.random() * 200);
       } else {
         setDone(true);
-        setTimeout(onComplete, 800);
+        queueTimeout(onComplete, 800);
       }
     };
-    const t = setTimeout(addLine, 400);
+
+    queueTimeout(addLine, 400);
     const blink = setInterval(() => setCursor((c) => !c), 500);
+
     return () => {
-      clearTimeout(t);
+      timeouts.forEach((id) => clearTimeout(id));
       clearInterval(blink);
     };
   }, [onComplete]);

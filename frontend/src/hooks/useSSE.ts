@@ -14,6 +14,7 @@ export function useSSE() {
   const setSseConnected = useAppStore((s) => s.setSseConnected);
   const esRef = useRef<EventSource | null>(null);
   const backoffRef = useRef(INITIAL_BACKOFF);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -56,9 +57,14 @@ export function useSSE() {
         setSseConnected(false);
         es.close();
         esRef.current = null;
+
+        if (reconnectTimerRef.current) return;
         const delay = backoffRef.current;
         backoffRef.current = Math.min(delay * 2, MAX_BACKOFF);
-        setTimeout(connect, delay);
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          connect();
+        }, delay);
       });
     }
 
@@ -66,6 +72,10 @@ export function useSSE() {
 
     return () => {
       mountedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;

@@ -241,6 +241,7 @@ export const AudioPlayer: React.FC = () => {
           onClick={prevTrack}
           style={btnStyle}
           title="Previous track"
+          aria-label="Previous track"
         >
           ⏮
         </button>
@@ -251,6 +252,7 @@ export const AudioPlayer: React.FC = () => {
         onClick={togglePlay}
         style={{ ...btnStyle, color: playing ? 'var(--primary)' : 'var(--text-dim)' }}
         title={playing ? 'Pause' : 'Play'}
+        aria-label={playing ? 'Pause audio' : 'Play audio'}
       >
         {playing ? '⏸' : '▶'}
       </button>
@@ -261,6 +263,7 @@ export const AudioPlayer: React.FC = () => {
           onClick={nextTrack}
           style={btnStyle}
           title="Next track"
+          aria-label="Next track"
         >
           ⏭
         </button>
@@ -271,6 +274,7 @@ export const AudioPlayer: React.FC = () => {
         onClick={toggleMute}
         style={btnStyle}
         title={muted ? 'Unmute' : 'Mute'}
+        aria-label={muted ? 'Unmute audio' : 'Mute audio'}
       >
         {muted ? '🔇' : '🔊'}
       </button>
