@@ -48,7 +48,9 @@ async def post_notification(
 
 @router.patch("/notifications/{nid}/read")
 async def read_notification(nid: str, db: aiosqlite.Connection = Depends(get_db)):
-    await mark_notification_read(db, nid)
+    updated = await mark_notification_read(db, nid)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Notification not found")
     return {"ok": True}
 
 
@@ -61,6 +63,8 @@ async def read_all(db: aiosqlite.Connection = Depends(get_db)):
 @router.delete("/notifications/{nid}")
 async def delete_one(nid: str, db: aiosqlite.Connection = Depends(get_db)):
     ok = await delete_notification(db, nid)
+    if ok is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
     if not ok:
         raise HTTPException(status_code=403, detail="Block notifications cannot be deleted individually")
     return {"ok": True}

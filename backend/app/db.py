@@ -147,9 +147,10 @@ async def list_notifications(
 
 
 async def mark_notification_read(db: aiosqlite.Connection, nid: str) -> bool:
-    await db.execute("UPDATE notifications SET read = 1 WHERE id = ?", (nid,))
+    async with db.execute("UPDATE notifications SET read = 1 WHERE id = ?", (nid,)) as cur:
+        updated = cur.rowcount
     await db.commit()
-    return True
+    return updated > 0
 
 
 async def mark_all_read(db: aiosqlite.Connection) -> int:
@@ -159,12 +160,14 @@ async def mark_all_read(db: aiosqlite.Connection) -> int:
     return count
 
 
-async def delete_notification(db: aiosqlite.Connection, nid: str) -> bool:
+async def delete_notification(db: aiosqlite.Connection, nid: str) -> Optional[bool]:
     async with db.execute(
         "SELECT is_block FROM notifications WHERE id = ?", (nid,)
     ) as cur:
         row = await cur.fetchone()
-    if row and row["is_block"]:
+    if row is None:
+        return None
+    if row["is_block"]:
         return False  # protected
     await db.execute("DELETE FROM notifications WHERE id = ?", (nid,))
     await db.commit()
