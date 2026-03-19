@@ -32,17 +32,28 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(data: dict[str, Any]) -> None:
-    """Persist config to file atomically to avoid partial-read races."""
+    """Persist config to file safely.
+
+    Tries atomic rename first; falls back to in-place write for
+    Docker bind-mounted files where cross-device rename fails.
+    """
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     merged = {**load_config(), **data}
 
     tmp_path = CONFIG_PATH.with_suffix(f"{CONFIG_PATH.suffix}.tmp")
-    with tmp_path.open("w") as f:
-        json.dump(merged, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-
-    tmp_path.replace(CONFIG_PATH)
+    try:
+        with tmp_path.open("w") as f:
+            json.dump(merged, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        tmp_path.replace(CONFIG_PATH)
+    except OSError:
+        # Bind-mounted files can't be atomically replaced — write in place
+        tmp_path.unlink(missing_ok=True)
+        with CONFIG_PATH.open("w") as f:
+            json.dump(merged, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
 
 
 def get_wallet() -> str:

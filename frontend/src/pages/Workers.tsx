@@ -132,27 +132,7 @@ const WorkerCard: React.FC<{ worker: Worker; maxHashrate: number; btcPrice: numb
         </div>
       </div>
 
-      {/* Acceptance rate bar at bottom */}
-      {worker.acceptance_rate > 0 && (
-        <div style={{ marginTop: '10px', borderTop: '1px solid rgba(0,85,170,0.15)', paddingTop: '8px' }}>
-          <div className="flex justify-between" style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '3px' }}>
-            <span>ACCEPTANCE</span>
-            <span style={{ color: worker.acceptance_rate >= 99 ? 'var(--color-success)' : 'var(--color-warning)' }}>
-              {worker.acceptance_rate.toFixed(1)}%
-            </span>
-          </div>
-          <div className="progress-bar" style={{ height: '4px' }}>
-            <div
-              className="progress-fill"
-              style={{
-                width: `${worker.acceptance_rate}%`,
-                background: worker.acceptance_rate >= 99 ? 'var(--color-success)' : 'var(--color-warning)',
-                boxShadow: `0 0 6px ${worker.acceptance_rate >= 99 ? 'var(--color-success)' : 'var(--color-warning)'}`,
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Acceptance rate removed — was hardcoded cosmetic data */}
     </div>
   );
 };

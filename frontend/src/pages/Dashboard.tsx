@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { HashrateChart } from '../components/HashrateChart';
@@ -6,9 +6,10 @@ import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { Sparkline } from '../components/Sparkline';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
+import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import type { DashboardMetrics } from '../types';
 
-// Rolling sparkline history (in-memory)
+// Rolling sparkline history (in-memory, survives re-renders but not full reload)
 const MAX_HISTORY = 60;
 const hrHistory: number[] = [];
 const priceHistory: number[] = [];
@@ -23,36 +24,24 @@ function addHistory(metrics: DashboardMetrics) {
   if (satsHistory.length > MAX_HISTORY) satsHistory.shift();
 }
 
-function fmtSats(sats: number): string {
-  if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;
-  if (sats >= 1_000) return `${(sats / 1_000).toFixed(1)}K`;
-  return String(sats);
-}
-
-function fmtHashrate(ths: number, unit: string): string {
-  return `${ths.toFixed(2)} ${unit.toUpperCase()}`;
+// DATUM Gateway: pool_fees between 0.9% and 1.3% = connected via DATUM protocol
+function isDatumConnected(poolFeesPct: number): boolean {
+  return poolFeesPct >= 0.9 && poolFeesPct <= 1.3;
 }
 
 export const Dashboard: React.FC = () => {
   const metrics = useAppStore((s) => s.metrics);
   const prevMetrics = useAppStore((s) => s.prevMetrics);
-  const [chartData60s, setChartData60s] = useState<{ label: string; value: number }[]>([]);
-  const [chartData3hr, setChartData3hr] = useState<{ label: string; value: number }[]>([]);
+  const chartData60s = useAppStore((s) => s.chartData60s);
+  const chartData3hr = useAppStore((s) => s.chartData3hr);
+  const addChartPoint = useAppStore((s) => s.addChartPoint);
   const { annotations: blockAnnotations } = useBlockAnnotations();
 
   useEffect(() => {
     if (!metrics) return;
     addHistory(metrics);
-    const ts = new Date().toLocaleTimeString();
-    setChartData60s((prev) => [
-      ...prev.slice(-60),
-      { label: ts, value: metrics.hashrate_60sec },
-    ]);
-    setChartData3hr((prev) => [
-      ...prev.slice(-60),
-      { label: ts, value: metrics.hashrate_3hr },
-    ]);
-  }, [metrics]);
+    addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr);
+  }, [metrics, addChartPoint]);
 
   if (!metrics) {
     return (
@@ -66,28 +55,55 @@ export const Dashboard: React.FC = () => {
     );
   }
 
+  const datumActive = isDatumConnected(metrics.pool_fees_percentage);
+  const hr60 = autoScaleHashrate(metrics.hashrate_60sec, metrics.hashrate_60sec_unit);
+  const hr10 = autoScaleHashrate(metrics.hashrate_10min, metrics.hashrate_10min_unit);
+  const hr3 = autoScaleHashrate(metrics.hashrate_3hr, metrics.hashrate_3hr_unit);
+  const hr24 = autoScaleHashrate(metrics.hashrate_24hr, metrics.hashrate_24hr_unit);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* Page title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Page title + status badges */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>MINING DASHBOARD</h1>
-        {metrics.low_hashrate_mode && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* DATUM Gateway badge */}
           <span
-            className="badge badge-warning"
+            className={`badge ${datumActive ? 'badge-online' : 'badge-offline'}`}
             style={{ fontSize: '12px', padding: '4px 12px' }}
           >
-            ⚠ LOW HASHRATE MODE
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: datumActive ? 'var(--color-success)' : 'var(--color-error)',
+                display: 'inline-block',
+                boxShadow: datumActive ? '0 0 6px var(--color-success)' : 'none',
+                animation: datumActive ? 'pulse-glow 2s infinite' : 'none',
+                marginRight: '6px',
+              }}
+            />
+            DATUM {datumActive ? 'CONNECTED' : 'OFFLINE'}
           </span>
-        )}
+          {metrics.low_hashrate_mode && (
+            <span
+              className="badge badge-warning"
+              style={{ fontSize: '12px', padding: '4px 12px' }}
+            >
+              ⚠ LOW HASHRATE
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Hashrate row */}
+      {/* Hashrate row — auto-scaled */}
       <div className="grid-4">
         <MetricCard
           label="60 SEC"
-          value={metrics.hashrate_60sec.toFixed(2)}
-          unit={metrics.hashrate_60sec_unit}
+          value={hr60.display}
+          unit={hr60.unit}
           current={metrics.hashrate_60sec}
           previous={prevMetrics?.hashrate_60sec}
           large
@@ -96,31 +112,31 @@ export const Dashboard: React.FC = () => {
         </MetricCard>
         <MetricCard
           label="10 MIN"
-          value={metrics.hashrate_10min.toFixed(2)}
-          unit={metrics.hashrate_10min_unit}
+          value={hr10.display}
+          unit={hr10.unit}
           current={metrics.hashrate_10min}
           previous={prevMetrics?.hashrate_10min}
           large
         />
         <MetricCard
           label="3 HR AVG"
-          value={metrics.hashrate_3hr.toFixed(2)}
-          unit={metrics.hashrate_3hr_unit}
+          value={hr3.display}
+          unit={hr3.unit}
           current={metrics.hashrate_3hr}
           previous={prevMetrics?.hashrate_3hr}
           large
         />
         <MetricCard
           label="24 HR AVG"
-          value={metrics.hashrate_24hr.toFixed(2)}
-          unit={metrics.hashrate_24hr_unit}
+          value={hr24.display}
+          unit={hr24.unit}
           current={metrics.hashrate_24hr}
           previous={prevMetrics?.hashrate_24hr}
           large
         />
       </div>
 
-      {/* Chart */}
+      {/* Chart — data from Zustand store, persists across route changes */}
       {chartData60s.length > 1 && (
         <div className="card">
           <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
@@ -133,7 +149,7 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Second row: workers, BTC price, unpaid, workers */}
+      {/* Second row: workers, BTC price, daily sats, unpaid */}
       <div className="grid-4">
         <MetricCard
           label="WORKERS HASHING"
@@ -194,8 +210,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid-4">
         <MetricCard
           label="NETWORK HASHRATE"
-          value={metrics.network_hashrate.toFixed(2)}
-          unit={metrics.network_hashrate_unit}
+          value={fmtHashrate(metrics.network_hashrate, metrics.network_hashrate_unit)}
         />
         <MetricCard
           label="DIFFICULTY"
@@ -204,8 +219,7 @@ export const Dashboard: React.FC = () => {
         />
         <MetricCard
           label="POOL HASHRATE"
-          value={metrics.pool_total_hashrate.toFixed(2)}
-          unit={metrics.pool_total_hashrate_unit}
+          value={fmtHashrate(metrics.pool_total_hashrate, metrics.pool_total_hashrate_unit)}
         />
         <MetricCard
           label="POOL FEES"

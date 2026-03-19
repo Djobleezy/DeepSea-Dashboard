@@ -2,11 +2,21 @@
 import { create } from 'zustand';
 import type { DashboardMetrics, WorkerSummary, Notification, Theme } from '../types';
 
+interface ChartPoint {
+  label: string;
+  value: number;
+}
+
 interface AppState {
   // Metrics
   metrics: DashboardMetrics | null;
   prevMetrics: DashboardMetrics | null;
   setMetrics: (m: DashboardMetrics) => void;
+
+  // Chart history (persists across route changes)
+  chartData60s: ChartPoint[];
+  chartData3hr: ChartPoint[];
+  addChartPoint: (hr60s: number, hr3hr: number) => void;
 
   // Workers
   workers: WorkerSummary | null;
@@ -36,6 +46,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   prevMetrics: null,
   setMetrics: (m) =>
     set({ prevMetrics: get().metrics, metrics: m, lastUpdated: Date.now() }),
+
+  chartData60s: [],
+  chartData3hr: [],
+  addChartPoint: (hr60s, hr3hr) =>
+    set((s) => {
+      const ts = new Date().toLocaleTimeString();
+      return {
+        chartData60s: [...s.chartData60s.slice(-59), { label: ts, value: hr60s }],
+        chartData3hr: [...s.chartData3hr.slice(-59), { label: ts, value: hr3hr }],
+      };
+    }),
 
   workers: null,
   setWorkers: (w) => set({ workers: w }),
