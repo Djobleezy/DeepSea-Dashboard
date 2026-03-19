@@ -40,6 +40,15 @@ interface Props {
   blockAnnotations?: AnnotationEntry[];
 }
 
+/** Auto-scale TH/s values to the best display unit */
+function autoScale(ths: number): { divisor: number; unit: string } {
+  if (ths >= 1_000_000) return { divisor: 1_000_000, unit: 'EH/s' };
+  if (ths >= 1_000) return { divisor: 1_000, unit: 'PH/s' };
+  if (ths >= 1) return { divisor: 1, unit: 'TH/s' };
+  if (ths >= 0.001) return { divisor: 0.001, unit: 'GH/s' };
+  return { divisor: 1, unit: 'TH/s' };
+}
+
 export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -62,9 +71,16 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     }
 
     const labels = data60s.map((d) => d.label);
-    const values60s = data60s.map((d) => d.value);
-    const values3hr = data3hr.map((d) => d.value);
+    const rawValues60s = data60s.map((d) => d.value);
+    const rawValues3hr = data3hr.map((d) => d.value);
     const labelSet = new Set(labels);
+
+    // Determine display unit from peak value (all values are in TH/s internally)
+    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
+    const { divisor, unit: displayUnit } = autoScale(peakThs);
+    const values60s = rawValues60s.map((v) => v / divisor);
+    const values3hr = rawValues3hr.map((v) => v / divisor);
+    const scaledAvg = avg24hr !== undefined ? avg24hr / divisor : undefined;
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 200);
     gradient.addColorStop(0, `${primary}44`);
@@ -101,17 +117,17 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     });
 
     // --- 24hr average annotation ---
-    if (avg24hr !== undefined && avg24hr > 0) {
+    if (scaledAvg !== undefined && scaledAvg > 0) {
       annotationDefs['avg24hr'] = {
         type: 'line',
-        yMin: avg24hr,
-        yMax: avg24hr,
+        yMin: scaledAvg,
+        yMax: scaledAvg,
         borderColor: `${primary}66`,
         borderWidth: 1,
         borderDash: [6, 3],
         label: {
           display: true,
-          content: `24H AVG: ${avg24hr.toFixed(2)} TH/s`,
+          content: `24H AVG: ${scaledAvg.toFixed(2)} ${displayUnit}`,
           backgroundColor: 'rgba(0,0,0,0.7)',
           color: `${primary}cc`,
           font: {
@@ -174,7 +190,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
             bodyColor: '#a0d4f5',
             bodyFont: { family: 'Share Tech Mono' },
             callbacks: {
-              label: (ctx) => ` ${(ctx.parsed.y ?? 0).toFixed(2)} TH/s`,
+              label: (ctx) => ` ${(ctx.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
             },
           },
           annotation: {
@@ -194,7 +210,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
             ticks: {
               color: textDim,
               font: { family: 'Share Tech Mono', size: 10 },
-              callback: (v) => `${Number(v).toFixed(1)} TH`,
+              callback: (v) => `${Number(v).toFixed(2)} ${displayUnit}`,
             },
             grid: { color: `${primary}11` },
           },

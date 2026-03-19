@@ -40,7 +40,7 @@ export const MetricCard: React.FC<Props> = ({
         )}
       </div>
       {subtext && (
-        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '4px' }}>
           {subtext}
         </div>
       )}

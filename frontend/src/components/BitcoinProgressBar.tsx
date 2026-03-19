@@ -49,7 +49,7 @@ export const BitcoinProgressBar: React.FC<Props> = ({
 
   return (
     <div>
-      <div className="flex justify-between mb-1" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+      <div className="flex justify-between mb-1" style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
         <span>BLOCK AGE</span>
         <span style={{ color }}>
           {fmt(elapsedSecs)} / {fmt(targetSecs)} target

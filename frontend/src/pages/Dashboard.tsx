@@ -179,7 +179,7 @@ export const Dashboard: React.FC = () => {
             <div>
               <div className="label">LAST BLOCK</div>
               <div className="value-sm glow">#{metrics.last_block_height.toLocaleString()}</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{metrics.last_block_time}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{metrics.last_block_time}</div>
             </div>
             <div>
               <div className="label">BLOCKS FOUND</div>

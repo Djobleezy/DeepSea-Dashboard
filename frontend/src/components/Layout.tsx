@@ -97,12 +97,12 @@ export const Layout: React.FC<Props> = ({ children }) => {
               to={link.to}
               style={({ isActive }) => ({
                 fontFamily: 'var(--font-mono)',
-                fontSize: '11px',
+                fontSize: '13px',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
                 color: isActive ? 'var(--primary)' : 'var(--text-dim)',
                 textDecoration: 'none',
-                padding: '6px 8px',
+                padding: '6px 10px',
                 borderRadius: '4px',
                 background: isActive ? 'var(--bg-hover)' : 'transparent',
                 border: isActive ? '1px solid var(--border)' : '1px solid transparent',
@@ -121,7 +121,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
                     right: '2px',
                     background: 'var(--color-error)',
                     color: '#fff',
-                    fontSize: '9px',
+                    fontSize: '10px',
                     borderRadius: '8px',
                     padding: '0 4px',
                     minWidth: '14px',

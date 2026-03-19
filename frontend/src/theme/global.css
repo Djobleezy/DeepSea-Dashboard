@@ -49,9 +49,9 @@ body {
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
-  -webkit-font-smoothing: none;
+  -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
@@ -130,14 +130,14 @@ h1, h2, h3, .vt323 {
 }
 
 .label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 2px;
 }
 
 .value {
-  font-size: 28px;
+  font-size: 32px;
   font-family: var(--font-vt323);
   color: var(--primary);
   text-shadow: 0 0 8px var(--primary-glow);
@@ -145,13 +145,13 @@ h1, h2, h3, .vt323 {
 }
 
 .value-sm {
-  font-size: 18px;
+  font-size: 22px;
   font-family: var(--font-vt323);
   color: var(--primary);
 }
 
 .unit {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-dim);
   margin-left: 4px;
 }
@@ -201,13 +201,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 th {
   text-align: left;
-  padding: 8px 12px;
-  font-size: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 2px;
   color: var(--text-dim);
@@ -221,7 +221,7 @@ th:hover {
 }
 
 td {
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(0, 85, 170, 0.15);
   vertical-align: middle;
 }
@@ -235,9 +235,9 @@ tr:hover td {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 12px;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 1px;
   border: 1px solid;
@@ -366,17 +366,12 @@ input:focus, select:focus, textarea:focus {
 
 /* ---- Mobile Responsiveness (≤768px / iPhone SE 375px) ---- */
 @media (max-width: 768px) {
-  /* Base font bump */
-  body {
-    font-size: 15px;
-  }
-
   /* Metric card values — minimum readable size */
   .value {
-    font-size: 22px;
+    font-size: 26px;
   }
   .value-sm {
-    font-size: 16px;
+    font-size: 20px;
   }
 
   /* Cards never overflow */
@@ -399,10 +394,10 @@ input:focus, select:focus, textarea:focus {
 
 @media (max-width: 480px) {
   .value {
-    font-size: 20px;
+    font-size: 24px;
   }
   .value-sm {
-    font-size: 15px;
+    font-size: 18px;
   }
 }
 
