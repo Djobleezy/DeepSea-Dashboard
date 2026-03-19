@@ -55,12 +55,19 @@ const PoolDonut: React.FC<{ slices: DonutSlice[]; total: number }> = ({ slices, 
   const cy = size / 2;
   const r = 70;
   const stroke = 28;
+  const circumference = 2 * Math.PI * r;
 
   let cumAngle = -90; // start from top
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+        <style>{`
+          @keyframes donut-draw-${uid.replace(/:/g, '')} {
+            from { stroke-dashoffset: var(--arc-len); }
+            to { stroke-dashoffset: 0; }
+          }
+        `}</style>
         {slices.map((s, i) => {
           const angle = (s.pct / 100) * 360;
           const startAngle = cumAngle;
@@ -74,6 +81,7 @@ const PoolDonut: React.FC<{ slices: DonutSlice[]; total: number }> = ({ slices, 
           const x2 = cx + r * Math.cos(endRad);
           const y2 = cy + r * Math.sin(endRad);
           const largeArc = angle > 180 ? 1 : 0;
+          const arcLen = (angle / 360) * circumference;
 
           return (
             <path
@@ -83,6 +91,12 @@ const PoolDonut: React.FC<{ slices: DonutSlice[]; total: number }> = ({ slices, 
               stroke={s.color}
               strokeWidth={stroke}
               opacity={0.85}
+              strokeDasharray={arcLen}
+              strokeDashoffset={0}
+              style={{
+                ['--arc-len' as string]: arcLen,
+                animation: `donut-draw-${uid.replace(/:/g, '')} 0.8s ease-out ${i * 0.1}s both`,
+              }}
             />
           );
         })}
@@ -315,17 +329,27 @@ export const Blocks: React.FC = () => {
           ERROR: {error}
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          {blocks.map((b) => (
-            <BlockCard key={b.height} block={b} btcPrice={btcPrice} />
-          ))}
-        </div>
+        <>
+          <style>{`
+            @keyframes block-card-in {
+              from { opacity: 0; transform: translateY(12px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            {blocks.map((b, i) => (
+              <div key={b.height} style={{ animation: `block-card-in 0.35s ease-out ${i * 0.04}s both` }}>
+                <BlockCard block={b} btcPrice={btcPrice} />
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

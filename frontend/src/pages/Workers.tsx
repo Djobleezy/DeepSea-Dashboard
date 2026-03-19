@@ -1,10 +1,40 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
 import { ArrowIndicator } from '../components/ArrowIndicator';
 import type { Worker } from '../types';
 
 type StatusFilter = 'all' | 'online' | 'offline';
+
+// ── Per-worker overrides stored in localStorage ─────────────────────────────
+const OVERRIDES_KEY = 'workerPowerOverrides';
+interface WorkerOverride {
+  efficiency?: number; // W/TH
+  powerConsumption?: number; // watts
+}
+type OverrideMap = Record<string, WorkerOverride>;
+
+function loadOverrides(): OverrideMap {
+  try {
+    const raw = localStorage.getItem(OVERRIDES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+function saveOverrides(m: OverrideMap) {
+  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(m));
+}
+
+// ── Fleet-level power cost stored in localStorage ───────────────────────────
+const POWER_COST_KEY = 'fleetPowerCostPerKwh';
+function loadPowerCost(): number {
+  try {
+    const v = localStorage.getItem(POWER_COST_KEY);
+    return v ? parseFloat(v) : 0.12;
+  } catch { return 0.12; }
+}
+function savePowerCost(v: number) {
+  localStorage.setItem(POWER_COST_KEY, String(v));
+}
 
 function fmtHashrate(v: number): string {
   if (v >= 1000) return `${(v / 1000).toFixed(2)} PH/s`;
@@ -18,57 +48,125 @@ function fmtPower(w: number): string {
   return `${w.toFixed(0)} W`;
 }
 
-const WorkerCard: React.FC<{ worker: Worker; maxHashrate: number; btcPrice: number }> = ({
-  worker,
-  maxHashrate,
-  btcPrice,
-}) => {
+// ── Worker Card ─────────────────────────────────────────────────────────────
+const WorkerCard: React.FC<{
+  worker: Worker;
+  maxHashrate: number;
+  btcPrice: number;
+  powerCost: number;
+  override?: WorkerOverride;
+  onOverride: (name: string, o: WorkerOverride | undefined) => void;
+}> = ({ worker, maxHashrate, btcPrice, powerCost, override, onOverride }) => {
+  const [editing, setEditing] = useState(false);
   const isOnline = worker.status === 'online';
   const hrPct = maxHashrate > 0 ? Math.min(100, (worker.hashrate_3hr / maxHashrate) * 100) : 0;
   const earningsSats = Math.floor(worker.earnings * 1e8);
   const earningsFiat = worker.earnings * btcPrice;
-  // Estimate daily power cost at $0.12/kWh
-  const dailyPowerCost = (worker.power_consumption / 1000) * 24 * 0.12;
+
+  // Apply overrides
+  const efficiency = override?.efficiency ?? worker.efficiency;
+  const powerWatts = override?.powerConsumption ?? (
+    efficiency > 0 && worker.hashrate_3hr > 0 ? Math.round(worker.hashrate_3hr * efficiency) : worker.power_consumption
+  );
+  const dailyPowerCost = (powerWatts / 1000) * 24 * powerCost;
+  const dailyProfit = earningsFiat - dailyPowerCost;
+  const hasOverride = override?.efficiency !== undefined || override?.powerConsumption !== undefined;
 
   return (
     <div
       className="card"
       style={{
-        borderColor: isOnline ? 'var(--border)' : 'var(--color-error)',
+        borderColor: isOnline ? (hasOverride ? 'var(--primary)' : 'var(--border)') : 'var(--color-error)',
         opacity: isOnline ? 1 : 0.7,
-        transition: 'opacity 0.3s, border-color 0.3s',
+        transition: 'all 0.3s',
       }}
     >
       {/* Header row */}
       <div className="flex justify-between items-center" style={{ marginBottom: '10px' }}>
         <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-vt323)',
-              fontSize: '22px',
-              color: 'var(--primary)',
-              textShadow: '0 0 8px var(--primary-glow)',
-            }}
-          >
+          <div style={{
+            fontFamily: 'var(--font-vt323)', fontSize: '22px',
+            color: 'var(--primary)', textShadow: '0 0 8px var(--primary-glow)',
+          }}>
             {worker.name}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{worker.model}</div>
         </div>
-        <span className={`badge badge-${worker.status}`}>
-          <span
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            className="btn"
+            onClick={() => setEditing(!editing)}
+            style={{ fontSize: '11px', padding: '2px 8px', opacity: 0.7 }}
+            title="Adjust power settings"
+          >
+            {editing ? '✕' : '⚙'}
+          </button>
+          <span className={`badge badge-${worker.status}`}>
+            <span style={{
+              width: '6px', height: '6px', borderRadius: '50%', display: 'inline-block',
               background: isOnline ? 'var(--color-success)' : 'var(--color-error)',
-              display: 'inline-block',
               boxShadow: isOnline ? '0 0 6px var(--color-success)' : 'none',
               animation: isOnline ? 'pulse-glow 2s infinite' : 'none',
-            }}
-          />
-          {worker.status.toUpperCase()}
-        </span>
+            }} />
+            {worker.status.toUpperCase()}
+          </span>
+        </div>
       </div>
+
+      {/* Edit panel */}
+      {editing && (
+        <div style={{
+          background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '10px',
+          marginBottom: '12px', border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>
+            POWER SETTINGS {hasOverride && <span style={{ color: 'var(--primary)' }}>(CUSTOM)</span>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Efficiency (W/TH)</label>
+              <input
+                type="number" step="0.5" min="0" max="200"
+                value={efficiency > 0 ? efficiency : ''}
+                placeholder={String(worker.efficiency || 30)}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v > 0) {
+                    const newPower = Math.round(worker.hashrate_3hr * v);
+                    onOverride(worker.name, { efficiency: v, powerConsumption: newPower });
+                  }
+                }}
+                style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Power (Watts)</label>
+              <input
+                type="number" step="10" min="0" max="50000"
+                value={powerWatts > 0 ? powerWatts : ''}
+                placeholder={String(worker.power_consumption || 0)}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v >= 0) {
+                    const newEff = worker.hashrate_3hr > 0 ? v / worker.hashrate_3hr : 0;
+                    onOverride(worker.name, { powerConsumption: v, efficiency: Math.round(newEff * 10) / 10 });
+                  }
+                }}
+                style={{ width: '100%', fontSize: '14px', padding: '4px 8px' }}
+              />
+            </div>
+          </div>
+          {hasOverride && (
+            <button
+              className="btn"
+              onClick={() => onOverride(worker.name, undefined)}
+              style={{ marginTop: '8px', fontSize: '11px', padding: '2px 10px', opacity: 0.7 }}
+            >
+              RESET TO AUTO-DETECT
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Hashrate bar */}
       <div style={{ marginBottom: '12px' }}>
@@ -79,32 +177,23 @@ const WorkerCard: React.FC<{ worker: Worker; maxHashrate: number; btcPrice: numb
           </span>
         </div>
         <div className="progress-bar" style={{ height: '8px' }}>
-          <div
-            className="progress-fill"
-            style={{
-              width: `${hrPct}%`,
-              transition: 'width 0.6s ease',
-            }}
-          />
+          <div className="progress-fill" style={{ width: `${hrPct}%`, transition: 'width 0.6s ease' }} />
         </div>
       </div>
 
       {/* Stats grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '8px',
-          fontSize: '13px',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>60s</div>
           <div style={{ color: 'var(--text)' }}>{fmtHashrate(worker.hashrate_60sec)}</div>
         </div>
         <div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Efficiency</div>
-          <div style={{ color: 'var(--text)' }}>{worker.efficiency > 0 ? `${worker.efficiency.toFixed(1)} W/TH` : '—'}</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
+            Efficiency {hasOverride && '✎'}
+          </div>
+          <div style={{ color: hasOverride ? 'var(--primary)' : 'var(--text)' }}>
+            {efficiency > 0 ? `${efficiency.toFixed(1)} W/TH` : '—'}
+          </div>
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Earnings</div>
@@ -114,25 +203,29 @@ const WorkerCard: React.FC<{ worker: Worker; maxHashrate: number; btcPrice: numb
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Fiat Value</div>
-          <div style={{ color: 'var(--color-success)' }}>
-            ${earningsFiat.toFixed(2)}
-          </div>
+          <div style={{ color: 'var(--color-success)' }}>${earningsFiat.toFixed(2)}</div>
         </div>
         <div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Power</div>
-          <div style={{ color: 'var(--color-warning)' }}>{fmtPower(worker.power_consumption)}</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>
+            Power {hasOverride && '✎'}
+          </div>
+          <div style={{ color: 'var(--color-warning)' }}>{fmtPower(powerWatts)}</div>
         </div>
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Cost/Day</div>
           <div style={{ color: 'var(--color-error)' }}>${dailyPowerCost.toFixed(2)}</div>
         </div>
-        <div style={{ gridColumn: '1 / -1' }}>
+        <div>
+          <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Profit/Day</div>
+          <div style={{ color: dailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
+            {dailyProfit >= 0 ? '+' : ''}${dailyProfit.toFixed(2)}
+          </div>
+        </div>
+        <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Last Share</div>
           <div style={{ color: 'var(--primary)' }}>{worker.last_share || '—'}</div>
         </div>
       </div>
-
-      {/* Acceptance rate removed — was hardcoded cosmetic data */}
     </div>
   );
 };
@@ -140,10 +233,27 @@ const WorkerCard: React.FC<{ worker: Worker; maxHashrate: number; btcPrice: numb
 export const Workers: React.FC = () => {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
+  const [overrides, setOverrides] = useState<OverrideMap>(loadOverrides);
+  const [powerCost, setPowerCost] = useState(loadPowerCost);
+  const [showPowerSettings, setShowPowerSettings] = useState(false);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
 
   const { workers, loading, error, refresh } = useWorkers(status, 'hashrate_3hr', true);
+
+  const handleOverride = useCallback((name: string, o: WorkerOverride | undefined) => {
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (o === undefined) { delete next[name]; } else { next[name] = o; }
+      saveOverrides(next);
+      return next;
+    });
+  }, []);
+
+  const handlePowerCostChange = useCallback((v: number) => {
+    setPowerCost(v);
+    savePowerCost(v);
+  }, []);
 
   // Filtered + searched workers
   const filtered = useMemo(() => {
@@ -175,10 +285,23 @@ export const Workers: React.FC = () => {
     return Object.entries(map).sort((a, b) => b[1].totalHr - a[1].totalHr);
   }, [filtered]);
 
+  // Compute power with overrides applied
+  const computeWorkerPower = useCallback((w: Worker) => {
+    const ov = overrides[w.name];
+    if (ov?.powerConsumption !== undefined) return ov.powerConsumption;
+    if (ov?.efficiency !== undefined && w.hashrate_3hr > 0) return Math.round(w.hashrate_3hr * ov.efficiency);
+    return w.power_consumption;
+  }, [overrides]);
+
   const totalPower = useMemo(
-    () => filtered.reduce((sum, w) => sum + w.power_consumption, 0),
-    [filtered],
+    () => filtered.reduce((sum, w) => sum + computeWorkerPower(w), 0),
+    [filtered, computeWorkerPower],
   );
+
+  const totalDailyCost = (totalPower / 1000) * 24 * powerCost;
+  const totalDailyEarningsFiat = (workers?.total_earnings ?? 0) * btcPrice;
+  const totalDailyProfit = totalDailyEarningsFiat - totalDailyCost;
+  const overrideCount = Object.keys(overrides).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -247,7 +370,7 @@ export const Workers: React.FC = () => {
               {fmtPower(totalPower)}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              ~${((totalPower / 1000) * 24 * 0.12).toFixed(2)}/day
+              ~${totalDailyCost.toFixed(2)}/day @ ${powerCost.toFixed(2)}/kWh
             </div>
           </div>
 
@@ -286,6 +409,67 @@ export const Workers: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Fleet Power Settings */}
+      <div className="card">
+        <div className="flex justify-between items-center" style={{ cursor: 'pointer' }} onClick={() => setShowPowerSettings(!showPowerSettings)}>
+          <div className="label">
+            ⚡ FLEET POWER SETTINGS
+            {overrideCount > 0 && (
+              <span style={{ color: 'var(--primary)', marginLeft: '8px', fontSize: '12px' }}>
+                {overrideCount} custom override{overrideCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <span style={{ color: 'var(--text-dim)', fontSize: '14px' }}>{showPowerSettings ? '▼' : '▶'}</span>
+        </div>
+
+        {showPowerSettings && (
+          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Electricity Cost ($/kWh)</label>
+                <input
+                  type="number" step="0.01" min="0" max="1"
+                  value={powerCost}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0) handlePowerCostChange(v); }}
+                  style={{ width: '100%', fontSize: '16px', padding: '6px 10px', marginTop: '4px' }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Daily Cost</div>
+                <div style={{ fontSize: '22px', color: 'var(--color-error)', fontFamily: 'var(--font-vt323)', marginTop: '4px' }}>
+                  ${totalDailyCost.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Daily Profit</div>
+                <div style={{
+                  fontSize: '22px', fontFamily: 'var(--font-vt323)', marginTop: '4px',
+                  color: totalDailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)',
+                  textShadow: totalDailyProfit >= 0 ? '0 0 8px rgba(0,204,102,0.3)' : '0 0 8px rgba(255,68,68,0.3)',
+                }}>
+                  {totalDailyProfit >= 0 ? '+' : ''}${totalDailyProfit.toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: '1.5' }}>
+              Click ⚙ on any worker card to set custom efficiency (W/TH) or power draw (watts).
+              Changes are saved locally and override the auto-detected values.
+              All cost/profit calculations across the dashboard update automatically.
+            </div>
+            {overrideCount > 0 && (
+              <button
+                className="btn"
+                onClick={() => { setOverrides({}); saveOverrides({}); }}
+                style={{ alignSelf: 'flex-start', fontSize: '12px' }}
+              >
+                RESET ALL OVERRIDES ({overrideCount})
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Controls */}
       <div className="flex gap-2 items-center" style={{ flexWrap: 'wrap' }}>
@@ -332,7 +516,15 @@ export const Workers: React.FC = () => {
           }}
         >
           {filtered.map((w) => (
-            <WorkerCard key={w.name} worker={w} maxHashrate={maxHashrate} btcPrice={btcPrice} />
+            <WorkerCard
+              key={w.name}
+              worker={w}
+              maxHashrate={maxHashrate}
+              btcPrice={btcPrice}
+              powerCost={powerCost}
+              override={overrides[w.name]}
+              onOverride={handleOverride}
+            />
           ))}
         </div>
       )}
