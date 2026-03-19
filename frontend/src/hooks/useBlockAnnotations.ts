@@ -12,6 +12,61 @@ const STORAGE_KEY = 'blockAnnotations_v2';
 const DEFAULT_WINDOW_MIN = 180;
 const MAX_ENTRIES = 100;
 
+/** Show a celebratory toast when a new block is found */
+function showBlockToast(blockHeight: number) {
+  // Remove existing toast if any
+  const existing = document.getElementById('block-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'block-toast';
+  toast.innerHTML = `⛏️ NEW BLOCK FOUND: #${blockHeight.toLocaleString()}`;
+  Object.assign(toast.style, {
+    position: 'fixed',
+    top: '70px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'var(--bg-card)',
+    color: 'var(--primary)',
+    border: '1px solid var(--primary)',
+    borderRadius: '8px',
+    padding: '12px 24px',
+    fontFamily: 'var(--font-vt323)',
+    fontSize: '20px',
+    letterSpacing: '2px',
+    textShadow: '0 0 10px var(--primary-glow)',
+    boxShadow: '0 0 20px var(--primary-glow), 0 4px 20px rgba(0,0,0,0.5)',
+    zIndex: '9999',
+    animation: 'blockToastIn 0.4s ease-out',
+    whiteSpace: 'nowrap',
+  });
+
+  // Inject animation keyframes if not already present
+  if (!document.getElementById('block-toast-style')) {
+    const style = document.createElement('style');
+    style.id = 'block-toast-style';
+    style.textContent = `
+      @keyframes blockToastIn {
+        0% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.9); }
+        100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+      }
+      @keyframes blockToastOut {
+        0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(toast);
+
+  // Fade out and remove after 5 seconds
+  setTimeout(() => {
+    toast.style.animation = 'blockToastOut 0.4s ease-in forwards';
+    setTimeout(() => toast.remove(), 400);
+  }, 5000);
+}
+
 export interface AnnotationEntry {
   /** Unix ms timestamp when the block was detected */
   timestamp: number;
@@ -86,6 +141,16 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     // Label must match the format used in the chart's x-axis
     const label = new Date().toLocaleTimeString();
     const newEntry: AnnotationEntry = { timestamp: now, label };
+
+    // 🔊 Play block found sound
+    try {
+      const audio = new Audio('/audio/block.mp3');
+      audio.volume = 0.7;
+      audio.play().catch(() => {}); // ignore autoplay restrictions
+    } catch {}
+
+    // 🎉 Show congrats toast
+    showBlockToast(metrics.last_block_height);
 
     setAnnotations((prev) => {
       const pruned = pruneEntries(prev, windowMinutes);
