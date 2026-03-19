@@ -354,6 +354,100 @@ input:focus, select:focus, textarea:focus {
   100% { top: 110%; }
 }
 
+/* ---- Arrow Indicator Bounce ---- */
+@keyframes arrowBounceUp {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(-5px) scale(1.2); }
+  60%  { transform: translateY(2px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes arrowBounceDown {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(5px) scale(1.2); }
+  60%  { transform: translateY(-2px) scale(0.95); }
+  100% { transform: translateY(0) scale(1); }
+}
+.arrow-bounce-up   { animation: arrowBounceUp   0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+.arrow-bounce-down { animation: arrowBounceDown 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+/* ---- CRT Retro Refresh Pulse ---- */
+@keyframes crtRefreshPulse {
+  0%   { opacity: 1; }
+  15%  { opacity: 0.82; filter: brightness(1.18) saturate(1.15); }
+  30%  { opacity: 0.96; }
+  50%  { opacity: 0.88; filter: brightness(1.08); }
+  100% { opacity: 1; filter: none; }
+}
+@keyframes crtScanFlash {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.18; }
+  60%  { opacity: 0.06; }
+  100% { opacity: 0; }
+}
+.crt-refresh-active { animation: crtRefreshPulse 0.28s ease-out forwards; }
+
+/* CRT scan flash overlay — inserted by retro refresh logic */
+#crt-refresh-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    var(--primary-glow) 3px,
+    var(--primary-glow) 4px
+  );
+  opacity: 0;
+}
+#crt-refresh-overlay.active { animation: crtScanFlash 0.28s ease-out forwards; }
+
+/* ---- Block Celebration Confetti ---- */
+@keyframes confettiDrop {
+  0%   { transform: translateY(-20px) rotate(0deg) scale(0.8); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateY(90vh) rotate(720deg) scale(0.4); opacity: 0; }
+}
+@keyframes confettiFloat {
+  0%   { transform: translateY(-10px) rotate(0deg) translateX(0); opacity: 0; }
+  10%  { opacity: 1; }
+  50%  { transform: translateY(40vh) rotate(360deg) translateX(var(--drift, 30px)); }
+  90%  { opacity: 0.5; }
+  100% { transform: translateY(95vh) rotate(720deg) translateX(calc(var(--drift, 30px) * 2)); opacity: 0; }
+}
+.confetti-particle {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 9997;
+  animation: confettiFloat var(--duration, 3s) ease-in var(--delay, 0s) forwards;
+}
+
+/* ---- Hashrate Notice ---- */
+.hashrate-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 170, 0, 0.08);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+  color: var(--color-warning);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  animation: stagger-in 0.3s ease-out both;
+}
+.hashrate-notice-error {
+  background: rgba(255, 68, 68, 0.08);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
 /* ---- Layout utilities ---- */
 .flex        { display: flex; }
 .flex-col    { flex-direction: column; }

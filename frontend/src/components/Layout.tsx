@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/store';
 import { ThemeToggle } from './ThemeToggle';
 import { AudioPlayer } from './AudioPlayer';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useRetroRefresh } from '../hooks/useRetroRefresh';
 import { EasterEgg } from './EasterEgg';
 import { UnderwaterBubbles } from './UnderwaterBubbles';
 
@@ -22,6 +23,7 @@ interface Props {
 
 export const Layout: React.FC<Props> = ({ children }) => {
   useKeyboardShortcuts();
+  useRetroRefresh();
   const sseConnected = useAppStore((s) => s.sseConnected);
   const unreadCount = useAppStore((s) => s.unreadCount);
   const [menuOpen, setMenuOpen] = useState(false);
