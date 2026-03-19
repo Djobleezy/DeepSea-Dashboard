@@ -335,7 +335,7 @@ export const Workers: React.FC = () => {
   const [showPowerSettings, setShowPowerSettings] = useState(false);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
-  const { formatFiat: formatFiatMain, formatFiatSigned: formatFiatSignedMain } = useCurrency();
+  const { formatFiat: formatFiatMain } = useCurrency();
 
   const { workers, loading, error, refresh } = useWorkers(status, 'hashrate_3hr', true);
 

@@ -211,7 +211,7 @@ interface BatchResult {
   duration_ms: number;
 }
 
-let _batchQueue: BatchQueueEntry[] = [];
+const _batchQueue: BatchQueueEntry[] = [];
 let _batchTimer: ReturnType<typeof window.setTimeout> | null = null;
 const BATCH_DEBOUNCE_MS = 50;
 
