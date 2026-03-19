@@ -36,7 +36,7 @@ async def get_workers(
     sort_by: str = Query(default="name", description="Sort column"),
     descending: bool = Query(default=False),
 ):
-    cached = await cache_get("workers")
+    cached = await cache_get(background.get_cache_key("workers"))
     if not cached:
         live = background.get_current_workers()
         if live:

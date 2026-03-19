@@ -20,7 +20,7 @@ router = APIRouter()
 @router.get("/metrics", response_model=DashboardMetrics)
 async def get_metrics():
     """Return the latest cached metrics snapshot."""
-    cached = await cache_get("metrics")
+    cached = await cache_get(background.get_cache_key("metrics"))
     if cached:
         return DashboardMetrics(**cached)
     # Return defaults if not yet populated

@@ -19,6 +19,7 @@ services:
     environment:
       - CONFIG_PATH=/config/config.json
       - REDIS_URL=redis://redis:6379
+      - DB_PATH=/data/deepsea.db
     volumes:
       - ./config.json:/config/config.json
       - deepsea-data:/data

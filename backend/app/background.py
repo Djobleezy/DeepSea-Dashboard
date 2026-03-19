@@ -11,7 +11,8 @@ import aiosqlite
 
 from app.config import get_wallet
 from app.db import DB_PATH, _configure_connection, save_metric_snapshot
-from app.services.cache import cache_set
+from app.models import DashboardMetrics, WorkerSummary
+from app.services.cache import cache_delete, cache_set
 from app.services.metrics_service import fetch_full_metrics
 from app.services.notification_engine import check_and_fire
 from app.services.ocean_client import OceanClient
@@ -24,6 +25,7 @@ _last_refresh: Optional[float] = None
 _current_metrics: Optional[dict] = None
 _current_workers: Optional[dict] = None
 _subscribers: list[asyncio.Queue] = []
+_cache_scope: Optional[str] = None
 
 _client: Optional[OceanClient] = None
 
@@ -65,23 +67,48 @@ def _broadcast(event: dict) -> None:
             pass  # slow consumer, skip
 
 
-async def refresh_once(db: aiosqlite.Connection) -> None:
-    global _last_refresh, _current_metrics, _current_workers, _client
+def get_cache_key(name: str, wallet: str | None = None) -> str:
+    scoped_wallet = (wallet or get_wallet() or "no-wallet").strip() or "no-wallet"
+    return f"deepsea:{scoped_wallet}:{name}"
 
-    wallet = get_wallet()
+
+async def _clear_runtime_state(previous_wallet: str | None = None) -> None:
+    global _current_metrics, _current_workers, _cache_scope
+
+    if previous_wallet:
+        await cache_delete(get_cache_key("metrics", previous_wallet))
+        await cache_delete(get_cache_key("workers", previous_wallet))
+
+    _current_metrics = None
+    _current_workers = None
+    _cache_scope = None
+    _broadcast({"type": "metrics", "data": DashboardMetrics().model_dump()})
+    _broadcast({"type": "workers", "data": WorkerSummary().model_dump()})
+
+
+async def refresh_once(db: aiosqlite.Connection) -> None:
+    global _last_refresh, _current_metrics, _current_workers, _client, _cache_scope
+
+    wallet = get_wallet().strip()
     if not wallet:
+        await _clear_runtime_state(_cache_scope)
         _log.debug("No wallet configured, skipping refresh")
         return
+
+    if _cache_scope and _cache_scope != wallet:
+        await _clear_runtime_state(_cache_scope)
 
     if _client is None or _client.wallet != wallet:
         if _client:
             await _client.close()
         _client = OceanClient(wallet=wallet)
 
+    _cache_scope = wallet
+
     try:
         metrics = await fetch_full_metrics(_client)
         _current_metrics = metrics.model_dump()
-        await cache_set("metrics", _current_metrics, ttl=120)
+        await cache_set(get_cache_key("metrics", wallet), _current_metrics, ttl=120)
 
         # Save historical snapshot
         await save_metric_snapshot(db, _current_metrics)
@@ -104,9 +131,14 @@ async def refresh_once(db: aiosqlite.Connection) -> None:
         workers = await _client.get_worker_data()
         if workers:
             from app.services.worker_service import enrich_workers
+
             workers["workers"] = enrich_workers(workers.get("workers", []))
             _current_workers = workers
-            await cache_set("workers", _current_workers, ttl=120)
+            await cache_set(get_cache_key("workers", wallet), _current_workers, ttl=120)
+            _broadcast({"type": "workers", "data": _current_workers})
+        else:
+            _current_workers = WorkerSummary().model_dump()
+            await cache_delete(get_cache_key("workers", wallet))
             _broadcast({"type": "workers", "data": _current_workers})
     except Exception as e:
         _log.error("Worker refresh error: %s", e)

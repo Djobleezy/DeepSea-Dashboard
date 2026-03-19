@@ -30,6 +30,7 @@ EXPOSE 8000
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/backend
+ENV DB_PATH=/data/deepsea.db
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8000/api/health || exit 1

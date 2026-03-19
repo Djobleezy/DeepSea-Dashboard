@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchNotifications,
   markNotificationRead,
@@ -15,23 +15,34 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const unreadCount = useAppStore((s) => s.unreadCount);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
     try {
       const data = await fetchNotifications(category);
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setNotifications(data);
       setError(null);
     } catch (e) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to load notifications');
     } finally {
+      if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setLoading(false);
     }
   }, [category, setNotifications]);
 
   useEffect(() => {
+    mountedRef.current = true;
     load();
     const timer = setInterval(load, pollMs);
-    return () => clearInterval(timer);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(timer);
+    };
   }, [load, pollMs]);
 
   const markRead = async (id: string) => {

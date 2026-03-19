@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -10,7 +11,7 @@ from typing import Optional
 
 import aiosqlite
 
-DB_PATH = Path("/app/data/deepsea.db")
+DB_PATH = Path(os.environ.get("DB_PATH", "/data/deepsea.db"))
 
 
 async def _configure_connection(db: aiosqlite.Connection) -> None:
