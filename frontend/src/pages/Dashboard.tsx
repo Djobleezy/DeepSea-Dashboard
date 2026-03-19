@@ -203,16 +203,16 @@ export const Dashboard: React.FC = () => {
       {/* Bitcoin progress bar + payout */}
       <div className="grid-2" style={{ animation: 'stagger-in 0.4s ease-out 0.35s both' }}>
         <div className="card">
-          <div className="label" style={{ marginBottom: '12px' }}>BITCOIN BLOCK TIMER</div>
+          <div className="label" style={{ marginBottom: '12px' }}>OCEAN POOL BLOCK TIMER</div>
           <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
           <div className="flex gap-2 mt-2">
             <div>
-              <div className="label">LAST BLOCK</div>
+              <div className="label">LAST OCEAN BLOCK</div>
               <div className="value-sm glow">#{metrics.last_block_height.toLocaleString()}</div>
               <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{metrics.last_block_time}</div>
             </div>
             <div>
-              <div className="label">BLOCKS FOUND</div>
+              <div className="label">POOL BLOCKS FOUND</div>
               <div className="value-sm glow">{metrics.blocks_found}</div>
             </div>
           </div>
