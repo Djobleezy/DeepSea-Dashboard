@@ -92,6 +92,15 @@ async def init_db() -> None:
                 unpaid_earnings REAL
             )
         """)
+        # Persists notification engine state across restarts, preventing alert
+        # storms and duplicate notifications after a process restart.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS alert_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+        """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS client_errors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -324,4 +333,39 @@ async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
     # Prune old entries (keep 30 days)
     cutoff = time.time() - 30 * 86400
     await db.execute("DELETE FROM metric_history WHERE timestamp < ?", (cutoff,))
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Alert state (notification engine persistence)
+# ---------------------------------------------------------------------------
+
+
+async def get_alert_state(db: aiosqlite.Connection) -> dict:
+    """Load persisted alert engine state from the database.
+
+    Returns a dict suitable for initialising
+    :attr:`~app.services.notification_engine._prev_state` and the cooldown
+    tracker on startup.  Missing keys are silently omitted so the caller
+    can apply safe defaults.
+    """
+    async with db.execute("SELECT key, value FROM alert_state") as cur:
+        rows = await cur.fetchall()
+    result: dict = {}
+    for row in rows:
+        try:
+            result[row["key"]] = json.loads(row["value"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return result
+
+
+async def set_alert_state(db: aiosqlite.Connection, key: str, value) -> None:
+    """Upsert a single key into the alert_state table."""
+    await db.execute(
+        """INSERT INTO alert_state (key, value, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+        (key, json.dumps(value), time.time()),
+    )
     await db.commit()
