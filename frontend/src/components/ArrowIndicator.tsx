@@ -116,7 +116,18 @@ export const ArrowIndicator: React.FC<Props> = ({
   const state = arrowMap.get(key);
   const valid = state && (now - state.setAt) <= ARROW_TTL_MS;
 
-  if (!valid) return null;
+  // Force re-render when TTL expires so the arrow disappears
+  useEffect(() => {
+    if (!state) return;
+    const remaining = ARROW_TTL_MS - (Date.now() - state.setAt);
+    if (remaining <= 0) return;
+    const timer = window.setTimeout(() => {
+      setTick((t) => t + 1);
+    }, remaining + 10);
+    return () => window.clearTimeout(timer);
+  }, [state?.setAt, key]);
+
+  if (!valid || !state) return null;
 
   // Pick bounce class when arrow first appears or direction changes
   const isNew =
@@ -135,17 +146,6 @@ export const ArrowIndicator: React.FC<Props> = ({
   const icon  = state.big
     ? (up ? '⇈' : '⇊')
     : (up ? '↑' : '↓');
-
-  // Force re-render when TTL expires so the arrow disappears
-  useEffect(() => {
-    if (!state) return;
-    const remaining = ARROW_TTL_MS - (Date.now() - state.setAt);
-    if (remaining <= 0) return;
-    const timer = window.setTimeout(() => {
-      setTick((t) => t + 1);
-    }, remaining + 10);
-    return () => window.clearTimeout(timer);
-  }, [state?.setAt, key]);
 
   void tick; // used to trigger rerender after TTL timeout
 
