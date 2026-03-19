@@ -89,6 +89,6 @@ app.include_router(notifications.router, prefix=api_prefix, tags=["notifications
 app.include_router(config_routes.router, prefix=api_prefix, tags=["config"])
 
 # Serve built frontend (if present)
-_frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if _frontend_dist.exists():
     app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="static")
