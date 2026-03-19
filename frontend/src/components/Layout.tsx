@@ -181,12 +181,12 @@ export const Layout: React.FC<Props> = ({ children }) => {
           padding: '8px 16px',
           fontSize: '10px',
           color: 'var(--text-dim)',
-          display: 'flex',
-          justifyContent: 'space-between',
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
         }}
       >
-        <span>DEEPSEA DASHBOARD v2.0 — OCEAN.XYZ MINING MONITOR</span>
+        <span>DEEPSEA DASHBOARD v2.0</span>
         <a
           href="https://x.com/DJObleezy"
           target="_blank"
@@ -202,7 +202,10 @@ export const Layout: React.FC<Props> = ({ children }) => {
         >
           MADE BY @DJO₿LEEZY
         </a>
-        <span style={{ color: sseConnected ? 'var(--color-success)' : 'var(--color-warning)' }}>
+        <span style={{
+          color: sseConnected ? 'var(--color-success)' : 'var(--color-warning)',
+          textAlign: 'right',
+        }}>
           {sseConnected ? '● LIVE' : '○ CONNECTING'}
         </span>
       </footer>

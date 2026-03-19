@@ -15,7 +15,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "5051:8000"
     environment:
       - CONFIG_PATH=/config/config.json
       - REDIS_URL=redis://redis:6379
