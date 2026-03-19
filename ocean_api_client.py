@@ -285,10 +285,15 @@ class OceanApiClientMixin:
                 if isinstance(blocks, list) and blocks:
                     block = blocks[0]
                     result["last_block_height"] = block.get("height")
-                    ts = block.get("time") or block.get("timestamp")
+                    ts = block.get("ts") or block.get("time") or block.get("timestamp")
                     if ts:
-                        dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
-                        result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+                        try:
+                            # Try ISO format first (e.g. "2026-03-19T01:10:25.190700")
+                            dt = datetime.fromisoformat(str(ts)).replace(tzinfo=ZoneInfo("UTC"))
+                        except (ValueError, TypeError):
+                            # Fall back to unix timestamp
+                            dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC"))
+                        result["last_block_time"] = dt.astimezone(ZoneInfo(get_timezone())).strftime("%Y-%m-%d %I:%M %p")
         except Exception as e:
             logging.error(f"Error parsing blocks API: {e}")
 
