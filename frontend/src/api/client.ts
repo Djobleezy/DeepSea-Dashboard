@@ -51,6 +51,9 @@ async function del<T>(path: string): Promise<T> {
 // Metrics
 export const fetchMetrics = () => get<DashboardMetrics>('/metrics');
 
+export const fetchMetricHistory = (hours = 1) =>
+  get<{ timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]>('/metrics/history', { hours });
+
 // Workers
 export const fetchWorkers = (
   status = 'all',

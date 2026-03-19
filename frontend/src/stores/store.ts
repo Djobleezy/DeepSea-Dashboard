@@ -61,7 +61,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
   hydrateChart: (points) =>
-    set(() => {
+    set((s) => {
       const data60s = points.map((p) => ({
         label: new Date(p.timestamp * 1000).toLocaleTimeString(),
         value: p.hashrate_60sec,
@@ -71,8 +71,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         value: p.hashrate_3hr,
       }));
       return {
-        chartData60s: data60s.slice(-60),
-        chartData3hr: data3hr.slice(-60),
+        // Keep any points already received via SSE/polling and prepend hydrated history.
+        chartData60s: [...data60s, ...s.chartData60s].slice(-60),
+        chartData3hr: [...data3hr, ...s.chartData3hr].slice(-60),
         chartHydrated: true,
       };
     }),

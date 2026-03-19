@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import { fetchMetricHistory } from '../api/client';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
@@ -49,13 +50,9 @@ export const Dashboard: React.FC = () => {
     if (hydrationAttempted.current || chartHydrated) return;
     hydrationAttempted.current = true;
 
-    const apiBase = import.meta.env.VITE_API_BASE || '';
-    fetch(`${apiBase}/api/metrics/history?hours=1`)
-      .then((r) => (r.ok ? r.json() : []))
+    fetchMetricHistory(1)
       .then((points) => {
-        if (Array.isArray(points) && points.length > 0) {
-          hydrateChart(points);
-        }
+        hydrateChart(Array.isArray(points) ? points : []);
       })
       .catch(() => {});
   }, [chartHydrated, hydrateChart]);

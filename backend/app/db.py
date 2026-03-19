@@ -269,7 +269,8 @@ async def get_metric_history(
     async with db.execute(
         """SELECT timestamp, hashrate_60sec, hashrate_3hr
            FROM metric_history
-           WHERE timestamp > ? AND hashrate_60sec > 0
+           WHERE timestamp > ?
+             AND (COALESCE(hashrate_60sec, 0) > 0 OR COALESCE(hashrate_3hr, 0) > 0)
            ORDER BY timestamp ASC
            LIMIT ?""",
         (cutoff, limit),
