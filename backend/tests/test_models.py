@@ -1,6 +1,5 @@
 """Tests for Pydantic models and utility functions."""
 
-import pytest
 from app.models import (
     DashboardMetrics,
     Worker,

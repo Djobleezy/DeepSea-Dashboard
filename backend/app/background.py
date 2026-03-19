@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Optional
+from typing import Optional
 
 import aiosqlite
 
@@ -13,7 +13,7 @@ from app.config import get_wallet
 from app.db import DB_PATH, _configure_connection, save_metric_snapshot
 from app.services.cache import cache_set
 from app.services.metrics_service import fetch_full_metrics
-from app.services.notification_engine import check_and_fire, fire_system_notification
+from app.services.notification_engine import check_and_fire
 from app.services.ocean_client import OceanClient
 
 _log = logging.getLogger(__name__)

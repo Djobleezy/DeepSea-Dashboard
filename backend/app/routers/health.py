@@ -1,6 +1,5 @@
 """Health check endpoint."""
 
-import time
 from fastapi import APIRouter
 
 from app import background
