@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
-import { ArrowIndicator } from '../components/ArrowIndicator';
 import { StaggerChildren } from '../components/StaggerChildren';
 import type { Worker } from '../types';
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import { fetchBlocks } from '../api/client';
 import { useAppStore } from '../stores/store';
-import { fmtHashrate } from '../utils/format';
 import type { Block, BlocksResponse } from '../types';
 
 // ── Pool colors ────────────────────────────────────────────────────────────

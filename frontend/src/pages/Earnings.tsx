@@ -3,8 +3,6 @@ import { fetchEarnings } from '../api/client';
 import { useAppStore } from '../stores/store';
 import type { EarningsResponse } from '../types';
 
-const SATS_PER_BTC = 100_000_000;
-
 export const Earnings: React.FC = () => {
   const [days, setDays] = useState(90);
   const [data, setData] = useState<EarningsResponse | null>(null);

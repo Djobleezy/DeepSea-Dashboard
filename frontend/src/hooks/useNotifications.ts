@@ -30,8 +30,9 @@ export function useNotifications(category = 'all', pollMs = 30000) {
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to load notifications');
     } finally {
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [category, setNotifications]);
 

@@ -1,40 +1,30 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/store';
 
 interface Droplet {
   id: number;
-  x: number;       // % from left
-  y: number;       // % from top
-  size: number;    // px
+  x: number; // % from left
+  y: number; // % from top
+  size: number; // px
   dripping: boolean;
   dripDuration: number; // s
   condenseFadeDelay: number; // s before condensation fades in
 }
 
-interface Trail {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 let nextDropletId = 0;
-let nextTrailId = 0;
 
 function createDroplet(): Droplet {
   return {
     id: nextDropletId++,
-    x: 5 + Math.random() * 90,       // 5–95% to stay on screen
-    y: 5 + Math.random() * 60,       // upper 65% of screen
-    size: 12 + Math.random() * 24,   // 12–36px
+    x: 5 + Math.random() * 90,
+    y: 5 + Math.random() * 60,
+    size: 12 + Math.random() * 24,
     dripping: false,
-    dripDuration: 3 + Math.random() * 3, // 3–6s
+    dripDuration: 3 + Math.random() * 3,
     condenseFadeDelay: Math.random() * 0.5,
   };
 }
 
-// Theme → droplet color config
 const THEME_COLORS: Record<string, { bg: string; glow: string; trail: string }> = {
   deepsea: {
     bg: 'rgba(0, 136, 204, 0.3)',
@@ -54,54 +44,29 @@ const THEME_COLORS: Record<string, { bg: string; glow: string; trail: string }> 
 };
 
 interface Props {
-  active?: boolean; // if false, droplets won't spawn
+  active?: boolean;
 }
 
 export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
   const theme = useAppStore((s) => s.theme);
   const [droplets, setDroplets] = React.useState<Droplet[]>([]);
-  const [trails, setTrails] = React.useState<Trail[]>([]);
   const [condensation, setCondensation] = React.useState(false);
   const spawnTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const colors = THEME_COLORS[theme] ?? THEME_COLORS.deepsea;
 
-  const removeDroplet = useCallback((id: number) => {
+  const removeDroplet = (id: number) => {
     setDroplets((prev) => prev.filter((d) => d.id !== id));
-  }, []);
-
-  const removeTrail = useCallback((id: number) => {
-    setTrails((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const startDripping = useCallback((id: number, x: number, y: number, size: number) => {
-    setDroplets((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, dripping: true } : d))
-    );
-    // Create trail
-    const trail: Trail = {
-      id: nextTrailId++,
-      x,
-      y: y + size / 2,
-      width: size * 0.4,
-      height: 0, // grows via animation
-    };
-    setTrails((prev) => [...prev, trail]);
-    // Remove trail after drip is done
-    setTimeout(() => removeTrail(trail.id), 5000);
-  }, [removeTrail]);
+  };
 
   useEffect(() => {
     if (!active) {
       setDroplets([]);
-      setTrails([]);
       setCondensation(false);
       return;
     }
 
-    // Show condensation overlay shortly after mounting
     const condTimer = setTimeout(() => setCondensation(true), 300);
 
-    // Spawn droplets gradually
     let spawnCount = 0;
     const maxDroplets = 8;
     spawnTimer.current = setInterval(() => {
@@ -113,7 +78,6 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
       spawnCount++;
     }, 400);
 
-    // After 3s start making them drip
     const dripTimer = setTimeout(() => {
       setDroplets((prev) => prev.map((d) => ({ ...d, dripping: true })));
     }, 3000);
@@ -148,18 +112,12 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
           30%  { transform: translateY(8px) scale(0.95, 1.1); opacity: 1; }
           100% { transform: translateY(100vh) scale(0.6, 1.3); opacity: 0; }
         }
-        @keyframes trail-grow {
-          0%   { height: 0; opacity: 0; }
-          20%  { opacity: 1; }
-          100% { height: 60px; opacity: 0; }
-        }
         @keyframes condensation-fade {
           0%   { opacity: 0; }
           100% { opacity: 1; }
         }
       `}</style>
 
-      {/* Screen condensation overlay */}
       {condensation && (
         <div
           style={{
@@ -171,24 +129,6 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
         />
       )}
 
-      {/* Trails */}
-      {trails.map((t) => (
-        <div
-          key={t.id}
-          style={{
-            position: 'absolute',
-            left: `${t.x}%`,
-            top: `${t.y}%`,
-            width: `${t.width}px`,
-            background: `linear-gradient(to bottom, transparent, ${colors.trail} 20%, ${colors.trail} 70%, transparent)`,
-            borderRadius: '50% 50% 0 0 / 80% 80% 0 0',
-            animation: `trail-grow 4.5s ease forwards`,
-            transform: 'translateX(-50%)',
-          }}
-        />
-      ))}
-
-      {/* Droplets */}
       {droplets.map((d) => (
         <div
           key={d.id}
@@ -214,7 +154,6 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
             opacity: d.dripping ? 1 : 0,
           }}
         >
-          {/* Highlight */}
           <div
             style={{
               position: 'absolute',

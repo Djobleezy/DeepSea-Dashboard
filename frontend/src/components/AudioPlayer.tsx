@@ -35,7 +35,9 @@ const CROSSFADE_DURATION = 2; // seconds
 function persist(key: string, value: string) {
   try {
     localStorage.setItem(key, value);
-  } catch {}
+  } catch (_err) {
+    // ignore storage failures (private mode/quota)
+  }
 }
 
 function load(key: string, fallback: string): string {

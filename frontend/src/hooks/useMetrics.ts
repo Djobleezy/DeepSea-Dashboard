@@ -23,8 +23,9 @@ export function useMetrics(pollMs = 60000) {
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to load metrics');
     } finally {
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [setMetrics]);
 

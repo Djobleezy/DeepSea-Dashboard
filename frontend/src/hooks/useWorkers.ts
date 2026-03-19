@@ -27,8 +27,9 @@ export function useWorkers(
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
       setError(e instanceof Error ? e.message : 'Failed to load workers');
     } finally {
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setLoading(false);
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [descending, setWorkers, sortBy, status]);
 

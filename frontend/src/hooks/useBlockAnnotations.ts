@@ -153,8 +153,12 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     try {
       const audio = new Audio('/audio/block.mp3');
       audio.volume = 0.7;
-      audio.play().catch(() => {}); // ignore autoplay restrictions
-    } catch {}
+      audio.play().catch(() => {
+        // ignore autoplay restrictions
+      });
+    } catch (_err) {
+      // ignore missing/blocked audio
+    }
 
     // 🎉 Show congrats toast
     showBlockToast(metrics.last_block_height);
