@@ -19,7 +19,27 @@ if "redis" not in sys.modules:
     sys.modules["redis"] = redis_mod
 
 from collections import deque
-from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES, MAX_HISTORY_ENTRIES
+import pytest
+import state_manager as sm_module
+from state_manager import StateManager, MAX_VARIANCE_HISTORY_ENTRIES
+
+# Other test modules (e.g. test_extended_history_reload) import app_setup
+# which calls init_state_manager() and mutates sm_module.MAX_HISTORY_ENTRIES.
+# Pytest collection order is non-deterministic, so we must read the constant
+# fresh from the module rather than relying on the import-time snapshot.
+_ORIGINAL_MAX = 180  # the default defined in state_manager.py
+
+
+@pytest.fixture(autouse=True)
+def _reset_max_history():
+    """Ensure MAX_HISTORY_ENTRIES is at its default before and after each test."""
+    sm_module.MAX_HISTORY_ENTRIES = _ORIGINAL_MAX
+    yield
+    sm_module.MAX_HISTORY_ENTRIES = _ORIGINAL_MAX
+
+
+# Local alias so existing test code still works
+MAX_HISTORY_ENTRIES = _ORIGINAL_MAX
 
 
 class DummyRedis:
