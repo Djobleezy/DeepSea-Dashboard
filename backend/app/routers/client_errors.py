@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Optional
+from typing import Any
 
 import aiosqlite
 from fastapi import APIRouter, Depends
 
 from app.db import get_db
-from app.models import ClientError, ClientErrorCreate
+from app.models import ClientErrorCreate
 
 MAX_ERRORS = 1000
 _log = logging.getLogger(__name__)
