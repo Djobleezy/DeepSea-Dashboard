@@ -17,6 +17,8 @@ interface AppState {
   chartData60s: ChartPoint[];
   chartData3hr: ChartPoint[];
   addChartPoint: (hr60s: number, hr3hr: number) => void;
+  chartHydrated: boolean;
+  hydrateChart: (points: { timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]) => void;
 
   // Workers
   workers: WorkerSummary | null;
@@ -49,12 +51,29 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   chartData60s: [],
   chartData3hr: [],
+  chartHydrated: false,
   addChartPoint: (hr60s, hr3hr) =>
     set((s) => {
       const ts = new Date().toLocaleTimeString();
       return {
         chartData60s: [...s.chartData60s.slice(-59), { label: ts, value: hr60s }],
         chartData3hr: [...s.chartData3hr.slice(-59), { label: ts, value: hr3hr }],
+      };
+    }),
+  hydrateChart: (points) =>
+    set(() => {
+      const data60s = points.map((p) => ({
+        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
+        value: p.hashrate_60sec,
+      }));
+      const data3hr = points.map((p) => ({
+        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
+        value: p.hashrate_3hr,
+      }));
+      return {
+        chartData60s: data60s.slice(-60),
+        chartData3hr: data3hr.slice(-60),
+        chartHydrated: true,
       };
     }),
 

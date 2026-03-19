@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
@@ -39,7 +39,26 @@ export const Dashboard: React.FC = () => {
   const chartData60s = useAppStore((s) => s.chartData60s);
   const chartData3hr = useAppStore((s) => s.chartData3hr);
   const addChartPoint = useAppStore((s) => s.addChartPoint);
+  const chartHydrated = useAppStore((s) => s.chartHydrated);
+  const hydrateChart = useAppStore((s) => s.hydrateChart);
   const { annotations: blockAnnotations } = useBlockAnnotations();
+  const hydrationAttempted = useRef(false);
+
+  // Hydrate chart from server history on first load
+  useEffect(() => {
+    if (hydrationAttempted.current || chartHydrated) return;
+    hydrationAttempted.current = true;
+
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    fetch(`${apiBase}/api/metrics/history?hours=1`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((points) => {
+        if (Array.isArray(points) && points.length > 0) {
+          hydrateChart(points);
+        }
+      })
+      .catch(() => {});
+  }, [chartHydrated, hydrateChart]);
 
   useEffect(() => {
     if (!metrics) return;
