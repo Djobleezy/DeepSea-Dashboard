@@ -182,6 +182,10 @@ export const fetchTimezones = () =>
 // Health
 export const fetchHealth = () => get<HealthStatus>('/health');
 
+// Exchange rates
+export const fetchExchangeRates = () =>
+  get<{ base: string; currencies: string[]; rates: Record<string, number> }>('/exchange-rates');
+
 // ---------------------------------------------------------------------------
 // Batch fetch client
 // ---------------------------------------------------------------------------
