@@ -1,4 +1,26 @@
-"""Metric processing, normalization, and unit conversion service."""
+"""Metrics aggregation, normalisation, and financial calculations.
+
+This module is the core data-assembly layer for the dashboard.  It coordinates
+parallel fetches from multiple Ocean API endpoints, normalises units, computes
+financial metrics, and returns a fully typed :class:`~app.models.DashboardMetrics`
+instance.
+
+**Aggregation pipeline** (``fetch_full_metrics``):
+
+1. Fire five concurrent API calls via ``asyncio.gather``: user hashrates, stat
+   snapshot, pool stats, latest block info, and Bitcoin network stats.
+2. Merge all result dicts into a single flat ``merged`` dict (later sources
+   overwrite earlier ones for conflicting keys).
+3. Normalise all hashrate fields to TH/s.
+4. Resolve ``workers_hashing`` from the per-user hashrate endpoint (not the
+   pool-wide count).
+5. Estimate ``daily_mined_sats`` from the hashrate-to-network-hashrate ratio.
+6. Compute profitability figures (revenue, power cost, profit) using config values.
+7. Optionally merge fields only available via HTML scraping (``est_time_to_payout``,
+   ``pool_fees_percentage``, ``blocks_found``) from a pre-cached scrape result.
+8. Detect low-hashrate mode (< 1 TH/s on the 60-second window).
+9. Construct and return a :class:`~app.models.DashboardMetrics` Pydantic model.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +38,19 @@ _log = logging.getLogger(__name__)
 
 
 def _normalize_hashrate_fields(data: dict) -> dict:
-    """Ensure all hashrate fields are in TH/s with proper unit strings."""
+    """Convert all hashrate fields in ``data`` to TH/s.
+
+    Reads each ``hashrate_*`` field and its companion ``*_unit`` field,
+    converts to TH/s using :func:`~app.models.convert_to_ths`, and writes
+    back ``"TH/s"`` as the unit.  Unknown or unconvertible values are
+    replaced with ``0.0``.
+
+    Args:
+        data: Flat metrics dict containing raw hashrate values.
+
+    Returns:
+        A new dict with normalised hashrate fields.
+    """
     out = dict(data)
     for field in ("hashrate_60sec", "hashrate_10min", "hashrate_3hr", "hashrate_24hr"):
         raw = out.get(field)
@@ -39,7 +73,26 @@ def compute_financials(
     power_cost: float,
     power_usage: float,
 ) -> dict[str, float]:
-    """Calculate daily/monthly revenue, power cost, and profit."""
+    """Calculate daily and monthly revenue, power cost, and profit in USD.
+
+    Formulas::
+
+        daily_revenue  = (daily_sats / 1e8) × btc_price
+        daily_power    = (power_usage_w / 1000) × 24 h × power_cost_per_kwh
+        daily_profit   = daily_revenue - daily_power
+        monthly_profit = monthly_revenue - (daily_power × 30)
+
+    Args:
+        daily_sats: Estimated sats mined per day.
+        monthly_sats: Estimated sats mined per month (typically daily × 30).
+        btc_price: Current BTC price in USD.
+        power_cost: Electricity cost in $/kWh (from config).
+        power_usage: Total miner power draw in watts (from config).
+
+    Returns:
+        Dict with keys: ``daily_revenue``, ``daily_power_cost``,
+        ``daily_profit_usd``, ``monthly_profit_usd`` (all USD, rounded to 2 dp).
+    """
     daily_revenue = (daily_sats / SATS_PER_BTC) * btc_price
     monthly_revenue = (monthly_sats / SATS_PER_BTC) * btc_price
     daily_power = (power_usage / 1000) * 24 * power_cost
@@ -58,7 +111,25 @@ def estimate_daily_sats_from_hashrate(
     network_hashrate_hs: float,
     block_reward_btc: float = 3.125,
 ) -> int:
-    """Rough estimate of daily mined sats from hashrate ratio."""
+    """Estimate daily mined satoshis from the miner's share of network hashrate.
+
+    Uses the proportional-share formula::
+
+        daily_btc = (user_H/s / network_H/s) × 144 blocks/day × block_reward_btc
+
+    This is a theoretical estimate; actual earnings depend on pool luck,
+    fees, and variance.
+
+    Args:
+        hashrate_ths: Miner's hashrate in TH/s.
+        network_hashrate_hs: Current network hashrate in H/s (raw).
+        block_reward_btc: Current block subsidy in BTC (default 3.125 post-4th
+            halving).
+
+    Returns:
+        Estimated daily earnings in satoshis (integer).  Returns ``0`` if
+        either hashrate argument is zero or negative.
+    """
     if network_hashrate_hs <= 0 or hashrate_ths <= 0:
         return 0
     user_hs = hashrate_ths * 1e12
@@ -72,7 +143,25 @@ async def fetch_full_metrics(
     client: OceanClient,
     cached_scrape: Optional[dict] = None,
 ) -> DashboardMetrics:
-    """Fetch all data sources concurrently and assemble DashboardMetrics."""
+    """Fetch, merge, and normalise all metrics into a ``DashboardMetrics`` model.
+
+    Executes five Ocean/Bitcoin API calls concurrently, merges results, applies
+    normalisation and financial calculations, and returns a fully populated
+    :class:`~app.models.DashboardMetrics` instance.
+
+    Args:
+        client: Authenticated :class:`~app.services.ocean_client.OceanClient`
+            instance for the configured wallet.
+        cached_scrape: Optional dict of fields sourced from a previous HTML
+            scrape (e.g. ``est_time_to_payout``, ``pool_fees_percentage``,
+            ``blocks_found``).  Used to fill in values not available via the
+            REST API.  Pass ``None`` to skip scrape merging.
+
+    Returns:
+        A fully populated :class:`~app.models.DashboardMetrics` instance.
+        Fields that could not be fetched retain their default values (typically
+        ``0.0`` or ``"N/A"``).
+    """
     power_cost = get_power_cost()
     power_usage = get_power_usage()
 

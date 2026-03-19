@@ -18,7 +18,7 @@ router = APIRouter()
 
 
 @router.get("/metrics", response_model=DashboardMetrics)
-async def get_metrics():
+async def get_metrics() -> DashboardMetrics:
     """Return the latest cached metrics snapshot."""
     cached = await cache_get(background.get_cache_key("metrics"))
     if cached:
@@ -31,7 +31,7 @@ async def get_metrics():
 
 
 @router.get("/stream")
-async def metrics_stream(request: Request):
+async def metrics_stream(request: Request) -> EventSourceResponse:
     """SSE endpoint — streams metrics + worker updates in real-time."""
 
     async def event_generator() -> AsyncGenerator[dict, None]:

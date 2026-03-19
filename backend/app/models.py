@@ -1,4 +1,26 @@
-"""Pydantic models for all data types in DeepSea Dashboard."""
+"""Pydantic v2 data models for the DeepSea Dashboard API.
+
+All models use Pydantic v2 syntax.  Key design decisions:
+
+- **Defensive defaults**: every field has a safe default so partially-populated
+  dicts can be unpacked into models without raising validation errors.
+- **Strict numeric bounds**: ``AppConfig`` / ``ConfigUpdate`` fields carry ``Field``
+  constraints (``ge``/``le``) that match the validation rules enforced at the API
+  layer.
+- **Hashrate units**: hashrate values are stored as raw floats alongside a
+  companion ``*_unit`` string (e.g. ``hashrate_3hr`` + ``hashrate_3hr_unit``).
+  Use :func:`convert_to_ths` and :func:`format_hashrate` for unit arithmetic.
+
+Model groups:
+
+- :class:`DashboardMetrics` — aggregated mining snapshot served by ``/api/metrics``
+- :class:`Worker` / :class:`WorkerSummary` — per-worker data and fleet summary
+- :class:`Block` / :class:`BlocksResponse` — Bitcoin block data
+- :class:`Payment` / :class:`EarningsResponse` — payout history
+- :class:`Notification` / :class:`NotificationCreate` — in-app event log
+- :class:`AppConfig` / :class:`ConfigUpdate` — user configuration
+- :class:`HealthStatus` — ``/api/health`` response
+"""
 
 from __future__ import annotations
 
@@ -14,6 +36,13 @@ from pydantic import BaseModel, Field, field_validator
 # ---------------------------------------------------------------------------
 
 class DashboardMetrics(BaseModel):
+    """Complete mining metrics snapshot served by ``GET /api/metrics``.
+
+    Aggregated from the Ocean REST API (hashrates, earnings, pool stats) and
+    Bitcoin network sources (BTC price, network hashrate, difficulty).  All
+    hashrate fields are normalised to TH/s; financial fields are in USD.
+    """
+
     hashrate_60sec: float = 0.0
     hashrate_60sec_unit: str = "TH/s"
     hashrate_10min: float = 0.0
@@ -61,6 +90,13 @@ class WorkerStatus(str, Enum):
 
 
 class Worker(BaseModel):
+    """A single mining worker (ASIC or BitAxe) with enriched metadata.
+
+    Raw data from the Ocean API is enriched by
+    :mod:`app.services.worker_service` to add ASIC model detection,
+    efficiency (J/TH), and estimated power consumption.
+    """
+
     name: str
     status: WorkerStatus = WorkerStatus.OFFLINE
     type: str = "ASIC"
@@ -77,6 +113,8 @@ class Worker(BaseModel):
 
 
 class WorkerSummary(BaseModel):
+    """Fleet-level worker summary returned by ``GET /api/workers``."""
+
     workers: list[Worker] = Field(default_factory=list)
     total_hashrate: float = 0.0
     hashrate_unit: str = "TH/s"
@@ -92,6 +130,8 @@ class WorkerSummary(BaseModel):
 # ---------------------------------------------------------------------------
 
 class Block(BaseModel):
+    """A single Bitcoin block with pool-attribution and miner earnings data."""
+
     height: int = 0
     hash: str = ""
     timestamp: str = ""
@@ -178,6 +218,12 @@ class NotificationCreate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class AppConfig(BaseModel):
+    """Full application configuration model (``GET /api/config`` response).
+
+    Reflects the persisted ``config.json`` values with validated types and
+    bounds.  See ``CONFIG.md`` in the repository root for field descriptions.
+    """
+
     wallet: str = ""
     power_cost: float = Field(default=0.12, ge=0, le=10)
     power_usage: float = Field(default=3450.0, ge=0, le=100000)
@@ -193,6 +239,12 @@ class AppConfig(BaseModel):
 
 
 class ConfigUpdate(BaseModel):
+    """Partial configuration update payload for ``POST /api/config``.
+
+    All fields are optional — only supplied fields are written to
+    ``config.json``.  Validation constraints mirror :class:`AppConfig`.
+    """
+
     wallet: Optional[str] = None
     power_cost: Optional[float] = Field(default=None, ge=0, le=10)
     power_usage: Optional[float] = Field(default=None, ge=0, le=100000)
@@ -214,6 +266,12 @@ class ConfigUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class HealthStatus(BaseModel):
+    """Response model for ``GET /api/health``.
+
+    Includes service-level liveness indicators for the Redis cache and the
+    Ocean API data refresh loop.
+    """
+
     status: str = "ok"
     version: str = "2.0.0"
     wallet_configured: bool = False

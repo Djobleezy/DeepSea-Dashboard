@@ -17,7 +17,7 @@ SATS_PER_BTC = 100_000_000
 
 
 @router.get("/earnings", response_model=EarningsResponse)
-async def get_earnings(days: int = Query(default=90, ge=1, le=365)):
+async def get_earnings(days: int = Query(default=90, ge=1, le=365)) -> EarningsResponse:
     wallet = get_wallet()
     if not wallet:
         return EarningsResponse()

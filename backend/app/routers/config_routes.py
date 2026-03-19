@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/config", response_model=AppConfig)
-async def get_config():
+async def get_config() -> AppConfig:
     cfg = await run_in_threadpool(load_config)
     return AppConfig(
         wallet=cfg.get("wallet", ""),
@@ -30,7 +30,7 @@ async def get_config():
 
 
 @router.post("/config", response_model=AppConfig)
-async def update_config(payload: ConfigUpdate):
+async def update_config(payload: ConfigUpdate) -> AppConfig:
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await run_in_threadpool(save_config, update)
 
@@ -43,5 +43,5 @@ async def update_config(payload: ConfigUpdate):
 
 
 @router.get("/timezones")
-async def list_timezones():
+async def list_timezones() -> dict[str, list[str]]:
     return {"timezones": sorted(pytz.all_timezones)}
