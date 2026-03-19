@@ -4,7 +4,7 @@ import { fetchMetrics, fetchWorkers } from '../api/client';
 import { useAppStore } from '../stores/store';
 import type { DashboardMetrics, WorkerSummary } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const API_BASE = String(import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
 const SSE_URL = `${API_BASE}/stream`;
 const INITIAL_BACKOFF = 1000;
 const MAX_BACKOFF = 30000;

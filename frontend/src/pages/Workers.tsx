@@ -69,7 +69,9 @@ const POWER_COST_KEY = 'fleetPowerCostPerKwh';
 function loadPowerCost(): number {
   try {
     const v = localStorage.getItem(POWER_COST_KEY);
-    return v ? parseFloat(v) : 0.12;
+    if (!v) return 0.12;
+    const parsed = parseFloat(v);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0.12;
   } catch { return 0.12; }
 }
 function savePowerCost(v: number) {
@@ -530,7 +532,7 @@ export const Workers: React.FC = () => {
               <div>
                 <label style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Electricity Cost ($/kWh)</label>
                 <input
-                  type="number" step="0.01" min="0" max="1"
+                  type="number" step="0.01" min="0" max="10"
                   value={powerCost}
                   onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0) handlePowerCostChange(v); }}
                   style={{ width: '100%', fontSize: '16px', padding: '6px 10px', marginTop: '4px' }}

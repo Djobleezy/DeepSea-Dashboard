@@ -10,11 +10,13 @@ import type {
   WorkerSummary,
 } from '../types';
 
-const BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const RAW_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+const BASE = String(RAW_BASE).replace(/\/+$/, '');
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 10000);
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean>): string {
-  const url = new URL(BASE + path, window.location.origin);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${BASE}${normalizedPath}`, window.location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
   }
