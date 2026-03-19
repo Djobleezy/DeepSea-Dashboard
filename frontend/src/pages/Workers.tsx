@@ -198,7 +198,7 @@ const WorkerCard: React.FC<{
                 <optgroup key={brand} label={brand}>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.model} — {m.efficiency} J/TH
+                      {m.model} — {m.efficiency} J/TH · {m.typicalThs} TH/s · {m.cooling}
                     </option>
                   ))}
                 </optgroup>
