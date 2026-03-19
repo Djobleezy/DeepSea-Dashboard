@@ -226,9 +226,17 @@ async def fetch_full_metrics(
                 if val is not None:
                     merged[field] = val
 
-    # Low hashrate mode detection
-    hr_60s = float(merged.get("hashrate_60sec") or 0)
-    merged["low_hashrate_mode"] = hr_60s < 1.0  # < 1 TH/s
+    # Low hashrate mode detection — designed for BitAxe / small tabletop
+    # miners whose 60-second readings are extremely volatile (they may only
+    # submit a share every few minutes).  When active the frontend switches
+    # the primary chart line from 60-sec to 3-hr data, notification
+    # thresholds use the 3-hr window, and the "60 SEC" card is de-emphasised.
+    #
+    # Threshold: < 1 TH/s on the *3-hour* window.  We use the 3-hr reading
+    # because 60-sec is unreliable at low hashrates — that's the whole point
+    # of the mode.
+    hr_3hr = float(merged.get("hashrate_3hr") or 0)
+    merged["low_hashrate_mode"] = hr_3hr < 3.0  # < 3 TH/s on 3hr avg
 
     merged["server_timestamp"] = time.time()
 

@@ -254,6 +254,42 @@ def _row_to_notification(row) -> dict:
 # Metric history
 # ---------------------------------------------------------------------------
 
+MAX_METRIC_HISTORY_ROWS = 7 * 24 * 60  # 10,080 rows (7 days @ 60s cadence)
+
+
+async def get_metric_history(
+    db: aiosqlite.Connection,
+    hours: int = 1,
+    limit: int = 360,
+) -> list[dict]:
+    """Return recent metric snapshots for chart hydration.
+
+    Args:
+        hours: How far back to look (default 1 hour).
+        limit: Maximum rows (default 360 = 6 hours at 60s intervals).
+    """
+    bounded_limit = max(1, min(int(limit), MAX_METRIC_HISTORY_ROWS))
+    cutoff = time.time() - hours * 3600
+    async with db.execute(
+        """SELECT timestamp, hashrate_60sec, hashrate_3hr
+           FROM metric_history
+           WHERE timestamp > ?
+             AND (COALESCE(hashrate_60sec, 0) > 0 OR COALESCE(hashrate_3hr, 0) > 0)
+           ORDER BY timestamp ASC
+           LIMIT ?""",
+        (cutoff, bounded_limit),
+    ) as cur:
+        rows = await cur.fetchall()
+    return [
+        {
+            "timestamp": row["timestamp"],
+            "hashrate_60sec": row["hashrate_60sec"],
+            "hashrate_3hr": row["hashrate_3hr"],
+        }
+        for row in rows
+    ]
+
+
 async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
     await db.execute(
         """INSERT INTO metric_history

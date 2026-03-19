@@ -254,7 +254,7 @@ class OceanClient:
             if rewards is not None:
                 result["estimated_rewards_in_window"] = float(rewards)
 
-            ts = snap.get("lastest_share_ts")
+            ts = snap.get("lastest_share_ts") or snap.get("latest_share_ts")
             if ts:
                 try:
                     dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(
@@ -489,9 +489,15 @@ class OceanClient:
                 return None
 
             if isinstance(workers_obj, dict):
-                workers_iter = workers_obj.items()
+                workers_iter = list(workers_obj.items())
+            elif isinstance(workers_obj, list):
+                workers_iter = []
+                for w in workers_obj:
+                    if not isinstance(w, dict):
+                        continue
+                    workers_iter.append((w.get("workername") or w.get("name"), w))
             else:
-                workers_iter = [(w.get("workername") or w.get("name"), w) for w in workers_obj]
+                return None
 
             workers = []
             total_hashrate = 0.0
@@ -500,17 +506,22 @@ class OceanClient:
             invalid = {"online", "offline", "status", "worker", "total"}
 
             for name, info in workers_iter:
-                if not name or str(name).lower() in invalid:
+                if not name or str(name).lower() in invalid or not isinstance(info, dict):
                     continue
-                hr3_raw = (
-                    info.get("hashrate_10800")
-                    or info.get("hashrate_7200")
-                    or info.get("hashrate_3600")
-                    or info.get("hashrate_300s")
-                )
-                hr60_raw = info.get("hashrate_60s") or 0
-                hr3 = convert_to_ths(float(hr3_raw or 0), "H/s")
-                hr60 = convert_to_ths(float(hr60_raw or 0), "H/s")
+                try:
+                    hr3_raw = (
+                        info.get("hashrate_10800")
+                        or info.get("hashrate_7200")
+                        or info.get("hashrate_3600")
+                        or info.get("hashrate_300s")
+                    )
+                    hr60_raw = info.get("hashrate_60s") or 0
+                    hr3 = convert_to_ths(float(hr3_raw or 0), "H/s")
+                    hr60 = convert_to_ths(float(hr60_raw or 0), "H/s")
+                except (TypeError, ValueError):
+                    _log.debug("Skipping worker with unparseable hashrates: %r", name)
+                    continue
+
                 status = "online" if (hr60 or hr3) else "offline"
                 if status == "online":
                     workers_online += 1

@@ -5,6 +5,7 @@ import type { DashboardMetrics, WorkerSummary, Notification, Theme } from '../ty
 interface ChartPoint {
   label: string;
   value: number;
+  ts: number;
 }
 
 interface AppState {
@@ -17,6 +18,8 @@ interface AppState {
   chartData60s: ChartPoint[];
   chartData3hr: ChartPoint[];
   addChartPoint: (hr60s: number, hr3hr: number) => void;
+  chartHydrated: boolean;
+  hydrateChart: (points: { timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]) => void;
 
   // Workers
   workers: WorkerSummary | null;
@@ -49,12 +52,45 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   chartData60s: [],
   chartData3hr: [],
+  chartHydrated: false,
   addChartPoint: (hr60s, hr3hr) =>
     set((s) => {
-      const ts = new Date().toLocaleTimeString();
+      const ts = Date.now();
+      const label = new Date(ts).toLocaleTimeString();
       return {
-        chartData60s: [...s.chartData60s.slice(-59), { label: ts, value: hr60s }],
-        chartData3hr: [...s.chartData3hr.slice(-59), { label: ts, value: hr3hr }],
+        chartData60s: [...s.chartData60s.slice(-59), { label, value: hr60s, ts }],
+        chartData3hr: [...s.chartData3hr.slice(-59), { label, value: hr3hr, ts }],
+      };
+    }),
+  hydrateChart: (points) =>
+    set((s) => {
+      const data60s = points.map((p) => ({
+        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
+        value: p.hashrate_60sec,
+        ts: p.timestamp * 1000,
+      }));
+      const data3hr = points.map((p) => ({
+        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
+        value: p.hashrate_3hr,
+        ts: p.timestamp * 1000,
+      }));
+
+      const mergeByTimestamp = (historical: ChartPoint[], live: ChartPoint[]) => {
+        const merged = new Map<string, ChartPoint>();
+        [...historical, ...live].forEach((point) => {
+          const key = `ts:${Math.floor(point.ts / 1000)}`;
+          merged.set(key, point);
+        });
+        return Array.from(merged.values())
+          .sort((a, b) => a.ts - b.ts)
+          .slice(-60);
+      };
+
+      return {
+        // Merge hydrated history with any already-received live points.
+        chartData60s: mergeByTimestamp(data60s, s.chartData60s),
+        chartData3hr: mergeByTimestamp(data3hr, s.chartData3hr),
+        chartHydrated: true,
       };
     }),
 

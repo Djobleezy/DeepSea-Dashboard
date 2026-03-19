@@ -7,14 +7,25 @@ import json
 import time
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Request
+import aiosqlite
+from fastapi import APIRouter, Depends, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app import background
+from app.db import get_db, get_metric_history
 from app.models import DashboardMetrics
 from app.services.cache import cache_get
 
 router = APIRouter()
+
+
+@router.get("/metrics/history")
+async def metrics_history(
+    hours: int = Query(default=1, ge=1, le=168, description="Hours of history (max 7 days)"),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> list[dict]:
+    """Return historical metric snapshots for chart hydration on page load."""
+    return await get_metric_history(db, hours=hours, limit=hours * 60)
 
 
 @router.get("/metrics", response_model=DashboardMetrics)

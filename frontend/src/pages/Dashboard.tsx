@@ -1,32 +1,16 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import { fetchMetricHistory } from '../api/client';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
-import { Sparkline } from '../components/Sparkline';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
-import type { DashboardMetrics } from '../types';
 
-// Rolling sparkline history (in-memory, survives re-renders but not full reload)
 const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
 );
-
-const MAX_HISTORY = 60;
-const hrHistory: number[] = [];
-const priceHistory: number[] = [];
-const satsHistory: number[] = [];
-
-function addHistory(metrics: DashboardMetrics) {
-  hrHistory.push(metrics.hashrate_60sec);
-  priceHistory.push(metrics.btc_price);
-  satsHistory.push(metrics.daily_mined_sats);
-  if (hrHistory.length > MAX_HISTORY) hrHistory.shift();
-  if (priceHistory.length > MAX_HISTORY) priceHistory.shift();
-  if (satsHistory.length > MAX_HISTORY) satsHistory.shift();
-}
 
 // DATUM Gateway: pool_fees between 0.9% and 1.3% = connected via DATUM protocol
 function isDatumConnected(poolFeesPct: number): boolean {
@@ -39,11 +23,25 @@ export const Dashboard: React.FC = () => {
   const chartData60s = useAppStore((s) => s.chartData60s);
   const chartData3hr = useAppStore((s) => s.chartData3hr);
   const addChartPoint = useAppStore((s) => s.addChartPoint);
+  const chartHydrated = useAppStore((s) => s.chartHydrated);
+  const hydrateChart = useAppStore((s) => s.hydrateChart);
   const { annotations: blockAnnotations } = useBlockAnnotations();
+  const hydrationAttempted = useRef(false);
+
+  // Hydrate chart from server history on first load
+  useEffect(() => {
+    if (hydrationAttempted.current || chartHydrated) return;
+    hydrationAttempted.current = true;
+
+    fetchMetricHistory(1)
+      .then((points) => {
+        hydrateChart(Array.isArray(points) ? points : []);
+      })
+      .catch(() => {});
+  }, [chartHydrated, hydrateChart]);
 
   useEffect(() => {
     if (!metrics) return;
-    addHistory(metrics);
     // Skip chart points when hashrate is zero — likely a transient API failure,
     // not a real drop.  Avoids visual dips to 0 on the chart.
     if (metrics.hashrate_60sec > 0 || metrics.hashrate_3hr > 0) {
@@ -99,25 +97,27 @@ export const Dashboard: React.FC = () => {
             <span
               className="badge badge-warning"
               style={{ fontSize: '12px', padding: '4px 12px' }}
+              title="Low hashrate device detected — chart uses 3hr average as primary, 60sec shown as secondary"
             >
-              ⚠ LOW HASHRATE
+              ⚠ LOW HASHRATE MODE
             </span>
           )}
         </div>
       </div>
 
-      {/* Hashrate row — auto-scaled */}
+      {/* Hashrate row — auto-scaled.  In low hashrate mode the 60-sec
+          reading is unreliable (BitAxe / small miners submit shares
+          infrequently), so we visually de-emphasise it and highlight
+          the 3hr average instead. */}
       <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
         <MetricCard
-          label="60 SEC"
+          label={metrics.low_hashrate_mode ? '60 SEC ⚡' : '60 SEC'}
           value={hr60.display}
           unit={hr60.unit}
           current={metrics.hashrate_60sec}
           previous={prevMetrics?.hashrate_60sec}
-          large
-        >
-          <Sparkline data={[...hrHistory]} width={120} height={24} />
-        </MetricCard>
+          large={!metrics.low_hashrate_mode}
+        />
         <MetricCard
           label="10 MIN"
           value={hr10.display}
@@ -127,7 +127,7 @@ export const Dashboard: React.FC = () => {
           large
         />
         <MetricCard
-          label="3 HR AVG"
+          label={metrics.low_hashrate_mode ? '⭐ 3 HR AVG' : '3 HR AVG'}
           value={hr3.display}
           unit={hr3.unit}
           current={metrics.hashrate_3hr}
@@ -147,7 +147,9 @@ export const Dashboard: React.FC = () => {
       {/* Chart — data from Zustand store, persists across route changes */}
       {chartData60s.length > 1 && (
         <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.15s both' }}>
-          <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
+          <div className="label" style={{ marginBottom: '12px' }}>
+            HASHRATE HISTORY{metrics.low_hashrate_mode ? ' — 3HR PRIMARY (LOW HASHRATE MODE)' : ''}
+          </div>
           <ErrorBoundary>
             <Suspense
               fallback={
@@ -164,6 +166,7 @@ export const Dashboard: React.FC = () => {
                 data3hr={chartData3hr}
                 avg24hr={metrics.hashrate_24hr}
                 blockAnnotations={blockAnnotations}
+                lowHashrateMode={metrics.low_hashrate_mode}
               />
             </Suspense>
           </ErrorBoundary>
@@ -185,9 +188,7 @@ export const Dashboard: React.FC = () => {
           current={metrics.btc_price}
           previous={prevMetrics?.btc_price}
           large
-        >
-          <Sparkline data={[...priceHistory]} width={120} height={24} />
-        </MetricCard>
+        />
         <MetricCard
           label="DAILY MINED"
           value={fmtSats(metrics.daily_mined_sats)}
@@ -195,9 +196,7 @@ export const Dashboard: React.FC = () => {
           current={metrics.daily_mined_sats}
           previous={prevMetrics?.daily_mined_sats}
           large
-        >
-          <Sparkline data={[...satsHistory]} width={120} height={24} />
-        </MetricCard>
+        />
         <MetricCard
           label="UNPAID EARNINGS"
           value={`${(metrics.unpaid_earnings * 1e8).toFixed(0)}`}
@@ -210,16 +209,16 @@ export const Dashboard: React.FC = () => {
       {/* Bitcoin progress bar + payout */}
       <div className="grid-2" style={{ animation: 'stagger-in 0.4s ease-out 0.35s both' }}>
         <div className="card">
-          <div className="label" style={{ marginBottom: '12px' }}>BITCOIN BLOCK TIMER</div>
+          <div className="label" style={{ marginBottom: '12px' }}>OCEAN POOL BLOCK TIMER</div>
           <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
           <div className="flex gap-2 mt-2">
             <div>
-              <div className="label">LAST BLOCK</div>
+              <div className="label">LAST OCEAN BLOCK</div>
               <div className="value-sm glow">#{metrics.last_block_height.toLocaleString()}</div>
               <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{metrics.last_block_time}</div>
             </div>
             <div>
-              <div className="label">BLOCKS FOUND</div>
+              <div className="label">POOL BLOCKS FOUND</div>
               <div className="value-sm glow">{metrics.blocks_found}</div>
             </div>
           </div>
