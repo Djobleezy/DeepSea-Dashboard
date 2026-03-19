@@ -83,7 +83,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Hashrate row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div className="grid-4">
         <MetricCard
           label="60 SEC"
           value={metrics.hashrate_60sec.toFixed(2)}
@@ -134,7 +134,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Second row: workers, BTC price, unpaid, workers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div className="grid-4">
         <MetricCard
           label="WORKERS HASHING"
           value={metrics.workers_hashing}
@@ -171,7 +171,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Bitcoin progress bar + payout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div className="grid-2">
         <div className="card">
           <div className="label" style={{ marginBottom: '12px' }}>BITCOIN BLOCK TIMER</div>
           <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
@@ -191,7 +191,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Network stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div className="grid-4">
         <MetricCard
           label="NETWORK HASHRATE"
           value={metrics.network_hashrate.toFixed(2)}
@@ -214,7 +214,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Profitability row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+      <div className="grid-4">
         <MetricCard
           label="DAILY REVENUE"
           value={`$${metrics.daily_revenue.toFixed(2)}`}

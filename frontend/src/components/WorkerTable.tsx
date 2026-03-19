@@ -45,8 +45,8 @@ export const WorkerTable: React.FC<Props> = ({
       : `${v.toFixed(2)} TH/s`;
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table>
+    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <table style={{ minWidth: '560px' }}>
         <thead>
           <tr>
             <th>{renderSortableHeader('name', 'WORKER')}</th>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { getThemeQuote } from '../utils/themeQuotes';
 import { useAppStore } from '../stores/store';
+import { WaterDroplets } from './WaterDroplets';
 
 const BOOT_LINES = [
   'DEEPSEA DASHBOARD v2.0 — INITIALIZING',
@@ -63,8 +64,11 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         flexDirection: 'column',
         gap: '0',
         padding: '40px',
+        position: 'relative',
       }}
     >
+      {/* Water droplets condense on screen during boot */}
+      <WaterDroplets active={!done} />
       <div
         style={{
           fontFamily: 'var(--font-vt323)',

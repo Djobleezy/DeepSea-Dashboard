@@ -363,3 +363,99 @@ input:focus, select:focus, textarea:focus {
 .text-center { text-align: center; }
 .text-right  { text-align: right; }
 .truncate    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Mobile Responsiveness (≤768px / iPhone SE 375px) ---- */
+@media (max-width: 768px) {
+  /* Base font bump */
+  body {
+    font-size: 15px;
+  }
+
+  /* Metric card values — minimum readable size */
+  .value {
+    font-size: 22px;
+  }
+  .value-sm {
+    font-size: 16px;
+  }
+
+  /* Cards never overflow */
+  .card {
+    min-width: 0;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  /* Sparklines compact on mobile */
+  svg.sparkline {
+    max-width: 80px;
+  }
+
+  /* Grid layouts collapse to 2-col or 1-col on small screens */
+  [style*="grid-template-columns: repeat(4"] {
+    /* Can't override inline styles directly, but these media classes help */
+  }
+}
+
+@media (max-width: 480px) {
+  .value {
+    font-size: 20px;
+  }
+  .value-sm {
+    font-size: 15px;
+  }
+}
+
+/* Mobile grid utilities — add these classes for responsive grids */
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 400px) {
+  .grid-4 {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+/* Hashrate chart responsive height */
+.chart-container {
+  position: relative;
+  height: 220px;
+}
+
+@media (max-width: 768px) {
+  .chart-container {
+    height: 160px;
+  }
+}
+
+/* Hide on mobile */
+@media (max-width: 600px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Scrollable table wrapper */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}

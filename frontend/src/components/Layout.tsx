@@ -5,6 +5,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { AudioPlayer } from './AudioPlayer';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { EasterEgg } from './EasterEgg';
+import { UnderwaterBubbles } from './UnderwaterBubbles';
 
 const NAV_LINKS = [
   { to: '/dashboard', label: '◈ DASHBOARD' },
@@ -39,25 +40,29 @@ export const Layout: React.FC<Props> = ({ children }) => {
         background: 'var(--bg)',
       }}
     >
+      {/* Underwater ambient bubbles (DeepSea theme only) */}
+      <UnderwaterBubbles />
+
       {/* Header */}
       <header
         style={{
           borderBottom: '1px solid var(--border)',
           background: 'var(--bg-card)',
-          padding: '0 24px',
+          padding: '0 16px',
           display: 'flex',
           alignItems: 'center',
-          height: '56px',
-          gap: '24px',
+          minHeight: '56px',
+          gap: '12px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
           boxShadow: '0 2px 12px var(--border-glow)',
+          flexWrap: 'wrap',
         }}
       >
         <NavLink
           to="/dashboard"
-          style={{ textDecoration: 'none' }}
+          style={{ textDecoration: 'none', flexShrink: 0 }}
         >
           <span
             style={{
@@ -72,7 +77,20 @@ export const Layout: React.FC<Props> = ({ children }) => {
           </span>
         </NavLink>
 
-        <nav style={{ display: 'flex', gap: '4px', flex: 1 }}>
+        {/* Mobile-scrollable nav */}
+        <nav
+          style={{
+            display: 'flex',
+            gap: '2px',
+            flex: 1,
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            minWidth: 0,
+          }}
+        >
+          <style>{`nav::-webkit-scrollbar { display: none; }`}</style>
           {NAV_LINKS.map((link) => (
             <NavLink
               key={link.to}
@@ -84,12 +102,14 @@ export const Layout: React.FC<Props> = ({ children }) => {
                 letterSpacing: '1px',
                 color: isActive ? 'var(--primary)' : 'var(--text-dim)',
                 textDecoration: 'none',
-                padding: '6px 10px',
+                padding: '6px 8px',
                 borderRadius: '4px',
                 background: isActive ? 'var(--bg-hover)' : 'transparent',
                 border: isActive ? '1px solid var(--border)' : '1px solid transparent',
                 textShadow: isActive ? '0 0 6px var(--primary-glow)' : 'none',
                 position: 'relative',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               })}
             >
               {link.label}
@@ -115,7 +135,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
           ))}
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           {/* SSE status indicator */}
           <span
             title={sseConnected ? 'Live feed connected' : 'Connecting...'}
@@ -126,10 +146,12 @@ export const Layout: React.FC<Props> = ({ children }) => {
               background: sseConnected ? 'var(--color-success)' : 'var(--color-warning)',
               boxShadow: sseConnected ? '0 0 8px var(--color-success)' : 'none',
               display: 'inline-block',
+              flexShrink: 0,
             }}
           />
           {lastUpdated && (
-            <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', display: 'none' }}
+              className="hide-mobile">
               {fmtTime(lastUpdated)}
             </span>
           )}
@@ -142,10 +164,11 @@ export const Layout: React.FC<Props> = ({ children }) => {
       <main
         style={{
           flex: 1,
-          padding: '24px',
+          padding: '16px',
           maxWidth: '1400px',
           margin: '0 auto',
           width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {children}
@@ -155,7 +178,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
       <footer
         style={{
           borderTop: '1px solid var(--border)',
-          padding: '8px 24px',
+          padding: '8px 16px',
           fontSize: '10px',
           color: 'var(--text-dim)',
           display: 'flex',

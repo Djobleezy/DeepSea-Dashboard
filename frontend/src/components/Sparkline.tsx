@@ -34,7 +34,13 @@ export const Sparkline: React.FC<Props> = ({
   const area = `${pts[0].split(',')[0]},${height} ${polyline} ${pts[pts.length - 1].split(',')[0]},${height}`;
 
   return (
-    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      className="sparkline"
+      style={{ display: 'block', overflow: 'visible', maxWidth: '100%' }}
+    >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
