@@ -13,11 +13,19 @@ import aiosqlite
 DB_PATH = Path("/data/deepsea.db")
 
 
+async def _configure_connection(db: aiosqlite.Connection) -> None:
+    """Apply SQLite pragmas for safer concurrent access."""
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute("PRAGMA busy_timeout=5000")
+
+
 async def get_db() -> aiosqlite.Connection:
     """Open a database connection (used as a FastAPI dependency)."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
+    await _configure_connection(db)
     try:
         yield db
     finally:
@@ -28,6 +36,7 @@ async def init_db() -> None:
     """Create all tables if they don't exist."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
+        await _configure_connection(db)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id TEXT PRIMARY KEY,

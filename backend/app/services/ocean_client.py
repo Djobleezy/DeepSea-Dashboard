@@ -63,13 +63,59 @@ class OceanClient:
 
     async def _get(self, url: str, timeout: int | None = None) -> Optional[httpx.Response]:
         client = await self._get_client()
-        try:
-            resp = await client.get(url, timeout=timeout or self.timeout)
-            resp.raise_for_status()
-            return resp
-        except Exception as e:
-            _log.warning("GET %s failed: %s", url, e)
-            return None
+        max_attempts = 3
+        req_timeout = timeout or self.timeout
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = await client.get(url, timeout=req_timeout)
+
+                # Transient upstream errors / rate limits: retry with backoff.
+                if resp.status_code in (429, 500, 502, 503, 504):
+                    if attempt < max_attempts:
+                        retry_after_raw = resp.headers.get("Retry-After")
+                        wait_s: float
+                        if retry_after_raw and retry_after_raw.isdigit():
+                            wait_s = max(0.1, min(float(retry_after_raw), 10.0))
+                        else:
+                            wait_s = min(0.5 * (2 ** (attempt - 1)), 4.0)
+                        _log.warning(
+                            "GET %s transient status=%s (attempt %d/%d), retrying in %.1fs",
+                            url,
+                            resp.status_code,
+                            attempt,
+                            max_attempts,
+                            wait_s,
+                        )
+                        await asyncio.sleep(wait_s)
+                        continue
+
+                resp.raise_for_status()
+                return resp
+
+            except httpx.RequestError as e:
+                if attempt < max_attempts:
+                    wait_s = min(0.5 * (2 ** (attempt - 1)), 4.0)
+                    _log.warning(
+                        "GET %s request error (attempt %d/%d): %s; retrying in %.1fs",
+                        url,
+                        attempt,
+                        max_attempts,
+                        e,
+                        wait_s,
+                    )
+                    await asyncio.sleep(wait_s)
+                    continue
+                _log.warning("GET %s failed after retries: %s", url, e)
+                return None
+            except httpx.HTTPStatusError as e:
+                _log.warning("GET %s failed with status %s", url, e.response.status_code)
+                return None
+            except Exception as e:
+                _log.warning("GET %s failed: %s", url, e)
+                return None
+
+        return None
 
     # ------------------------------------------------------------------
     # Core API Methods

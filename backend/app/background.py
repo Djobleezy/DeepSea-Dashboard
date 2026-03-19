@@ -10,7 +10,7 @@ from typing import Any, Optional
 import aiosqlite
 
 from app.config import get_wallet
-from app.db import DB_PATH, save_metric_snapshot
+from app.db import DB_PATH, _configure_connection, save_metric_snapshot
 from app.services.cache import cache_set
 from app.services.metrics_service import fetch_full_metrics
 from app.services.notification_engine import check_and_fire, fire_system_notification
@@ -124,6 +124,7 @@ async def background_loop() -> None:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             async with aiosqlite.connect(str(DB_PATH)) as db:
                 db.row_factory = aiosqlite.Row
+                await _configure_connection(db)
                 await refresh_once(db)
         except asyncio.CancelledError:
             _log.info("Background loop cancelled")
