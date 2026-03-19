@@ -1,0 +1,12 @@
+{
+  "wallet": "bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "power_cost": 0.12,
+  "power_usage": 3000,
+  "currency": "USD",
+  "timezone": "America/Los_Angeles",
+  "network_fee": 2.0,
+  "extended_history": false,
+  "exchange_rate_api_key": "",
+  "low_hashrate_threshold_ths": 3.0,
+  "high_hashrate_threshold_ths": 20.0
+}

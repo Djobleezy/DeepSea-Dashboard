@@ -1,4 +1,24 @@
-"""Application configuration — reads from config.json and environment variables."""
+"""Application configuration: loading, saving, and accessor helpers.
+
+Configuration is stored in a JSON file at ``CONFIG_PATH`` (default
+``/config/config.json``, overridable via the ``CONFIG_PATH`` environment
+variable).  The file is created on first ``save_config`` call if it does not
+yet exist.
+
+**Load strategy** (``load_config``): reads the JSON file and deep-merges with
+``_DEFAULTS`` so that keys added in new releases are available even in
+pre-existing config files.  Returns the defaults dict on any read/parse error.
+
+**Save strategy** (``save_config``): atomic write via ``rename(tmpfile →
+config.json)`` with ``fsync`` for durability.  Falls back to an in-place write
+for Docker bind-mounted files where cross-device rename fails (``EXDEV``).
+File permissions are set to ``0600`` (owner read/write only) on every write.
+
+**Accessor functions** (``get_wallet``, ``get_power_cost``, etc.) reload the
+config on every call to pick up changes made via the API without requiring a
+process restart.  This is intentionally simple; for high-frequency access
+consider caching the result per request cycle.
+"""
 
 import json
 import logging

@@ -1,5 +1,7 @@
 """Notification CRUD endpoints."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 import aiosqlite
@@ -25,7 +27,7 @@ async def get_notifications(
     unread_only: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=500),
     db: aiosqlite.Connection = Depends(get_db),
-):
+) -> list[Notification]:
     rows = await list_notifications(db, category=category, unread_only=unread_only, limit=limit)
     return [Notification(**r) for r in rows]
 
@@ -34,7 +36,7 @@ async def get_notifications(
 async def post_notification(
     payload: NotificationCreate,
     db: aiosqlite.Connection = Depends(get_db),
-):
+) -> Notification:
     row = await create_notification(
         db,
         message=payload.message,
@@ -47,7 +49,7 @@ async def post_notification(
 
 
 @router.patch("/notifications/{nid}/read")
-async def read_notification(nid: str, db: aiosqlite.Connection = Depends(get_db)):
+async def read_notification(nid: str, db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:
     updated = await mark_notification_read(db, nid)
     if not updated:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -55,13 +57,13 @@ async def read_notification(nid: str, db: aiosqlite.Connection = Depends(get_db)
 
 
 @router.post("/notifications/read-all")
-async def read_all(db: aiosqlite.Connection = Depends(get_db)):
+async def read_all(db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:
     count = await mark_all_read(db)
     return {"marked_read": count}
 
 
 @router.delete("/notifications/{nid}")
-async def delete_one(nid: str, db: aiosqlite.Connection = Depends(get_db)):
+async def delete_one(nid: str, db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:
     ok = await delete_notification(db, nid)
     if ok is None:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -71,12 +73,12 @@ async def delete_one(nid: str, db: aiosqlite.Connection = Depends(get_db)):
 
 
 @router.delete("/notifications/clear/read")
-async def clear_read(db: aiosqlite.Connection = Depends(get_db)):
+async def clear_read(db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:
     count = await clear_read_notifications(db)
     return {"cleared": count}
 
 
 @router.delete("/notifications/clear/all")
-async def clear_all(db: aiosqlite.Connection = Depends(get_db)):
+async def clear_all(db: aiosqlite.Connection = Depends(get_db)) -> dict[str, Any]:
     count = await clear_all_notifications(db)
     return {"cleared": count}

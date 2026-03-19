@@ -72,7 +72,7 @@ async def _fetch_mempool_blocks(start_height: int | None = None) -> list[dict]:
 async def get_blocks(
     page: int = Query(default=0, ge=0),
     page_size: int = Query(default=20, ge=1, le=100),
-):
+) -> BlocksResponse:
     try:
         # mempool.space returns ~15 blocks per call, paginate by fetching from a start height
         all_blocks: list[dict] = []

@@ -1,4 +1,21 @@
-"""Worker data management service."""
+"""Worker data enrichment, ASIC model detection, and sorting/filtering utilities.
+
+This module sits on top of the raw worker data returned by :class:`OceanClient`
+and adds value in three ways:
+
+1. **ASIC model detection** (``detect_miner_model``): matches worker names against
+   a list of regular-expression patterns to identify the specific ASIC model.
+   Unknown workers fall back to ``"Unknown ASIC"`` with a conservative 30 J/TH
+   efficiency estimate.
+
+2. **Power estimation** (``enrich_workers``): uses the detected efficiency (J/TH)
+   and the worker's 3-hour average hashrate to estimate power consumption in watts:
+   ``power_consumption = hashrate_ths × efficiency_j_per_th``.
+
+3. **Sorting and filtering** (``sort_workers``, ``filter_workers``): used by the
+   workers API router to apply client-requested ordering and status filters without
+   re-fetching data.
+"""
 
 from __future__ import annotations
 
@@ -33,7 +50,20 @@ _MINER_PATTERNS = [
 
 
 def detect_miner_model(worker_name: str) -> tuple[str, float]:
-    """Return (model_name, efficiency_j_per_th) for a worker name."""
+    """Identify the ASIC model and its efficiency from a worker name string.
+
+    Matches against ``_MINER_PATTERNS`` in order (most-specific first).  The
+    patterns are case-insensitive and cover the Bitmain Antminer S/T-series,
+    MicroBT Whatsminer M-series, and BitAxe/NerdQAxe open-source miners.
+
+    Args:
+        worker_name: The raw worker identifier string from Ocean (e.g.
+            ``"s19pro-rack1-01"``).
+
+    Returns:
+        A tuple of ``(model_display_name, efficiency_j_per_th)``.  Falls back
+        to ``("Unknown ASIC", 30.0)`` when no pattern matches.
+    """
     for pattern, model, efficiency in _MINER_PATTERNS:
         if pattern.search(worker_name):
             return model, efficiency
@@ -41,7 +71,21 @@ def detect_miner_model(worker_name: str) -> tuple[str, float]:
 
 
 def enrich_workers(workers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Add model detection and power estimates to worker list."""
+    """Add ASIC model detection, efficiency values, and power estimates to workers.
+
+    For each worker that doesn't already have a known model, calls
+    ``detect_miner_model`` and populates ``model``, ``efficiency`` (J/TH), and
+    ``power_consumption`` (watts, derived from 3-hour average hashrate ×
+    efficiency).  Also sets the ``type`` field (``"ASIC"``, ``"Whatsminer"``,
+    or ``"Bitaxe"``) based on the detected model name.
+
+    Args:
+        workers: List of raw worker dicts (typically from ``OceanClient``).
+
+    Returns:
+        New list of worker dicts with enriched fields.  Input dicts are
+        shallow-copied; originals are not modified.
+    """
     enriched = []
     for w in workers:
         worker = dict(w)
@@ -72,7 +116,20 @@ def sort_workers(
     sort_by: str = "name",
     descending: bool = False,
 ) -> list[dict]:
-    """Sort worker list by a given column."""
+    """Return a sorted copy of the worker list.
+
+    Args:
+        workers: List of worker dicts to sort.
+        sort_by: Column key to sort by.  Supported values: ``"name"``,
+            ``"status"``, ``"hashrate"`` / ``"hashrate_3hr"``,
+            ``"hashrate_60sec"``, ``"earnings"``, ``"efficiency"``,
+            ``"last_share"``.  Defaults to ``"name"``.
+        descending: If ``True``, sort in descending order.
+
+    Returns:
+        Sorted list (original list is not modified).  Falls back to the
+        original order on sort errors.
+    """
     key_map = {
         "name": lambda w: w.get("name", ""),
         "status": lambda w: w.get("status", ""),
@@ -94,6 +151,16 @@ def sort_workers(
 def filter_workers(
     workers: list[dict], status: Optional[str] = None
 ) -> list[dict]:
+    """Filter workers by online/offline status.
+
+    Args:
+        workers: List of worker dicts.
+        status: ``"online"``, ``"offline"``, or ``None``/``"all"`` to return
+            all workers.
+
+    Returns:
+        Filtered list (a new list; originals are not modified).
+    """
     if not status or status == "all":
         return workers
     return [w for w in workers if w.get("status") == status]

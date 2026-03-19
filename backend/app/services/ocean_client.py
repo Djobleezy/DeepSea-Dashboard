@@ -1,4 +1,32 @@
-"""Ocean.xyz API client — async port of the existing client + scraper logic."""
+"""Ocean.xyz API + scraper client.
+
+This module provides an async HTTP client for fetching mining data from Ocean.xyz.
+It uses a **dual-source strategy**:
+
+1. **Ocean REST API** (``https://api.ocean.xyz/v1/``): the primary data source for
+   hashrates, pool stats, payment history, and worker data.  All endpoints are JSON
+   and require only a Bitcoin wallet address — no authentication.
+
+2. **HTML scraper** (``https://ocean.xyz/stats/<wallet>``): a fallback used when the
+   API endpoint for worker data is unavailable or returns an empty result.  The
+   scraper parses the worker table with BeautifulSoup.
+
+**Retry logic:** every ``_get()`` call retries up to 3 times with exponential backoff
+(max 4 s) on transient HTTP status codes (429, 500, 502, 503, 504) and network errors.
+``Retry-After`` headers are respected for 429 responses.
+
+**Bitcoin network stats** are fetched from mempool.guide with a mempool.space fallback.
+
+Typical call order (in ``metrics_service.fetch_full_metrics``)::
+
+    client = OceanClient(wallet)
+    hr      = await client.get_user_hashrate()      # per-user hashrates
+    snap    = await client.get_statsnap()            # unpaid earnings, last share
+    pool    = await client.get_pool_stat()           # pool-wide stats
+    block   = await client.get_latest_block_info()  # last block height/time
+    btc     = await client.get_bitcoin_stats()      # BTC price, network hashrate
+    workers = await client.get_worker_data()        # API + scraper fallback
+"""
 
 from __future__ import annotations
 
@@ -40,7 +68,16 @@ def _elapsed_str(ts_seconds: float) -> str:
 
 
 class OceanClient:
-    """Async Ocean.xyz API + scraper client."""
+    """Async Ocean.xyz API + scraper client.
+
+    Manages a single shared ``httpx.AsyncClient`` instance (lazy-initialised on
+    first use, re-created if closed) to benefit from connection pooling.
+
+    Args:
+        wallet: Bitcoin address used as the key for all per-user API calls.
+        timeout: Default request timeout in seconds (default 10).  Individual
+            methods may pass a longer timeout (e.g. 15 s for payment history).
+    """
 
     def __init__(self, wallet: str, timeout: int = 10):
         self.wallet = wallet
@@ -66,6 +103,23 @@ class OceanClient:
         timeout: int | float | None = None,
         headers: Optional[dict[str, str]] = None,
     ) -> Optional[httpx.Response]:
+        """Perform a GET request with automatic retry on transient errors.
+
+        Retries up to 3 times with exponential backoff (0.5 s, 1 s, 2 s, capped
+        at 4 s).  A ``Retry-After`` header (integer seconds) is honoured for 429
+        responses, capped at 10 s to avoid excessive stalls.
+
+        Args:
+            url: Full URL to fetch.
+            timeout: Per-request timeout override (seconds).  Falls back to
+                ``self.timeout`` when ``None``.
+            headers: Additional HTTP headers to merge with the default
+                ``User-Agent`` header.
+
+        Returns:
+            The ``httpx.Response`` on success, or ``None`` after all retries are
+            exhausted or a non-transient error occurs.
+        """
         client = await self._get_client()
         max_attempts = 3
         req_timeout = timeout or self.timeout
@@ -126,6 +180,18 @@ class OceanClient:
     # ------------------------------------------------------------------
 
     async def get_user_hashrate(self) -> dict[str, Any]:
+        """Fetch per-user hashrates and active worker count from the Ocean API.
+
+        Calls ``/v1/user_hashrate/<wallet>`` and normalises all hashrate fields
+        to TH/s.  Returns a partial dict suitable for merging into the metrics
+        snapshot.
+
+        Returns:
+            Dict with keys: ``hashrate_60sec``, ``hashrate_10min``,
+            ``hashrate_3hr``, ``hashrate_24hr`` (all TH/s floats), their
+            corresponding ``_unit`` keys, and ``workers_hashing`` (int).
+            Empty dict on error.
+        """
         resp = await self._get(f"{API_BASE}/user_hashrate/{self.wallet}")
         if resp is None:
             return {}
@@ -161,6 +227,14 @@ class OceanClient:
             return {}
 
     async def get_statsnap(self) -> dict[str, Any]:
+        """Fetch the miner's unpaid earnings snapshot from ``/v1/statsnap/<wallet>``.
+
+        Returns:
+            Dict with keys: ``unpaid_earnings`` (BTC float),
+            ``estimated_earnings_next_block`` (BTC), ``estimated_rewards_in_window``
+            (BTC), and ``total_last_share`` (localised timestamp string).
+            Empty dict on error.
+        """
         resp = await self._get(f"{API_BASE}/statsnap/{self.wallet}")
         if resp is None:
             return {}
@@ -196,6 +270,17 @@ class OceanClient:
             return {}
 
     async def get_pool_stat(self) -> dict[str, Any]:
+        """Fetch pool-wide statistics concurrently from two endpoints.
+
+        Calls ``/v1/pool_stat`` and ``/v1/pool_hashrate`` in parallel via
+        ``asyncio.gather``.
+
+        Returns:
+            Dict with keys: ``workers_hashing`` (pool-wide int), ``difficulty``
+            (network difficulty float), ``current_estimated_block_reward``
+            (BTC float), ``pool_total_hashrate`` (auto-scaled float), and
+            ``pool_total_hashrate_unit`` (e.g. ``"PH/s"``).
+        """
         stat_resp, hr_resp = await asyncio.gather(
             self._get(f"{API_BASE}/pool_stat"),
             self._get(f"{API_BASE}/pool_hashrate"),
@@ -232,6 +317,15 @@ class OceanClient:
         return result
 
     async def get_blocks(self, page: int = 0, page_size: int = 20) -> list[dict]:
+        """Fetch a page of recent Ocean pool blocks from ``/v1/blocks``.
+
+        Args:
+            page: Zero-based page index.
+            page_size: Number of blocks per page (default 20).
+
+        Returns:
+            List of raw block dicts from the API, or an empty list on error.
+        """
         resp = await self._get(f"{API_BASE}/blocks/{page}/{page_size}/0")
         if resp is None:
             return []
@@ -250,6 +344,13 @@ class OceanClient:
             return []
 
     async def get_latest_block_info(self) -> dict[str, Any]:
+        """Return the height and relative timestamp of the most recent pool block.
+
+        Returns:
+            Dict with ``last_block_height`` (int) and ``last_block_time``
+            (human-readable string such as ``"5 mins ago"``).
+            Empty dict if no blocks are available.
+        """
         blocks = await self.get_blocks(page=0, page_size=1)
         if not blocks:
             return {}
@@ -280,6 +381,21 @@ class OceanClient:
     async def get_payment_history(
         self, days: int = 360, btc_price: Optional[float] = None
     ) -> list[dict]:
+        """Fetch confirmed payout history for the wallet.
+
+        Calls ``/v1/earnpay/<wallet>/<start>/<end>`` with a date range derived
+        from ``days``.  Results are capped at ``MAX_PAYOUT_HISTORY`` entries.
+
+        Args:
+            days: Number of historical days to include (default 360).
+            btc_price: If provided, each payment dict will include ``rate``
+                and ``fiat_value`` fields.
+
+        Returns:
+            List of payment dicts with fields: ``date``, ``date_iso``, ``txid``,
+            ``lightning_txid``, ``amount_btc``, ``amount_sats``, ``status``,
+            and optionally ``rate`` / ``fiat_value``.
+        """
         tz = get_timezone()
         end = datetime.now(ZoneInfo("UTC"))
         start = end - timedelta(days=days)
@@ -331,7 +447,18 @@ class OceanClient:
             return []
 
     async def get_worker_data(self) -> Optional[dict]:
-        """Try API first, fall back to scraper."""
+        """Return enriched worker data, trying the API then the HTML scraper.
+
+        Calls ``_get_worker_data_api()`` first; if that returns ``None`` (e.g.
+        the API endpoint is unavailable or returns no workers), falls back to
+        ``_get_worker_data_scrape()`` which parses the Ocean stats page HTML.
+
+        Returns:
+            Dict with keys ``workers`` (list), ``total_hashrate``,
+            ``hashrate_unit``, ``workers_total``, ``workers_online``,
+            ``workers_offline``, ``total_earnings``, and ``timestamp``.
+            ``None`` if both sources fail.
+        """
         result = await self._get_worker_data_api()
         if result:
             return result
@@ -339,6 +466,15 @@ class OceanClient:
         return await self._get_worker_data_scrape()
 
     async def _get_worker_data_api(self) -> Optional[dict]:
+        """Fetch worker data from ``/v1/user_hashrate_full/<wallet>``.
+
+        Handles both dict-of-workers and list-of-workers response shapes.
+        Filters out sentinel keys (``online``, ``offline``, ``total``, etc.)
+        that Ocean sometimes includes alongside real worker entries.
+
+        Returns:
+            Normalised worker summary dict, or ``None`` if unavailable/empty.
+        """
         resp = await self._get(f"{API_BASE}/user_hashrate_full/{self.wallet}", timeout=15)
         if resp is None:
             return None
@@ -520,7 +656,16 @@ class OceanClient:
     # ------------------------------------------------------------------
 
     async def get_bitcoin_stats(self) -> dict[str, Any]:
-        """Fetch network stats from mempool.guide with mempool.space fallback."""
+        """Fetch Bitcoin network stats with a two-tier primary/fallback strategy.
+
+        Tries **mempool.guide** first for all three sub-requests (hashrate,
+        prices, tip height).  Falls back to **mempool.space** for any that fail.
+
+        Returns:
+            Dict with keys: ``btc_price`` (USD float), ``btc_price_<CURR>`` for
+            each currency returned by the prices endpoint, ``network_hashrate``
+            (raw H/s float), ``difficulty`` (float), and ``block_count`` (int).
+        """
         result: dict[str, Any] = {}
         primary_urls = {
             "hashrate": "https://mempool.guide/api/v1/mining/hashrate/3d",

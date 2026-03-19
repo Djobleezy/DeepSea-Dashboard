@@ -124,10 +124,19 @@ _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "d
 if _frontend_dist.exists():
     _index_html = _frontend_dist / "index.html"
 
+    # Paths that FastAPI handles natively — must NOT be caught by the SPA fallback.
+    # Without this guard the catch-all swallows /docs, /redoc, and /openapi.json before
+    # FastAPI's own routing can serve them.
+    _API_DOC_PATHS = {"docs", "redoc", "openapi.json"}
+
     # SPA catch-all: any non-API path that isn't a real file → index.html
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
         from fastapi.responses import FileResponse
+
+        # Let FastAPI serve its built-in API documentation endpoints.
+        if full_path in _API_DOC_PATHS:
+            raise HTTPException(status_code=404, detail="Not found")
 
         dist_root = _frontend_dist.resolve()
         requested = (dist_root / full_path).resolve()
