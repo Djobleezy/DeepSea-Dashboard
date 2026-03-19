@@ -315,7 +315,7 @@ const WorkerCard: React.FC<{
         <div>
           <div style={{ color: 'var(--text-dim)', fontSize: '11px', textTransform: 'uppercase' }}>Profit/Day</div>
           <div style={{ color: dailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
-            {dailyProfit >= 0 ? '+' : ''}{formatFiat(Math.abs(dailyProfit))}
+            {dailyProfit >= 0 ? '+' : '-'}{formatFiat(Math.abs(dailyProfit))}
           </div>
         </div>
         <div>
@@ -554,7 +554,7 @@ export const Workers: React.FC = () => {
                   color: totalDailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)',
                   textShadow: totalDailyProfit >= 0 ? '0 0 8px rgba(0,204,102,0.3)' : '0 0 8px rgba(255,68,68,0.3)',
                 }}>
-                  {totalDailyProfit >= 0 ? '+' : ''}{formatFiatMain(Math.abs(totalDailyProfit))}
+                  {totalDailyProfit >= 0 ? '+' : '-'}{formatFiatMain(Math.abs(totalDailyProfit))}
                 </div>
               </div>
             </div>
