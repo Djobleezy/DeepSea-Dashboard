@@ -39,6 +39,7 @@ interface Props {
   data3hr: DataPoint[];
   avg24hr?: number;
   blockAnnotations?: AnnotationEntry[];
+  lowHashrateMode?: boolean;
 }
 
 /** Auto-scale TH/s values to the best display unit */
@@ -50,7 +51,7 @@ function autoScale(ths: number): { divisor: number; unit: string } {
   return { divisor: 1, unit: 'TH/s' };
 }
 
-export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [] }) => {
+export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [], lowHashrateMode = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const theme = useAppStore((s) => s.theme);
@@ -144,14 +145,22 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       };
     }
 
+    // In low hashrate mode (BitAxe / small miners), the 3hr average is the
+    // truthful reading while the 60sec line bounces erratically.  Swap which
+    // dataset is the "hero" filled line vs the secondary dashed line.
+    const primaryData = lowHashrateMode ? values3hr : values60s;
+    const secondaryData = lowHashrateMode ? values60s : values3hr;
+    const primaryLabel = lowHashrateMode ? '3hr Hashrate' : '60s Hashrate';
+    const secondaryLabel = lowHashrateMode ? '60s Hashrate' : '3hr Hashrate';
+
     chartRef.current = new Chart(ctx, {
       type: 'line',
       data: {
         labels,
         datasets: [
           {
-            label: '60s Hashrate',
-            data: values60s,
+            label: primaryLabel,
+            data: primaryData,
             borderColor: primary,
             backgroundColor: gradient,
             borderWidth: 2,
@@ -161,8 +170,8 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
             pointHoverRadius: 4,
           },
           {
-            label: '3hr Hashrate',
-            data: values3hr,
+            label: secondaryLabel,
+            data: secondaryData,
             borderColor: `${primaryDim}cc`,
             backgroundColor: 'transparent',
             borderWidth: 1,
@@ -225,7 +234,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       chartRef.current?.destroy();
     };
     // theme in deps → chart rebuilds with new CSS vars on theme change
-  }, [data60s, data3hr, avg24hr, blockAnnotations, theme]);
+  }, [data60s, data3hr, avg24hr, blockAnnotations, theme, lowHashrateMode]);
 
   return (
     <div className="chart-container">

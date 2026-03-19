@@ -67,16 +67,25 @@ async def check_and_fire(
     """
     fired: list[dict] = []
 
+    # In low hashrate mode (BitAxe / tabletop miners) use 3hr averages for
+    # change detection — the 60-sec window is too noisy to be meaningful.
+    # In normal mode we already use 3hr as the baseline, so this is
+    # consistent.  We also relax the drop threshold slightly for low-
+    # hashrate devices whose readings are inherently more variable.
+    low_mode = bool(metrics.get("low_hashrate_mode"))
+    drop_threshold = 40.0 if low_mode else HASHRATE_DROP_THRESHOLD
+    spike_threshold = HASHRATE_SPIKE_THRESHOLD
+
     prev_hr = _prev_state.get("hashrate_3hr")
     curr_hr = metrics.get("hashrate_3hr", 0)
 
     if prev_hr and prev_hr > 0 and curr_hr is not None:
         change_pct = ((curr_hr - prev_hr) / prev_hr) * 100
-        if change_pct <= -HASHRATE_DROP_THRESHOLD:
+        if change_pct <= -drop_threshold:
             msg = f"⚠️ Hashrate dropped {abs(change_pct):.1f}% (from {prev_hr:.2f} to {curr_hr:.2f} TH/s)"
             n = await create_notification(db, msg, "hashrate", "warning")
             fired.append(n)
-        elif change_pct >= HASHRATE_SPIKE_THRESHOLD:
+        elif change_pct >= spike_threshold:
             msg = f"📈 Hashrate increased {change_pct:.1f}% (from {prev_hr:.2f} to {curr_hr:.2f} TH/s)"
             n = await create_notification(db, msg, "hashrate", "success")
             fired.append(n)

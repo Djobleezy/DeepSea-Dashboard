@@ -97,22 +97,26 @@ export const Dashboard: React.FC = () => {
             <span
               className="badge badge-warning"
               style={{ fontSize: '12px', padding: '4px 12px' }}
+              title="Low hashrate device detected — chart uses 3hr average as primary, 60sec shown as secondary"
             >
-              ⚠ LOW HASHRATE
+              ⚠ LOW HASHRATE MODE
             </span>
           )}
         </div>
       </div>
 
-      {/* Hashrate row — auto-scaled */}
+      {/* Hashrate row — auto-scaled.  In low hashrate mode the 60-sec
+          reading is unreliable (BitAxe / small miners submit shares
+          infrequently), so we visually de-emphasise it and highlight
+          the 3hr average instead. */}
       <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
         <MetricCard
-          label="60 SEC"
+          label={metrics.low_hashrate_mode ? '60 SEC ⚡' : '60 SEC'}
           value={hr60.display}
           unit={hr60.unit}
           current={metrics.hashrate_60sec}
           previous={prevMetrics?.hashrate_60sec}
-          large
+          large={!metrics.low_hashrate_mode}
         />
         <MetricCard
           label="10 MIN"
@@ -123,7 +127,7 @@ export const Dashboard: React.FC = () => {
           large
         />
         <MetricCard
-          label="3 HR AVG"
+          label={metrics.low_hashrate_mode ? '⭐ 3 HR AVG' : '3 HR AVG'}
           value={hr3.display}
           unit={hr3.unit}
           current={metrics.hashrate_3hr}
@@ -143,7 +147,9 @@ export const Dashboard: React.FC = () => {
       {/* Chart — data from Zustand store, persists across route changes */}
       {chartData60s.length > 1 && (
         <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.15s both' }}>
-          <div className="label" style={{ marginBottom: '12px' }}>HASHRATE HISTORY</div>
+          <div className="label" style={{ marginBottom: '12px' }}>
+            HASHRATE HISTORY{metrics.low_hashrate_mode ? ' — 3HR PRIMARY (LOW HASHRATE MODE)' : ''}
+          </div>
           <ErrorBoundary>
             <Suspense
               fallback={
@@ -160,6 +166,7 @@ export const Dashboard: React.FC = () => {
                 data3hr={chartData3hr}
                 avg24hr={metrics.hashrate_24hr}
                 blockAnnotations={blockAnnotations}
+                lowHashrateMode={metrics.low_hashrate_mode}
               />
             </Suspense>
           </ErrorBoundary>
