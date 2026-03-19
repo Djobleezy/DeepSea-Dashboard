@@ -142,7 +142,7 @@ class NotificationService:
         self.max_notifications = 100  # Maximum number to store
         self.last_block_height = None  # Track the last seen block height
         self.last_payout_notification_time = None  # Track the last payout notification time
-        self.last_estimated_payout_time = None  # Track the last estimated payout time
+        self.last_worker_count = None  # Track workers for change detection
 
         # Load existing notifications from state
         self._load_notifications()
@@ -155,6 +155,9 @@ class NotificationService:
 
         # Load last block height from state
         self._load_last_block_height()
+
+        # Load persisted timestamps to survive container restarts
+        self._load_persisted_timestamps()
 
     def close(self):
         """Release references and clear cached data."""
@@ -271,6 +274,38 @@ class NotificationService:
         """Save last block height to persistent storage."""
         if self.last_block_height:
             self._set_redis_value("last_block_height", self.last_block_height)
+
+    def _load_persisted_timestamps(self) -> None:
+        """Load persisted timestamps so rate-limits survive restarts."""
+        try:
+            ts = self._get_redis_value("last_daily_stats_ts")
+            if ts:
+                self.last_daily_stats = datetime.fromisoformat(ts)
+                logging.info(f"[NotificationService] Loaded last_daily_stats: {self.last_daily_stats}")
+
+            ts = self._get_redis_value("last_payout_notification_ts")
+            if ts:
+                self.last_payout_notification_time = datetime.fromisoformat(ts)
+                logging.info("[NotificationService] Loaded last_payout_notification_time")
+
+            wc = self._get_redis_value("last_worker_count")
+            if wc:
+                self.last_worker_count = int(wc)
+                logging.info(f"[NotificationService] Loaded last_worker_count: {self.last_worker_count}")
+        except Exception as e:
+            logging.error(f"[NotificationService] Error loading persisted timestamps: {e}")
+
+    def _save_persisted_timestamps(self) -> None:
+        """Persist rate-limit timestamps to Redis."""
+        try:
+            if self.last_daily_stats:
+                self._set_redis_value("last_daily_stats_ts", self.last_daily_stats.isoformat())
+            if self.last_payout_notification_time:
+                self._set_redis_value("last_payout_notification_ts", self.last_payout_notification_time.isoformat())
+            if self.last_worker_count is not None:
+                self._set_redis_value("last_worker_count", str(self.last_worker_count))
+        except Exception as e:
+            logging.error(f"[NotificationService] Error saving persisted timestamps: {e}")
 
     def _save_notifications(self) -> None:
         """Save notifications with improved pruning."""
@@ -494,7 +529,12 @@ class NotificationService:
             # Check for block updates (using persistent storage)
             last_block_height = current_metrics.get("last_block_height")
             if last_block_height and last_block_height != "N/A":
-                if self.last_block_height is not None and self.last_block_height != last_block_height:
+                # Normalize to string for comparison — Redis returns strings,
+                # but metrics may have int. Without this, "941220" != 941220
+                # triggers false block-found notifications on every poll.
+                last_block_height_str = str(last_block_height)
+                stored_str = str(self.last_block_height) if self.last_block_height is not None else None
+                if stored_str is not None and stored_str != last_block_height_str:
                     logging.info(
                         f"[NotificationService] Block change detected: {self.last_block_height} -> {last_block_height}"
                     )
@@ -503,8 +543,8 @@ class NotificationService:
                         new_notifications.append(block_notification)
 
                 # Always update the stored last block height when it changes
-                if self.last_block_height != last_block_height:
-                    self.last_block_height = last_block_height
+                if stored_str != last_block_height_str:
+                    self.last_block_height = last_block_height_str
                     self._save_last_block_height()
 
             # Regular comparison with previous metrics
@@ -524,6 +564,11 @@ class NotificationService:
                 earnings_notification = self._check_earnings_progress(current_metrics, previous_metrics)
                 if earnings_notification:
                     new_notifications.append(earnings_notification)
+
+            # Check for worker count changes (doesn't need previous_metrics — uses persisted count)
+            worker_notification = self._check_worker_count(current_metrics)
+            if worker_notification:
+                new_notifications.append(worker_notification)
 
             return new_notifications
 
@@ -551,6 +596,7 @@ class NotificationService:
         # All conditions met, update timestamp and return True
         logging.info(f"[NotificationService] Posting daily stats at {now.hour}:{now.minute}")
         self.last_daily_stats = now
+        self._save_persisted_timestamps()
         return True
 
     def _generate_daily_stats(self, metrics: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -761,6 +807,60 @@ class NotificationService:
             logging.error(f"[NotificationService] Error checking hashrate change: {e}")
             return None
 
+    def _check_worker_count(self, current: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Check for workers going offline or coming back online."""
+        try:
+            current_count = current.get("workers_hashing")
+            if current_count is None or current_count == "N/A":
+                return None
+
+            current_count = int(float(str(current_count)))
+
+            # First time — just record baseline
+            if self.last_worker_count is None:
+                self.last_worker_count = current_count
+                self._save_persisted_timestamps()
+                return None
+
+            prev_count = self.last_worker_count
+            diff = current_count - prev_count
+
+            # No change
+            if diff == 0:
+                return None
+
+            # Update stored count
+            self.last_worker_count = current_count
+            self._save_persisted_timestamps()
+
+            if diff < 0:
+                message = (
+                    f"Worker count decreased: {prev_count} → {current_count} "
+                    f"({abs(diff)} worker{'s' if abs(diff) > 1 else ''} offline)"
+                )
+                level = NotificationLevel.WARNING
+            else:
+                message = (
+                    f"Worker count increased: {prev_count} → {current_count} "
+                    f"({diff} worker{'s' if diff > 1 else ''} online)"
+                )
+                level = NotificationLevel.SUCCESS
+
+            logging.info(f"[NotificationService] {message}")
+            return self.add_notification(
+                message,
+                level=level,
+                category=NotificationCategory.WORKER,
+                data={
+                    "previous_count": prev_count,
+                    "current_count": current_count,
+                    "change": diff,
+                },
+            )
+        except Exception as e:
+            logging.error(f"[NotificationService] Error checking worker count: {e}")
+            return None
+
     def _check_earnings_progress(self, current: Dict[str, Any], previous: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Check for significant earnings progress or payout approach."""
         try:
@@ -792,6 +892,7 @@ class NotificationService:
                         if self._should_send_payout_notification():
                             message = "Payout approaching! Estimated within 1 day"
                             self.last_payout_notification_time = self._get_current_time()
+                            self._save_persisted_timestamps()
                             return self.add_notification(
                                 message,
                                 level=NotificationLevel.SUCCESS,
@@ -803,6 +904,7 @@ class NotificationService:
                     if self._should_send_payout_notification():
                         message = "Payout expected with next block!"
                         self.last_payout_notification_time = self._get_current_time()
+                        self._save_persisted_timestamps()
                         return self.add_notification(
                             message,
                             level=NotificationLevel.SUCCESS,

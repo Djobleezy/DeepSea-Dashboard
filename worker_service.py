@@ -187,7 +187,13 @@ class WorkerService:
         dashboard_worker_count = dashboard_metrics.get("workers_hashing")
         if dashboard_worker_count is not None:
             current_worker_count = worker_data.get("workers_total", 0)
-            target_count = max(current_worker_count, dashboard_worker_count)
+            # Trust scraped worker count over pool-wide API stat.
+            # The API returns the entire pool's worker count, not per-user.
+            # Only use API count if we have no scraped workers at all.
+            if current_worker_count > 0:
+                target_count = current_worker_count
+            else:
+                target_count = dashboard_worker_count
 
             if current_worker_count != target_count:
                 logging.info(

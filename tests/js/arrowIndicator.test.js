@@ -26,6 +26,8 @@ const context = {
     localStorage: global.localStorage,
     MutationObserver: global.MutationObserver,
     setTimeout: global.setTimeout,
+    setInterval: global.setInterval,
+    clearInterval: global.clearInterval,
     THEME,
     getCurrentTheme
 };

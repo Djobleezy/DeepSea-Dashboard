@@ -18,6 +18,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - LOG_LEVEL=INFO
     volumes:
+        - ./config.json:/app/config.json
         - ./logs:/app/logs
         - ./static/audio:/app/static/audio
         - ./static/vendor:/app/static/vendor

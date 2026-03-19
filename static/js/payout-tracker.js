@@ -196,10 +196,10 @@ function format_payout_html(payout) {
 
     let txLink = '';
     if (payout.officialId) {
-        txLink += `<a href="https://mempool.guide/tx/${payout.officialId}" target="_blank" class="btn btn-sm btn-secondary ms-2" style="font-size: 12px; width: 90px;" title="View transaction on mempool.guide"><i class="fa-solid fa-external-link-alt"></i> View TX</a>`;
+        txLink += `<a href="https://mempool.guide/tx/${payout.officialId}" target="_blank" class="payout-tx-btn" title="View on mempool.guide"><i class="fa-solid fa-external-link-alt"></i> VIEW TX</a>`;
     }
     if (payout.lightningId) {
-        txLink += `<a href="https://ocean.xyz/info/tx/lightning/${payout.lightningId}" target="_blank" class="btn btn-sm btn-secondary ms-2" style="font-size: 12px; width: 90px;" title="View Lightning transaction"><i class="fa-solid fa-bolt"></i> LN TX</a>`;
+        txLink += `<a href="https://ocean.xyz/info/tx/lightning/${payout.lightningId}" target="_blank" class="payout-tx-btn" title="View Lightning TX"><i class="fa-solid fa-bolt"></i> LN TX</a>`;
     }
 
     const interval = lastPayoutTracking.avgDays ? `${lastPayoutTracking.avgDays.toFixed(2)} days` : 'N/A';
@@ -207,16 +207,28 @@ function format_payout_html(payout) {
     const statusClass = payout.verified ? 'green' : 'yellow';
 
     return `
-        <div style="font-size: 14px;">
-            <div style="display: flex; justify-content: center;">
-                <div style="width: 100%; max-width: 200px;">
-                    <p><strong>Date:</strong> <span class="metric-value white">${payoutDate}</span></p>
-                    <p><strong>Amount:</strong> <span class="metric-value yellow">${btcAmount} BTC</span></p>
-                    <p><strong>Fiat Value:</strong> <span class="metric-value green">${fiatValueStr}</span></p>
-                    <p><strong>Last Payout Interval:</strong> <span class="metric-value yellow">${interval}</span></p>
-                    <p><strong>Status:</strong> <span class="metric-value ${statusClass}">${statusDisplay}</span> ${txLink}</p>
-                </div>
+        <div class="payout-detail-grid">
+            <div class="payout-row">
+                <span class="payout-label">DATE</span>
+                <span class="metric-value white">${payoutDate}</span>
             </div>
+            <div class="payout-row">
+                <span class="payout-label">AMOUNT</span>
+                <span class="metric-value yellow">${btcAmount} BTC</span>
+            </div>
+            <div class="payout-row">
+                <span class="payout-label">FIAT VALUE</span>
+                <span class="metric-value green">${fiatValueStr}</span>
+            </div>
+            <div class="payout-row">
+                <span class="payout-label">INTERVAL</span>
+                <span class="metric-value yellow">${interval}</span>
+            </div>
+            <div class="payout-row">
+                <span class="payout-label">STATUS</span>
+                <span class="metric-value ${statusClass}">${statusDisplay}</span>
+            </div>
+            ${txLink ? `<div class="payout-tx-links">${txLink}</div>` : ''}
         </div>`;
 }
 
@@ -277,18 +289,12 @@ function initPayoutTracking() {
         id: "view-payout-history",
         text: "VIEW LAST PAYOUT",
         click: togglePayoutHistoryDisplay,
-        class: "btn btn-sm mt-2 d-block",
-        style: `
-            background-color: ${theme.PRIMARY};
-            color: ${isDeepSea ? 'white' : 'black'};
-            border-radius: 0;
-            font-style: bold;
-        `
+        class: "payout-toggle-btn",
     });
 
-    const viewHistoryWrapper = $("<p>", {
+    const viewHistoryWrapper = $("<div>", {
         id: "last-payout-btn-wrapper",
-        class: "mt-2 mb-0"
+        class: "payout-btn-wrapper"
     }).append(viewHistoryButton);
 
     $("#est_time_to_payout").parent().after(viewHistoryWrapper);
@@ -299,18 +305,7 @@ function initPayoutTracking() {
         style: "display: none; margin-top: 10px;"
     }).insertAfter(viewHistoryWrapper);
 
-    // Update theme-change listener for the button with fixed colors for each theme
-    $(document).on('themeChanged', function () {
-        const updatedTheme = getCurrentTheme();
-        const matrixActive = localStorage.getItem('useMatrixTheme') === 'true';
-        const isDeepSeaActive = localStorage.getItem('useDeepSeaTheme') === 'true' && !matrixActive;
-
-        $("#view-payout-history").css({
-            'background-color': updatedTheme.PRIMARY,
-            // Use black text for Matrix and Bitcoin themes
-            'color': isDeepSeaActive ? 'white' : 'black'
-        });
-    });
+    // Theme change: buttons use CSS vars, no JS needed
 
     // Verify payouts against official records
     verifyPayoutsAgainstOfficial();
@@ -347,8 +342,8 @@ function displayPayoutSummary() {
     container.empty();
 
     const summaryElement = $(
-        `<div id="payout-summary" class="mb-3 p-2">
-            <h6 style="color:${theme.PRIMARY};margin-bottom:8px; font-weight: bold; font-size: 18px; text-align: center;">Last Payout Summary</h6>
+        `<div id="payout-summary">
+            <div class="payout-summary-header">LAST PAYOUT</div>
             <div id="summary-content"></div>
         </div>`
     );
@@ -359,12 +354,10 @@ function displayPayoutSummary() {
 
     container.append(summaryElement);
 
-    const viewMoreLink = $("<div class='text-center'></div>");
-    const matrixActive = localStorage.getItem('useMatrixTheme') === 'true';
-    const isDeepSea = localStorage.getItem('useDeepSeaTheme') === 'true' && !matrixActive;
+    const viewMoreLink = $("<div class='payout-more-wrapper'></div>");
     viewMoreLink.html(
-        `<a href='/earnings' class='btn btn-sm' style='background-color:${theme.PRIMARY};color:${isDeepSea ? 'white' : 'black'};'>
-            Complete Payout History
+        `<a href='/earnings' class='payout-tx-btn'>
+            <i class="fa-solid fa-clock-rotate-left"></i> FULL PAYOUT HISTORY
         </a>`
     );
     container.append(viewMoreLink);

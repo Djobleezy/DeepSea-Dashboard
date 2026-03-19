@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install curl for healthcheck and other dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends curl gcc python3-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

@@ -406,6 +406,17 @@ class MetricsCalculatorMixin:
                 "last_block_earnings": ocean_data.last_block_earnings,
                 "pool_fees_percentage": ocean_data.pool_fees_percentage,
             }
+            # Override pool-wide workers_hashing with actual per-user count from scraper
+            if self.worker_service:
+                try:
+                    wd = self.worker_service.get_workers_data(metrics, force_refresh=False)
+                    if wd and "workers" in wd and isinstance(wd["workers"], list):
+                        scraped_count = len(wd["workers"])
+                        if scraped_count > 0 and scraped_count < metrics.get("workers_hashing", 0):
+                            metrics["workers_hashing"] = scraped_count
+                except Exception:
+                    pass
+
             metrics["estimated_earnings_per_day_sats"] = int(round(estimated_earnings_per_day * self.sats_per_btc))
             metrics["estimated_earnings_next_block_sats"] = int(
                 round(estimated_earnings_next_block * self.sats_per_btc)

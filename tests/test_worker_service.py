@@ -137,9 +137,10 @@ def test_sync_worker_counts_with_dashboard(monkeypatch):
         "unpaid_earnings": 0.2,
     }
     svc.sync_worker_counts_with_dashboard(worker_data, metrics)
-    assert worker_data["workers_total"] == 4
-    assert worker_data["workers_online"] == 2
-    assert worker_data["workers_offline"] == 2
+    # Scraped count (2) is trusted over API count (4) when scraped > 0
+    assert worker_data["workers_total"] == 2
+    assert worker_data["workers_online"] == 1
+    assert worker_data["workers_offline"] == 1
     assert worker_data["total_hashrate"] == 100
     assert worker_data["hashrate_unit"] == "TH/s"
     assert worker_data["daily_sats"] == 150

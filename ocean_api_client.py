@@ -209,7 +209,7 @@ class OceanApiClientMixin:
             result["hashrate_3hr_unit"] = "th/s"
             # active_worker_count lives in user_hashrate response
             if hr_data.get("active_worker_count") is not None:
-                result["workers_hashing"] = hr_data["active_worker_count"]
+                result["workers_hashing"] = int(hr_data["active_worker_count"])
         except Exception as e:
             logging.error(f"Error parsing user_hashrate API: {e}")
 
@@ -244,7 +244,8 @@ class OceanApiClientMixin:
                     resp.close()
                 except Exception:
                     pass
-                result["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                _wh = stat.get("active_workers") or stat.get("workers")
+                result["workers_hashing"] = int(_wh) if _wh is not None else 0
                 result["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
                 result["network_difficulty"] = stat.get("network_difficulty")
         except Exception as e:
@@ -284,10 +285,31 @@ class OceanApiClientMixin:
                 if isinstance(blocks, list) and blocks:
                     block = blocks[0]
                     result["last_block_height"] = block.get("height")
-                    ts = block.get("time") or block.get("timestamp")
+                    ts = block.get("ts") or block.get("time") or block.get("timestamp")
                     if ts:
-                        dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC")).astimezone(ZoneInfo(get_timezone()))
-                        result["last_block_time"] = dt.strftime("%Y-%m-%d %I:%M %p")
+                        try:
+                            # Try ISO format first (e.g. "2026-03-19T01:10:25.190700")
+                            dt = datetime.fromisoformat(str(ts)).replace(tzinfo=ZoneInfo("UTC"))
+                        except (ValueError, TypeError):
+                            # Fall back to unix timestamp
+                            dt = datetime.fromtimestamp(int(ts), tz=ZoneInfo("UTC"))
+                        now = datetime.now(tz=ZoneInfo("UTC"))
+                        delta = now - dt
+                        total_seconds = int(delta.total_seconds())
+                        if total_seconds < 60:
+                            result["last_block_time"] = f"{total_seconds} secs ago"
+                        elif total_seconds < 3600:
+                            mins = total_seconds // 60
+                            result["last_block_time"] = f"{mins} {'min' if mins == 1 else 'mins'} ago"
+                        else:
+                            hours = total_seconds // 3600
+                            mins = (total_seconds % 3600) // 60
+                            h_label = "hour" if hours == 1 else "hours"
+                            if mins > 0:
+                                m_label = "min" if mins == 1 else "mins"
+                                result["last_block_time"] = f"{hours} {h_label}, {mins} {m_label} ago"
+                            else:
+                                result["last_block_time"] = f"{hours} {h_label} ago"
         except Exception as e:
             logging.error(f"Error parsing blocks API: {e}")
 
@@ -307,7 +329,8 @@ class OceanApiClientMixin:
                 except Exception:
                     pass
                 # pool_stat uses "active_workers" (not "workers")
-                data["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                _wh2 = stat.get("active_workers") or stat.get("workers")
+                data["workers_hashing"] = int(_wh2) if _wh2 is not None else 0
                 data["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
                 data["network_difficulty"] = stat.get("network_difficulty")
                 # pool_stat does NOT contain hashrate or blocks_found
