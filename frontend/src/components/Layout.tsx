@@ -7,6 +7,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useRetroRefresh } from '../hooks/useRetroRefresh';
 import { EasterEgg } from './EasterEgg';
 import { UnderwaterBubbles } from './UnderwaterBubbles';
+import { MatrixRain } from './MatrixRain';
 
 const NAV_LINKS = [
   { to: '/dashboard', icon: '◈', label: 'DASHBOARD' },
@@ -40,10 +41,12 @@ export const Layout: React.FC<Props> = ({ children }) => {
   }, []);
 
   const toggleMenu = useCallback(() => setMenuOpen((o) => !o), []);
+  const theme = useAppStore((s) => s.theme);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-      <UnderwaterBubbles />
+      {theme === 'deepsea' && <UnderwaterBubbles />}
+      {theme === 'matrix' && <MatrixRain />}
 
       {/* CSS for responsive nav */}
       <style>{`
