@@ -1,17 +1,15 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
 import { useCurrency } from '../hooks/useCurrency';
 import { StaggerChildren } from '../components/StaggerChildren';
 import { ASIC_MODELS, groupedModels } from '../data/asicModels';
+import { fetchWorkerSettings, saveWorkerSettings, saveElectricityRate } from '../api/client';
 import type { Worker } from '../types';
 
 type StatusFilter = 'all' | 'online' | 'offline';
 
-// ── Per-worker overrides stored in localStorage ─────────────────────────────
-const OVERRIDES_KEY = 'workerPowerOverrides';
-const MAX_OVERRIDE_ENTRIES = 500;
-const MAX_OVERRIDE_BYTES = 256 * 1024;
+// ── Per-worker overrides (server-persisted) ─────────────────────────────────
 
 interface WorkerOverride {
   efficiency?: number; // W/TH
@@ -20,63 +18,31 @@ interface WorkerOverride {
 }
 type OverrideMap = Record<string, WorkerOverride>;
 
-function sanitizeOverrides(input: unknown): OverrideMap {
-  if (!input || typeof input !== 'object') return {};
+// Save debounce to avoid spamming PUT on every keystroke
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const entries = Object.entries(input as Record<string, unknown>)
-    .filter(([name, value]) => {
-      if (!name || typeof name !== 'string' || typeof value !== 'object' || value === null) return false;
-      const candidate = value as WorkerOverride;
-      const effValid = candidate.efficiency === undefined || (Number.isFinite(candidate.efficiency) && candidate.efficiency > 0 && candidate.efficiency <= 200);
-      const powerValid = candidate.powerConsumption === undefined || (Number.isFinite(candidate.powerConsumption) && candidate.powerConsumption >= 0 && candidate.powerConsumption <= 50_000);
-      return effValid && powerValid;
-    })
-    .slice(-MAX_OVERRIDE_ENTRIES);
-
-  return entries.reduce<OverrideMap>((acc, [name, value]) => {
-    acc[name] = value as WorkerOverride;
-    return acc;
-  }, {});
-}
-
-function loadOverrides(): OverrideMap {
-  try {
-    const raw = localStorage.getItem(OVERRIDES_KEY);
-    if (!raw) return {};
-    return sanitizeOverrides(JSON.parse(raw));
-  } catch {
-    return {};
-  }
-}
-
-function saveOverrides(m: OverrideMap) {
-  try {
-    const limited = sanitizeOverrides(m);
-    const serialized = JSON.stringify(limited);
-    if (serialized.length > MAX_OVERRIDE_BYTES) {
-      console.warn('[Workers] Overrides payload exceeded storage cap, dropping oldest entries.');
-      const trimmed = Object.fromEntries(Object.entries(limited).slice(-Math.floor(MAX_OVERRIDE_ENTRIES / 2)));
-      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(trimmed));
-      return;
+function debouncedSaveOverrides(overrides: OverrideMap) {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const payload: Record<string, { asicId?: string | null; efficiency?: number | null; power?: number | null }> = {};
+    for (const [name, o] of Object.entries(overrides)) {
+      payload[name] = {
+        asicId: o.asicId ?? null,
+        efficiency: o.efficiency ?? null,
+        power: o.powerConsumption ?? null,
+      };
     }
-    localStorage.setItem(OVERRIDES_KEY, serialized);
-  } catch (e) {
-    console.warn('[Workers] Failed to persist overrides', e);
-  }
+    saveWorkerSettings(payload).catch((e) =>
+      console.warn('[Workers] Failed to save overrides to server', e),
+    );
+  }, 800);
 }
 
-// ── Fleet-level power cost stored in localStorage ───────────────────────────
-const POWER_COST_KEY = 'fleetPowerCostPerKwh';
-function loadPowerCost(): number {
-  try {
-    const v = localStorage.getItem(POWER_COST_KEY);
-    if (!v) return 0.12;
-    const parsed = parseFloat(v);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0.12;
-  } catch { return 0.12; }
-}
-function savePowerCost(v: number) {
-  localStorage.setItem(POWER_COST_KEY, String(v));
+function debouncedSaveRate(rate: number) {
+  // Electricity rate changes are infrequent, save immediately
+  saveElectricityRate(rate).catch((e) =>
+    console.warn('[Workers] Failed to save electricity rate', e),
+  );
 }
 
 function fmtHashrate(v: number): string {
@@ -330,8 +296,48 @@ const WorkerCard: React.FC<{
 export const Workers: React.FC = () => {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
-  const [overrides, setOverrides] = useState<OverrideMap>(loadOverrides);
-  const [powerCost, setPowerCost] = useState(loadPowerCost);
+  const [overrides, setOverrides] = useState<OverrideMap>({});
+  const [powerCost, setPowerCost] = useState(0.12);
+  const [, setSettingsLoaded] = useState(false);
+
+  // Load overrides + electricity rate from server on mount
+  useEffect(() => {
+    fetchWorkerSettings()
+      .then((data) => {
+        const serverOverrides: OverrideMap = {};
+        for (const [name, o] of Object.entries(data.overrides)) {
+          serverOverrides[name] = {
+            asicId: o.asicId ?? undefined,
+            efficiency: o.efficiency ?? undefined,
+            powerConsumption: o.power ?? undefined,
+          };
+        }
+        setOverrides(serverOverrides);
+        setPowerCost(data.electricity_rate);
+        setSettingsLoaded(true);
+      })
+      .catch(() => {
+        // Fallback to localStorage for first-time migration
+        try {
+          const raw = localStorage.getItem('workerPowerOverrides');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            setOverrides(parsed);
+            // Migrate to server
+            debouncedSaveOverrides(parsed);
+          }
+          const rate = localStorage.getItem('fleetPowerCostPerKwh');
+          if (rate) {
+            const v = parseFloat(rate);
+            if (Number.isFinite(v) && v >= 0) {
+              setPowerCost(v);
+              debouncedSaveRate(v);
+            }
+          }
+        } catch { /* ignore */ }
+        setSettingsLoaded(true);
+      });
+  }, []);
   const [showPowerSettings, setShowPowerSettings] = useState(false);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
@@ -343,14 +349,14 @@ export const Workers: React.FC = () => {
     setOverrides((prev) => {
       const next = { ...prev };
       if (o === undefined) { delete next[name]; } else { next[name] = o; }
-      saveOverrides(next);
+      debouncedSaveOverrides(next);
       return next;
     });
   }, []);
 
   const handlePowerCostChange = useCallback((v: number) => {
     setPowerCost(v);
-    savePowerCost(v);
+    debouncedSaveRate(v);
   }, []);
 
   // Filtered + searched workers
@@ -566,7 +572,7 @@ export const Workers: React.FC = () => {
             {overrideCount > 0 && (
               <button
                 className="btn"
-                onClick={() => { setOverrides({}); saveOverrides({}); }}
+                onClick={() => { setOverrides({}); debouncedSaveOverrides({}); }}
                 style={{ alignSelf: 'flex-start', fontSize: '12px' }}
               >
                 RESET ALL OVERRIDES ({overrideCount})
