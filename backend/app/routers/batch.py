@@ -84,7 +84,10 @@ async def batch_requests(payload: BatchPayload, request: Request) -> BatchResult
                 if not path.startswith("/api/"):
                     responses.append(BatchResponse(status=400, body={"detail": "Only /api/* paths are allowed in batch"}))
                     continue
-                if path in {"/api/stream", "/api/batch"}:
+                from urllib.parse import urlsplit
+                parsed = urlsplit(path)
+                normalized_path = parsed.path
+                if normalized_path in {"/api/stream", "/api/batch"}:
                     responses.append(BatchResponse(status=400, body={"detail": "Path not allowed in batch"}))
                     continue
 
