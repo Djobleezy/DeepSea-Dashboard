@@ -724,9 +724,12 @@ function updateChartWithNormalizedData(chart, data) {
                             console.log(`Low hashrate mode: Y-axis range [${chart.options.scales.y.min.toFixed(2)}, ${chart.options.scales.y.max.toFixed(2)}] TH/s`);
                         } else {
                             // Normal mode scaling with smarter padding (less padding for large ranges)
-                            const dynamicPadding = Math.min(0.2, 10 / yMax); // Reduce padding as max increases
-                            chart.options.scales.y.min = Math.max(0, yMin * (1 - dynamicPadding)); // Never go below zero
-                            chart.options.scales.y.max = yMax * (1 + dynamicPadding);
+                            // Include 24hr average in range so annotation is always visible
+                            const effectiveMin = normalizedAvg > 0 ? Math.min(yMin, normalizedAvg) : yMin;
+                            const effectiveMax = normalizedAvg > 0 ? Math.max(yMax, normalizedAvg) : yMax;
+                            const dynamicPadding = Math.min(0.2, 10 / effectiveMax); // Reduce padding as max increases
+                            chart.options.scales.y.min = Math.max(0, effectiveMin * (1 - dynamicPadding)); // Never go below zero
+                            chart.options.scales.y.max = effectiveMax * (1 + dynamicPadding);
                         }
 
                         // Set appropriate step size based on range - improved algorithm
