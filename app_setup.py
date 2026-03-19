@@ -53,6 +53,10 @@ def init_state_manager():
     MEMORY_CONFIG["MAX_METRICS_LOG_ENTRIES"] = max_entries
     MEMORY_CONFIG["MAX_ARROW_HISTORY_ENTRIES"] = max_entries
 
+    # Update module-level constant so SSE service and other consumers see it
+    import state_manager as sm_module
+    sm_module.MAX_HISTORY_ENTRIES = max_entries
+
     return StateManager(redis_url, max_history_entries=max_entries)
 
 

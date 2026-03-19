@@ -209,7 +209,7 @@ class OceanApiClientMixin:
             result["hashrate_3hr_unit"] = "th/s"
             # active_worker_count lives in user_hashrate response
             if hr_data.get("active_worker_count") is not None:
-                result["workers_hashing"] = hr_data["active_worker_count"]
+                result["workers_hashing"] = int(hr_data["active_worker_count"])
         except Exception as e:
             logging.error(f"Error parsing user_hashrate API: {e}")
 
@@ -244,7 +244,8 @@ class OceanApiClientMixin:
                     resp.close()
                 except Exception:
                     pass
-                result["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                _wh = stat.get("active_workers") or stat.get("workers")
+                result["workers_hashing"] = int(_wh) if _wh is not None else 0
                 result["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
                 result["network_difficulty"] = stat.get("network_difficulty")
         except Exception as e:
@@ -307,7 +308,8 @@ class OceanApiClientMixin:
                 except Exception:
                     pass
                 # pool_stat uses "active_workers" (not "workers")
-                data["workers_hashing"] = stat.get("active_workers") or stat.get("workers")
+                _wh2 = stat.get("active_workers") or stat.get("workers")
+                data["workers_hashing"] = int(_wh2) if _wh2 is not None else 0
                 data["current_estimated_block_reward"] = stat.get("current_estimated_block_reward")
                 data["network_difficulty"] = stat.get("network_difficulty")
                 # pool_stat does NOT contain hashrate or blocks_found

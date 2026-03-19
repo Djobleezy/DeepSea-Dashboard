@@ -218,6 +218,19 @@ function updatePaymentHistoryTable(payments) {
             satsTd.textContent = formatSats(pay.amount_sats);
             row.appendChild(satsTd);
 
+            const txTd = document.createElement('td');
+            if (pay.txid) {
+                const txLink = document.createElement('a');
+                txLink.href = 'https://mempool.guide/tx/' + pay.txid;
+                txLink.target = '_blank';
+                txLink.className = 'tx-link';
+                txLink.textContent = pay.txid.substring(0, 8) + '…' + pay.txid.slice(-8);
+                txTd.appendChild(txLink);
+            } else {
+                txTd.textContent = 'N/A';
+            }
+            row.appendChild(txTd);
+
             const statusTd = document.createElement('td');
             const span = document.createElement('span');
             span.className = 'status-label status-' + pay.status;

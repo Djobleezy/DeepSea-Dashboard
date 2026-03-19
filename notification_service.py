@@ -494,7 +494,12 @@ class NotificationService:
             # Check for block updates (using persistent storage)
             last_block_height = current_metrics.get("last_block_height")
             if last_block_height and last_block_height != "N/A":
-                if self.last_block_height is not None and self.last_block_height != last_block_height:
+                # Normalize to string for comparison — Redis returns strings,
+                # but metrics may have int. Without this, "941220" != 941220
+                # triggers false block-found notifications on every poll.
+                last_block_height_str = str(last_block_height)
+                stored_str = str(self.last_block_height) if self.last_block_height is not None else None
+                if stored_str is not None and stored_str != last_block_height_str:
                     logging.info(
                         f"[NotificationService] Block change detected: {self.last_block_height} -> {last_block_height}"
                     )
@@ -503,8 +508,8 @@ class NotificationService:
                         new_notifications.append(block_notification)
 
                 # Always update the stored last block height when it changes
-                if self.last_block_height != last_block_height:
-                    self.last_block_height = last_block_height
+                if stored_str != last_block_height_str:
+                    self.last_block_height = last_block_height_str
                     self._save_last_block_height()
 
             # Regular comparison with previous metrics

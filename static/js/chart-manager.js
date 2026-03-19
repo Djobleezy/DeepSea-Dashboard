@@ -112,7 +112,7 @@ function initializeChart() {
             data: {
                 labels: [],
                 datasets: [{
-                    label: 'HASHRATE TREND (TH/s)',
+                    label: 'HASHRATE TREND',
                     data: [],
                     borderWidth: 2,
                     pointRadius: extendedHistoryEnabled && chartPoints === Infinity ? 0 : 3,
@@ -174,7 +174,7 @@ function initializeChart() {
                     y: {
                         title: {
                             display: true,
-                            text: 'HASHRATE (TH/S)',
+                            text: 'HASHRATE',
                             color: theme.PRIMARY,
                             font: {
                                 family: "'VT323', monospace",
@@ -184,33 +184,29 @@ function initializeChart() {
                         },
                         ticks: {
                             color: '#FFFFFF',
-                            maxTicksLimit: 6, // Limit total number of ticks
-                            precision: 1,     // Control decimal precision
-                            autoSkip: true,   // Skip labels to prevent overcrowding
-                            autoSkipPadding: 10, // Padding between skipped labels
+                            maxTicksLimit: 6,
+                            precision: 1,
+                            autoSkip: true,
+                            autoSkipPadding: 10,
                             font: {
-                                family: "'VT323', monospace", // Terminal font
+                                family: "'VT323', monospace",
                                 size: 14
                             },
                             callback: function (value) {
-                                // For zero, just return 0
                                 if (value === 0) return '0';
-
-                                // For large values (1000+ TH/s), show in PH/s
-                                if (value >= 1000) {
-                                    return (value / 1000).toFixed(1) + ' PH';
-                                }
-                                // For values between 10 and 1000 TH/s
-                                else if (value >= 10) {
-                                    return Math.round(value);
-                                }
-                                // For small values, limit decimal places
-                                else if (value >= 1) {
-                                    return value.toFixed(1);
-                                }
-                                // For tiny values, use appropriate precision
-                                else {
-                                    return value.toPrecision(2);
+                                // Auto-scale unit based on magnitude
+                                if (value >= 1000000) {
+                                    return (value / 1000000).toFixed(2) + ' EH/s';
+                                } else if (value >= 1000) {
+                                    return (value / 1000).toFixed(2) + ' PH/s';
+                                } else if (value >= 10) {
+                                    return Math.round(value) + ' TH/s';
+                                } else if (value >= 1) {
+                                    return value.toFixed(1) + ' TH/s';
+                                } else if (value >= 0.001) {
+                                    return (value * 1000).toFixed(1) + ' GH/s';
+                                } else {
+                                    return value.toPrecision(2) + ' TH/s';
                                 }
                             }
                         },
@@ -650,14 +646,14 @@ function updateChartWithNormalizedData(chart, data) {
 
                         if (originalData) {
                             if (originalData.storageValue !== undefined && originalData.storageUnit) {
-                                return `HASHRATE: ${originalData.storageValue} ${originalData.storageUnit.toUpperCase()}`;
+                                return 'HASHRATE: ' + formatHashrateForDisplay(originalData.storageValue, originalData.storageUnit).toUpperCase();
                             }
                             else if (originalData.originalValue !== undefined && originalData.originalUnit) {
-                                return `HASHRATE: ${originalData.originalValue} ${originalData.originalUnit.toUpperCase()}`;
+                                return 'HASHRATE: ' + formatHashrateForDisplay(originalData.originalValue, originalData.originalUnit).toUpperCase();
                             }
                         }
 
-                        // Last resort fallback
+                        // Last resort fallback — context.raw is already in TH/s
                         return 'HASHRATE: ' + formatHashrateForDisplay(context.raw).toUpperCase();
                     };
 
