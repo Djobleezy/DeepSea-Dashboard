@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
@@ -26,10 +26,10 @@ function AppInner() {
     return !sessionStorage.getItem(BOOT_SHOWN_KEY);
   });
 
-  const handleBootComplete = () => {
+  const handleBootComplete = useCallback(() => {
     sessionStorage.setItem(BOOT_SHOWN_KEY, '1');
     setShowBoot(false);
-  };
+  }, []);
 
   if (showBoot) {
     return <BootSequence onComplete={handleBootComplete} />;

@@ -7,7 +7,6 @@ import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
-import type { DashboardMetrics } from '../types';
 
 const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
