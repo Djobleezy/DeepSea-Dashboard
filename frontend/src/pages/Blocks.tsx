@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import { fetchBlocks } from '../api/client';
 import { useAppStore } from '../stores/store';
+import { useCurrency } from '../hooks/useCurrency';
 import type { Block, BlocksResponse } from '../types';
 
 // ── Pool colors ────────────────────────────────────────────────────────────
@@ -151,83 +152,161 @@ const PoolDonut: React.FC<{ slices: DonutSlice[]; total: number }> = ({ slices, 
   );
 };
 
+// ── Ocean pulse keyframe (injected once at module level) ───────────────────
+const OCEAN_STYLES = `
+  @keyframes ocean-pulse-glow {
+    0%, 100% { box-shadow: 0 0 12px rgba(0, 191, 255, 0.3), inset 0 0 20px rgba(0, 191, 255, 0.05); }
+    50%       { box-shadow: 0 0 20px rgba(0, 191, 255, 0.5), inset 0 0 28px rgba(0, 191, 255, 0.08); }
+  }
+`;
+
 // ── Block Card ─────────────────────────────────────────────────────────────
 const BlockCard: React.FC<{ block: Block; btcPrice: number }> = ({ block, btcPrice }) => {
   const rewardUsd = block.reward_btc * btcPrice;
   const feePct = block.reward_btc > 0 ? (block.fees_btc / block.reward_btc) * 100 : 0;
   const color = poolColor(block.pool);
+  const { formatFiat } = useCurrency();
+  const isOcean = block.pool.toLowerCase().includes('ocean');
+
+  const cardStyle: React.CSSProperties = isOcean
+    ? {
+        border: '2px solid #00bfff',
+        background: 'linear-gradient(135deg, rgba(0, 191, 255, 0.08), transparent 60%)',
+        animation: 'ocean-pulse-glow 3s ease-in-out infinite',
+        position: 'relative',
+        overflow: 'hidden',
+      }
+    : {
+        borderLeft: `3px solid ${color}`,
+      };
+
+  return (
+    <>
+      <style>{OCEAN_STYLES}</style>
+      <div className="card" style={cardStyle}>
+        {/* OUR POOL ribbon for Ocean blocks */}
+        {isOcean && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '-22px',
+              background: 'linear-gradient(135deg, #00bfff, #0080cc)',
+              color: '#000',
+              fontSize: '9px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              padding: '3px 28px',
+              transform: 'rotate(35deg)',
+              transformOrigin: 'center',
+              boxShadow: '0 2px 8px rgba(0, 191, 255, 0.6)',
+              zIndex: 2,
+              userSelect: 'none',
+            }}
+          >
+            OUR POOL
+          </div>
+        )}
+
+        <div className="flex justify-between items-center" style={{ marginBottom: '8px' }}>
+          <a
+            href={`https://mempool.space/block/${block.hash || block.height}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: 'var(--font-vt323)',
+              fontSize: '24px',
+              color: isOcean ? '#00bfff' : 'var(--primary)',
+              textDecoration: 'none',
+              textShadow: isOcean ? '0 0 12px #00bfff' : '0 0 8px var(--primary-glow)',
+            }}
+          >
+            #{block.height.toLocaleString()}
+          </a>
+          <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
+            {block.time_ago || block.timestamp.slice(0, 16)}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '10px',
+            fontSize: '13px',
+          }}
+        >
+          <div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>REWARD</div>
+            <div style={{ color: 'var(--color-success)', textShadow: '0 0 4px rgba(0,204,102,0.3)' }}>
+              ₿ {block.reward_btc.toFixed(5)}
+            </div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>
+              {formatFiat(rewardUsd)}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>FEES</div>
+            <div style={{ color: 'var(--color-warning)' }}>₿ {block.fees_btc.toFixed(5)}</div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>{feePct.toFixed(1)}%</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>TXs</div>
+            <div style={{ color: 'var(--text)' }}>
+              {block.tx_count > 0 ? block.tx_count.toLocaleString() : '—'}
+            </div>
+          </div>
+        </div>
+
+        {/* Pool badge */}
+        <div style={{ marginTop: '10px', borderTop: `1px solid ${isOcean ? 'rgba(0,191,255,0.25)' : 'rgba(0,85,170,0.15)'}`, paddingTop: '8px' }}>
+          <div className="flex justify-between items-center" style={{ fontSize: '12px' }}>
+            <span style={{ color: 'var(--text-dim)' }}>POOL</span>
+            <span
+              style={{
+                fontSize: '12px',
+                fontFamily: 'var(--font-mono)',
+                color: isOcean ? '#00bfff' : color,
+                textShadow: isOcean ? '0 0 8px #00bfff' : `0 0 6px ${color}40`,
+                fontWeight: isOcean ? 700 : 600,
+              }}
+            >
+              {isOcean ? '⚡ OCEAN' : block.pool}
+            </span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ── Ocean Blocks summary card ───────────────────────────────────────────────
+const OceanBlocksCard: React.FC<{ blocks: Block[] }> = ({ blocks }) => {
+  const oceanCount = blocks.filter((b) => b.pool.toLowerCase().includes('ocean')).length;
+  const pct = blocks.length > 0 ? ((oceanCount / blocks.length) * 100).toFixed(0) : '0';
 
   return (
     <div
       className="card"
-      style={{ borderLeft: `3px solid ${color}` }}
+      style={{
+        border: oceanCount > 0 ? '1px solid rgba(0,191,255,0.4)' : undefined,
+        background: oceanCount > 0 ? 'linear-gradient(135deg, rgba(0,191,255,0.06), transparent 60%)' : undefined,
+      }}
     >
-      <div className="flex justify-between items-center" style={{ marginBottom: '8px' }}>
-        <a
-          href={`https://mempool.space/block/${block.hash || block.height}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontFamily: 'var(--font-vt323)',
-            fontSize: '24px',
-            color: 'var(--primary)',
-            textDecoration: 'none',
-            textShadow: '0 0 8px var(--primary-glow)',
-          }}
-        >
-          #{block.height.toLocaleString()}
-        </a>
-        <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
-          {block.time_ago || block.timestamp.slice(0, 16)}
-        </span>
-      </div>
-
+      <div className="label" style={{ color: '#00bfff', letterSpacing: '1px' }}>🌊 OCEAN BLOCKS</div>
       <div
+        className="value glow"
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '10px',
-          fontSize: '13px',
+          marginTop: '6px',
+          color: oceanCount > 0 ? '#00bfff' : 'var(--text-dim)',
+          textShadow: oceanCount > 0 ? '0 0 10px #00bfff' : undefined,
         }}
       >
-        <div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>REWARD</div>
-          <div style={{ color: 'var(--color-success)', textShadow: '0 0 4px rgba(0,204,102,0.3)' }}>
-            ₿ {block.reward_btc.toFixed(5)}
-          </div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>
-            ${rewardUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </div>
-        </div>
-        <div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>FEES</div>
-          <div style={{ color: 'var(--color-warning)' }}>₿ {block.fees_btc.toFixed(5)}</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>{feePct.toFixed(1)}%</div>
-        </div>
-        <div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>TXs</div>
-          <div style={{ color: 'var(--text)' }}>
-            {block.tx_count > 0 ? block.tx_count.toLocaleString() : '—'}
-          </div>
-        </div>
+        {oceanCount}
       </div>
-
-      {/* Pool badge */}
-      <div style={{ marginTop: '10px', borderTop: '1px solid rgba(0,85,170,0.15)', paddingTop: '8px' }}>
-        <div className="flex justify-between items-center" style={{ fontSize: '12px' }}>
-          <span style={{ color: 'var(--text-dim)' }}>POOL</span>
-          <span
-            style={{
-              fontSize: '12px',
-              fontFamily: 'var(--font-mono)',
-              color: color,
-              textShadow: `0 0 6px ${color}40`,
-              fontWeight: 600,
-            }}
-          >
-            {block.pool === 'Ocean.xyz' ? '🌊 ' : ''}{block.pool}
-          </span>
-        </div>
+      <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
+        {pct}% of this page
       </div>
     </div>
   );
@@ -243,6 +322,7 @@ export const Blocks: React.FC = () => {
   const [donutBlocks, setDonutBlocks] = useState<Block[]>([]);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
+  const { formatFiat } = useCurrency();
 
   async function load(p: number) {
     setLoading(true);
@@ -311,8 +391,8 @@ export const Blocks: React.FC = () => {
           <MetricCardSimple label="LAST BLOCK" value={`#${metrics.last_block_height.toLocaleString()}`} sub={metrics.last_block_time} />
           <MetricCardSimple label="BLOCKS FOUND" value={String(metrics.blocks_found)} />
           <MetricCardSimple label="PAGE REWARDS" value={`₿ ${blocks.reduce((s, b) => s + b.reward_btc, 0).toFixed(3)}`}
-            sub={`$${(blocks.reduce((s, b) => s + b.reward_btc, 0) * btcPrice).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
-          <MetricCardSimple label="PAGE FEES" value={`₿ ${blocks.reduce((s, b) => s + b.fees_btc, 0).toFixed(5)}`} />
+            sub={formatFiat(blocks.reduce((s, b) => s + b.reward_btc, 0) * btcPrice)} />
+          <OceanBlocksCard blocks={blocks} />
         </div>
       )}
 

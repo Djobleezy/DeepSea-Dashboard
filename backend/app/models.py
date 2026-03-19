@@ -273,11 +273,34 @@ class HealthStatus(BaseModel):
     """
 
     status: str = "ok"
-    version: str = "2.0.0"
+    version: str = "2.0.1"
     wallet_configured: bool = False
     redis_connected: bool = False
     last_refresh: Optional[float] = None
     uptime_seconds: float = 0.0
+    server_timestamp: Optional[float] = None  # Unix timestamp (seconds) for client time sync
+
+
+# ---------------------------------------------------------------------------
+# Client error reporting
+# ---------------------------------------------------------------------------
+
+class ClientErrorCreate(BaseModel):
+    """Payload accepted by POST /api/client-errors."""
+
+    message: str = Field(default="", max_length=2000)
+    source: Optional[str] = Field(default=None, max_length=500)
+    lineno: Optional[int] = None
+    colno: Optional[int] = None
+    stack: Optional[str] = Field(default=None, max_length=5000)
+    url: Optional[str] = Field(default=None, max_length=500)
+
+
+class ClientError(ClientErrorCreate):
+    """Stored client error row."""
+
+    id: int
+    ts: float
 
 
 # ---------------------------------------------------------------------------

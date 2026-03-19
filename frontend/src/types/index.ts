@@ -157,4 +157,5 @@ export interface HealthStatus {
   redis_connected: boolean;
   last_refresh?: number;
   uptime_seconds: number;
+  server_timestamp?: number;
 }

@@ -15,23 +15,26 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import background
 from app.db import init_db
+from app.logging_config import configure_logging, get_request_middleware, log_startup_banner
 from app.routers import (
+    batch,
     blocks,
+    client_errors,
     config_routes,
     earnings,
+    exchange,
     health,
     metrics,
     notifications,
     workers,
 )
-from app.services.cache import init_cache
+from app.services.cache import init_cache, is_redis_connected
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+# Configure structured logging before anything else
+configure_logging()
 
 _bg_task: asyncio.Task | None = None
+_log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -44,6 +47,14 @@ async def lifespan(app: FastAPI):
 
     # Start background refresh loop
     _bg_task = asyncio.create_task(background.background_loop())
+
+    # Emit startup banner after services are initialised
+    from app.config import get_wallet
+    log_startup_banner(
+        version="2.0.1",
+        wallet_configured=bool(get_wallet()),
+        redis_connected=await is_redis_connected(),
+    )
 
     yield
 
@@ -61,7 +72,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DeepSea Dashboard API",
-    version="2.0.0",
+    version="2.0.1",
     description="Ocean.xyz mining monitoring dashboard",
     lifespan=lifespan,
 )
@@ -96,6 +107,9 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# Request logging middleware (logs method, path, status, duration_ms at DEBUG level)
+app.middleware("http")(get_request_middleware())
+
 # CORS — configurable via CORS_ORIGINS (comma-separated)
 # Default is permissive for local/dev but does not claim credentialed wildcard support.
 _cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
@@ -118,6 +132,9 @@ app.include_router(blocks.router, prefix=api_prefix, tags=["blocks"])
 app.include_router(earnings.router, prefix=api_prefix, tags=["earnings"])
 app.include_router(notifications.router, prefix=api_prefix, tags=["notifications"])
 app.include_router(config_routes.router, prefix=api_prefix, tags=["config"])
+app.include_router(exchange.router, prefix=api_prefix, tags=["exchange"])
+app.include_router(client_errors.router, prefix=api_prefix, tags=["client-errors"])
+app.include_router(batch.router, prefix=api_prefix, tags=["system"])
 
 # Serve built frontend (if present) with SPA fallback
 _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

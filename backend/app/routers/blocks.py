@@ -68,11 +68,17 @@ async def _fetch_mempool_blocks(start_height: int | None = None) -> list[dict]:
         return resp.json()
 
 
-@router.get("/blocks", response_model=BlocksResponse)
+@router.get("/blocks", response_model=BlocksResponse, tags=["blocks"])
 async def get_blocks(
-    page: int = Query(default=0, ge=0),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page: int = Query(default=0, ge=0, description="Page number (0-indexed)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Results per page (1–100)"),
 ) -> BlocksResponse:
+    """Fetch recent Bitcoin network blocks from mempool.space.
+
+    Supports pagination via ``page`` and ``page_size``. Block data includes
+    height, hash, timestamp, transaction count, fees, reward, and mining pool.
+    Returns 502 if mempool.space is unreachable.
+    """
     try:
         # mempool.space returns ~15 blocks per call, paginate by fetching from a start height
         all_blocks: list[dict] = []

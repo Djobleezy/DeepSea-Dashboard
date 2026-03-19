@@ -19,18 +19,28 @@ from app.services.cache import cache_get
 router = APIRouter()
 
 
-@router.get("/metrics/history")
+@router.get("/metrics/history", response_model=list[dict], tags=["metrics"])
 async def metrics_history(
     hours: int = Query(default=1, ge=1, le=168, description="Hours of history (max 7 days)"),
     db: aiosqlite.Connection = Depends(get_db),
 ) -> list[dict]:
-    """Return historical metric snapshots for chart hydration on page load."""
+    """Return historical metric snapshots for chart hydration on page load.
+
+    Queries the SQLite ``metric_history`` table. Use ``hours`` to control
+    the time window (1–168 hours / up to 7 days). Returns an empty list if
+    no history has been collected yet.
+    """
     return await get_metric_history(db, hours=hours, limit=hours * 60)
 
 
-@router.get("/metrics", response_model=DashboardMetrics)
+@router.get("/metrics", response_model=DashboardMetrics, tags=["metrics"])
 async def get_metrics() -> DashboardMetrics:
-    """Return the latest cached metrics snapshot."""
+    """Return the latest cached mining metrics snapshot.
+
+    Data is sourced from the Ocean.xyz API and refreshed every 30 seconds by
+    the background loop. Returns safe zero-value defaults if no data has been
+    collected yet (e.g., on first startup or unconfigured wallet).
+    """
     cached = await cache_get(background.get_cache_key("metrics"))
     if cached:
         return DashboardMetrics(**cached)
@@ -41,9 +51,17 @@ async def get_metrics() -> DashboardMetrics:
     return DashboardMetrics(server_timestamp=time.time())
 
 
-@router.get("/stream")
+@router.get("/stream", tags=["metrics"])
 async def metrics_stream(request: Request) -> EventSourceResponse:
-    """SSE endpoint — streams metrics + worker updates in real-time."""
+    """Server-Sent Events stream — pushes live metrics and worker updates.
+
+    Emits ``metrics`` and ``workers`` events whenever the background loop
+    produces new data. Sends a ``heartbeat`` event every 30s to keep the
+    connection alive through proxies. Automatically unsubscribes on
+    client disconnect.
+
+    Event types: ``metrics`` | ``workers`` | ``heartbeat``
+    """
 
     async def event_generator() -> AsyncGenerator[dict, None]:
         q = background.subscribe()

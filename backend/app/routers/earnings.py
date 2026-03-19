@@ -16,8 +16,16 @@ router = APIRouter()
 SATS_PER_BTC = 100_000_000
 
 
-@router.get("/earnings", response_model=EarningsResponse)
-async def get_earnings(days: int = Query(default=90, ge=1, le=365)) -> EarningsResponse:
+@router.get("/earnings", response_model=EarningsResponse, tags=["earnings"])
+async def get_earnings(
+    days: int = Query(default=90, ge=1, le=365, description="History window in days (1–365)"),
+) -> EarningsResponse:
+    """Return payment history and earnings aggregates for the configured wallet.
+
+    Fetches payout records from the Ocean.xyz API and computes daily/monthly
+    summaries. Requires ``wallet`` to be set in config. Returns empty response
+    with 200 if wallet is not configured.
+    """
     wallet = get_wallet()
     if not wallet:
         return EarningsResponse()

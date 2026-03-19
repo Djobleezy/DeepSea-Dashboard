@@ -6,7 +6,10 @@ import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
+import { useCurrency } from '../hooks/useCurrency';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
+import { LiveBlockTimer } from '../components/LiveBlockTimer';
+import { HashrateNotices } from '../components/HashrateNotices';
 
 const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
@@ -18,6 +21,7 @@ function isDatumConnected(poolFeesPct: number): boolean {
 }
 
 export const Dashboard: React.FC = () => {
+  const { formatFiat, formatFiatSigned } = useCurrency();
   const metrics = useAppStore((s) => s.metrics);
   const prevMetrics = useAppStore((s) => s.prevMetrics);
   const chartData60s = useAppStore((s) => s.chartData60s);
@@ -116,6 +120,7 @@ export const Dashboard: React.FC = () => {
           unit={hr60.unit}
           current={metrics.hashrate_60sec}
           previous={prevMetrics?.hashrate_60sec}
+          metricKey="hashrate_60sec"
           large={!metrics.low_hashrate_mode}
         />
         <MetricCard
@@ -124,6 +129,7 @@ export const Dashboard: React.FC = () => {
           unit={hr10.unit}
           current={metrics.hashrate_10min}
           previous={prevMetrics?.hashrate_10min}
+          metricKey="hashrate_10min"
           large
         />
         <MetricCard
@@ -132,6 +138,7 @@ export const Dashboard: React.FC = () => {
           unit={hr3.unit}
           current={metrics.hashrate_3hr}
           previous={prevMetrics?.hashrate_3hr}
+          metricKey="hashrate_3hr"
           large
         />
         <MetricCard
@@ -140,9 +147,13 @@ export const Dashboard: React.FC = () => {
           unit={hr24.unit}
           current={metrics.hashrate_24hr}
           previous={prevMetrics?.hashrate_24hr}
+          metricKey="hashrate_24hr"
           large
         />
       </div>
+
+      {/* Hashrate notices — shown when hashrate drops or low-hashrate mode */}
+      <HashrateNotices metrics={metrics} />
 
       {/* Chart — data from Zustand store, persists across route changes */}
       {chartData60s.length > 1 && (
@@ -180,13 +191,15 @@ export const Dashboard: React.FC = () => {
           value={metrics.workers_hashing}
           current={metrics.workers_hashing}
           previous={prevMetrics?.workers_hashing}
+          metricKey="workers_hashing"
           large
         />
         <MetricCard
           label="BTC PRICE"
-          value={`$${metrics.btc_price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+          value={formatFiat(metrics.btc_price)}
           current={metrics.btc_price}
           previous={prevMetrics?.btc_price}
+          metricKey="btc_price"
           large
         />
         <MetricCard
@@ -195,6 +208,7 @@ export const Dashboard: React.FC = () => {
           unit="SATS"
           current={metrics.daily_mined_sats}
           previous={prevMetrics?.daily_mined_sats}
+          metricKey="daily_mined_sats"
           large
         />
         <MetricCard
@@ -202,7 +216,7 @@ export const Dashboard: React.FC = () => {
           value={`${(metrics.unpaid_earnings * 1e8).toFixed(0)}`}
           unit="SATS"
           large
-          subtext={`≈ $${(metrics.unpaid_earnings * metrics.btc_price).toFixed(2)}`}
+          subtext={`≈ ${formatFiat(metrics.unpaid_earnings * metrics.btc_price)}`}
         />
       </div>
 
@@ -215,7 +229,10 @@ export const Dashboard: React.FC = () => {
             <div>
               <div className="label">LAST OCEAN BLOCK</div>
               <div className="value-sm glow">#{metrics.last_block_height.toLocaleString()}</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>{metrics.last_block_time}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <LiveBlockTimer lastBlockTime={metrics.last_block_time} />
+                <span style={{ color: 'var(--text-dim)' }}>ago</span>
+              </div>
             </div>
             <div>
               <div className="label">POOL BLOCKS FOUND</div>
@@ -251,23 +268,25 @@ export const Dashboard: React.FC = () => {
       <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.55s both' }}>
         <MetricCard
           label="DAILY REVENUE"
-          value={`$${metrics.daily_revenue.toFixed(2)}`}
+          value={formatFiat(metrics.daily_revenue)}
           current={metrics.daily_revenue}
           previous={prevMetrics?.daily_revenue}
+          metricKey="daily_revenue"
         />
         <MetricCard
           label="POWER COST/DAY"
-          value={`$${metrics.daily_power_cost.toFixed(2)}`}
+          value={formatFiat(metrics.daily_power_cost)}
         />
         <MetricCard
           label="DAILY PROFIT"
-          value={`${metrics.daily_profit_usd >= 0 ? '+' : ''}$${metrics.daily_profit_usd.toFixed(2)}`}
+          value={formatFiatSigned(metrics.daily_profit_usd)}
           current={metrics.daily_profit_usd}
           previous={prevMetrics?.daily_profit_usd}
+          metricKey="daily_profit_usd"
         />
         <MetricCard
           label="MONTHLY PROFIT"
-          value={`${metrics.monthly_profit_usd >= 0 ? '+' : ''}$${metrics.monthly_profit_usd.toFixed(0)}`}
+          value={formatFiatSigned(metrics.monthly_profit_usd)}
         />
       </div>
     </div>
