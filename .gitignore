@@ -1,45 +1,32 @@
-# Python caches and artifacts
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
 .ruff_cache/
 .coverage
-coverage_html/
 
 # Virtual environments
 .venv/
 .venv-test/
 
-# Frontend artifacts
+# Frontend
 frontend/node_modules/
 frontend/dist/
 
-# Build/minified static outputs
-static/js/min/
-static/css/min/
-templates/min/
-
-# Environment and local secrets
+# Environment and secrets
 .env
 .env.*
 *.env
 
 # Logs
 logs/
-/logs/dashboard.log
-/logs/dashboard.log.1
-/logs/dashboard.log.2
-/logs/dashboard.log.3
-/logs/dashboard.log.4
-/logs/dashboard.log.5
 
 # IDE / editor
 *.swp
 *.swo
 .idea/
 .vscode/
-.vs/
 
-# OS files
+# OS
 .DS_Store

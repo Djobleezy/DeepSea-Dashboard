@@ -7,41 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  # ── v1 legacy (remove after v1 cleanup PR) ──────────────────────────
-  v1-tests:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install v1 dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Ruff (v1)
-        run: ruff check . --exclude frontend --exclude backend
-      - name: Tests (v1)
-        run: pytest -q --ignore=backend --ignore=frontend
-      - name: JS tests (v1)
-        run: |
-          node tests/js/formatCurrency.test.js
-          node tests/js/formatDuration.test.js
-          node tests/js/main_dom_safety.test.js
-          node tests/js/main_chart_load.test.js
-          node tests/js/normalizeHashrate.test.js
-          node tests/js/arrowIndicator.test.js
-          node tests/js/audioCrossfadeTheme.test.js
-          node tests/js/getBlockTimerClass.test.js
-          node tests/js/blockProbability.test.js
-          node tests/js/notificationsTimestamp.test.js
-          node tests/js/workerUtils.test.js
-          node tests/js/themeToggle.test.js
-
-  # ── v2 backend ──────────────────────────────────────────────────────
-  v2-backend:
+  # ── Backend ─────────────────────────────────────────────────────────
+  backend:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,7 +31,7 @@ jobs:
         run: pytest backend/ -q
 
   # ── v2 frontend ─────────────────────────────────────────────────────
-  v2-frontend:
+  frontend:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,7 +59,7 @@ jobs:
         run: npm run build
 
   # ── Security checks ─────────────────────────────────────────────────
-  v2-security:
+  security:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -115,7 +82,7 @@ jobs:
         run: npm audit --audit-level=high
 
   # ── Docker build ────────────────────────────────────────────────────
-  v2-docker:
+  docker:
     runs-on: ubuntu-latest
     permissions:
       contents: read

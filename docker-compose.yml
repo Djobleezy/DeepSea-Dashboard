@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5051:8000"
+      - "5000:8000"
     environment:
       - CONFIG_PATH=/config/config.json
       - REDIS_PASSWORD=${REDIS_PASSWORD:-change-me-in-production}
