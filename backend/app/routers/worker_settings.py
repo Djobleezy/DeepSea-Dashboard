@@ -1,7 +1,9 @@
 """Worker settings endpoints — persist ASIC overrides and electricity rate."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, StringConstraints
 
 import aiosqlite
 
@@ -20,22 +22,25 @@ router = APIRouter(tags=["worker-settings"])
 
 
 class WorkerOverride(BaseModel):
-    asicId: str | None = None
-    efficiency: float | None = None
-    power: float | None = None
+    asicId: str | None = Field(default=None, min_length=1, max_length=128)
+    efficiency: float | None = Field(default=None, gt=0, le=200)
+    power: float | None = Field(default=None, ge=0, le=50_000)
+
+
+WorkerName = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 
 
 class WorkerOverridesPayload(BaseModel):
-    overrides: dict[str, WorkerOverride]
+    overrides: dict[WorkerName, WorkerOverride]
 
 
 class WorkerOverridesResponse(BaseModel):
-    overrides: dict[str, dict]
+    overrides: dict[str, WorkerOverride]
     electricity_rate: float
 
 
 class ElectricityRatePayload(BaseModel):
-    rate: float
+    rate: float = Field(ge=0, le=10)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -49,7 +54,11 @@ class ElectricityRatePayload(BaseModel):
 async def get_settings(db: aiosqlite.Connection = Depends(get_db)):
     overrides = await get_worker_overrides(db)
     settings = await get_user_settings(db)
-    rate = settings.get("electricity_rate", 0.12)
+    rate_raw = settings.get("electricity_rate", 0.12)
+    try:
+        rate = float(rate_raw)
+    except (TypeError, ValueError):
+        rate = 0.12
     return WorkerOverridesResponse(overrides=overrides, electricity_rate=rate)
 
 
@@ -65,7 +74,11 @@ async def save_settings(
     overrides_dict = {k: v.model_dump() for k, v in payload.overrides.items()}
     await set_worker_overrides(db, overrides_dict)
     settings = await get_user_settings(db)
-    rate = settings.get("electricity_rate", 0.12)
+    rate_raw = settings.get("electricity_rate", 0.12)
+    try:
+        rate = float(rate_raw)
+    except (TypeError, ValueError):
+        rate = 0.12
     return WorkerOverridesResponse(overrides=overrides_dict, electricity_rate=rate)
 
 
