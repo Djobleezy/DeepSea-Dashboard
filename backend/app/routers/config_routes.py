@@ -2,6 +2,7 @@
 
 import pytz
 from fastapi import APIRouter
+from fastapi.concurrency import run_in_threadpool
 
 from app.config import load_config, save_config
 from app.models import AppConfig, ConfigUpdate
@@ -11,7 +12,7 @@ router = APIRouter()
 
 @router.get("/config", response_model=AppConfig)
 async def get_config():
-    cfg = load_config()
+    cfg = await run_in_threadpool(load_config)
     return AppConfig(
         wallet=cfg.get("wallet", ""),
         power_cost=float(cfg.get("power_cost", 0.12)),
@@ -26,7 +27,7 @@ async def get_config():
 @router.post("/config", response_model=AppConfig)
 async def update_config(payload: ConfigUpdate):
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
-    save_config(update)
+    await run_in_threadpool(save_config, update)
     return await get_config()
 
 

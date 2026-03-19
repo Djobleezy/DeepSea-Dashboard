@@ -6,7 +6,7 @@ import time
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -179,22 +179,34 @@ class NotificationCreate(BaseModel):
 
 class AppConfig(BaseModel):
     wallet: str = ""
-    power_cost: float = 0.12
-    power_usage: float = 3450.0
-    currency: str = "USD"
+    power_cost: float = Field(default=0.12, ge=0, le=10)
+    power_usage: float = Field(default=3450.0, ge=0, le=100000)
+    currency: str = Field(default="USD", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
     timezone: str = "America/Los_Angeles"
-    network_fee: float = 0.5
+    network_fee: float = Field(default=0.5, ge=0, le=100)
     extended_history: bool = False
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: str) -> str:
+        return str(value).upper()
 
 
 class ConfigUpdate(BaseModel):
     wallet: Optional[str] = None
-    power_cost: Optional[float] = None
-    power_usage: Optional[float] = None
-    currency: Optional[str] = None
+    power_cost: Optional[float] = Field(default=None, ge=0, le=10)
+    power_usage: Optional[float] = Field(default=None, ge=0, le=100000)
+    currency: Optional[str] = Field(default=None, min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
     timezone: Optional[str] = None
-    network_fee: Optional[float] = None
+    network_fee: Optional[float] = Field(default=None, ge=0, le=100)
     extended_history: Optional[bool] = None
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return str(value).upper()
 
 
 # ---------------------------------------------------------------------------
