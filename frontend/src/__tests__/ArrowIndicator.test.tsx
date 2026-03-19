@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { ArrowIndicator, updateArrowPrev, getArrowPrev } from '../components/ArrowIndicator';
+import { ArrowIndicator } from '../components/ArrowIndicator';
+import { updateArrowPrev, getArrowPrev } from '../utils/arrowState';
 
 describe('ArrowIndicator', () => {
   it('renders nothing when previous is undefined', () => {

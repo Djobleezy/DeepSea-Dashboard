@@ -1,21 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { parseElapsedSecs } from '../utils/time';
 
 interface Props {
   lastBlockTime: string; // e.g. "5 mins ago"
   targetMinutes?: number;
-}
-
-/** Parses "X mins ago" / "X hours ago" → elapsed seconds */
-function parseElapsedSecs(str: string): number {
-  if (!str || str === 'N/A') return 0;
-  const m = str.match(/(\d+)\s*(sec|min|hour)/i);
-  if (!m) return 0;
-  const n = parseInt(m[1]);
-  const unit = m[2].toLowerCase();
-  if (unit.startsWith('sec')) return n;
-  if (unit.startsWith('min')) return n * 60;
-  if (unit.startsWith('hour')) return n * 3600;
-  return 0;
 }
 
 export const BitcoinProgressBar: React.FC<Props> = ({

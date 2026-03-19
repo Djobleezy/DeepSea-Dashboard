@@ -48,7 +48,7 @@ interface ArrowState {
   setAt: number;
 }
 const arrowMap  = new Map<string, ArrowState>();
-const prevMap   = new Map<string, number>();
+// prevMap lives in utils/arrowState.ts for react-refresh compat
 
 // Cleanup stale arrows every 10 s
 setInterval(() => {
@@ -125,7 +125,7 @@ export const ArrowIndicator: React.FC<Props> = ({
       setTick((t) => t + 1);
     }, remaining + 10);
     return () => window.clearTimeout(timer);
-  }, [state?.setAt, key]);
+  }, [state?.setAt, key, state]);
 
   if (!valid || !state) return null;
 
@@ -169,14 +169,4 @@ export const ArrowIndicator: React.FC<Props> = ({
   );
 };
 
-// ── Export helper so MetricCard can pass metricKey ───────────────────────────
-export { THRESHOLDS as ARROW_THRESHOLDS };
 
-// ── Track previous values (called by SSE/store updates) ─────────────────────
-export function updateArrowPrev(key: string, value: number): void {
-  prevMap.set(key, value);
-}
-
-export function getArrowPrev(key: string): number | undefined {
-  return prevMap.get(key);
-}
