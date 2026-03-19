@@ -24,7 +24,7 @@ jobs:
     - name: Ruff (v1)
       run: ruff check . --exclude frontend --exclude backend
     - name: Tests (v1)
-      run: pytest -q
+      run: pytest -q --ignore=backend --ignore=frontend
     - name: JS tests (v1)
       run: |
         node tests/js/formatCurrency.test.js
