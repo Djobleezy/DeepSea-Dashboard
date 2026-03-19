@@ -1,0 +1,365 @@
+/* ============================================================
+   DeepSea Dashboard — Global CRT Retro Stylesheet
+   ============================================================ */
+
+/* ---- Google Fonts fallback (also loaded in index.html) ---- */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+/* ---- CSS Custom Properties (defaults: DeepSea theme) ---- */
+:root {
+  --primary:       #0088cc;
+  --primary-dim:   #005580;
+  --primary-glow:  rgba(0, 136, 204, 0.4);
+  --bg:            #0a0f14;
+  --bg-card:       #0d1a24;
+  --bg-hover:      #112233;
+  --text:          #a0d4f5;
+  --text-dim:      #4a7a9b;
+  --border:        #0055aa;
+  --border-glow:   rgba(0, 136, 204, 0.3);
+  --scanline:      rgba(0, 136, 204, 0.04);
+
+  --font-mono:  'Share Tech Mono', 'Courier New', monospace;
+  --font-vt323: 'VT323', monospace;
+
+  --radius:  4px;
+  --card-pad: 1rem;
+
+  /* Status colors (theme-agnostic) */
+  --color-success: #00cc66;
+  --color-warning: #ffaa00;
+  --color-error:   #ff4444;
+  --color-info:    var(--primary);
+}
+
+/* ---- Reset & Base ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- CRT Scanline Overlay ---- */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scanline) 2px,
+    var(--scanline) 4px
+  );
+}
+
+/* ---- CRT Flicker Animation ---- */
+@keyframes flicker {
+  0%   { opacity: 1; }
+  92%  { opacity: 1; }
+  93%  { opacity: 0.97; }
+  94%  { opacity: 1; }
+  96%  { opacity: 0.98; }
+  100% { opacity: 1; }
+}
+
+/* ---- Phosphor Glow Utilities ---- */
+.glow {
+  text-shadow:
+    0 0 5px var(--primary),
+    0 0 15px var(--primary-glow),
+    0 0 30px var(--primary-glow);
+}
+
+.glow-strong {
+  text-shadow:
+    0 0 3px #fff,
+    0 0 8px var(--primary),
+    0 0 20px var(--primary),
+    0 0 40px var(--primary-glow);
+}
+
+.box-glow {
+  box-shadow:
+    0 0 6px var(--border-glow),
+    inset 0 0 6px var(--border-glow);
+}
+
+/* ---- Card ---- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--card-pad);
+  box-shadow: 0 0 8px var(--border-glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--primary-glow) 0%, transparent 50%);
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+/* ---- Typography ---- */
+h1, h2, h3, .vt323 {
+  font-family: var(--font-vt323);
+  color: var(--primary);
+}
+
+.label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.value {
+  font-size: 28px;
+  font-family: var(--font-vt323);
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+  line-height: 1.1;
+}
+
+.value-sm {
+  font-size: 18px;
+  font-family: var(--font-vt323);
+  color: var(--primary);
+}
+
+.unit {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--primary);
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  box-shadow: 0 0 8px var(--border-glow);
+}
+
+.btn-primary {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.btn-danger {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.btn-danger:hover {
+  background: rgba(255, 68, 68, 0.1);
+}
+
+/* ---- Tables ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+th:hover {
+  color: var(--primary);
+}
+
+td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 85, 170, 0.15);
+  vertical-align: middle;
+}
+
+tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* ---- Status Badges ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid;
+}
+
+.badge-online {
+  color: var(--color-success);
+  border-color: var(--color-success);
+  background: rgba(0, 204, 102, 0.1);
+  text-shadow: 0 0 6px var(--color-success);
+}
+
+.badge-offline {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.badge-warning {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  background: rgba(255, 170, 0, 0.1);
+}
+
+/* ---- Notification Levels ---- */
+.notif-info    { border-left: 3px solid var(--color-info); }
+.notif-success { border-left: 3px solid var(--color-success); }
+.notif-warning { border-left: 3px solid var(--color-warning); }
+.notif-error   { border-left: 3px solid var(--color-error); }
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dim);
+}
+
+/* ---- Input ---- */
+input, select, textarea {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 6px var(--primary-glow);
+}
+
+/* ---- Progress Bar ---- */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* ---- Animations ---- */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 6px var(--border-glow); }
+  50%       { box-shadow: 0 0 18px var(--primary-glow); }
+}
+
+@keyframes boot-line {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scan-line-sweep {
+  0%   { top: -10%; }
+  100% { top: 110%; }
+}
+
+/* ---- Layout utilities ---- */
+.flex        { display: flex; }
+.flex-col    { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-1       { gap: 0.5rem; }
+.gap-2       { gap: 1rem; }
+.gap-3       { gap: 1.5rem; }
+.flex-1      { flex: 1; }
+.w-full      { width: 100%; }
+.mt-1        { margin-top: 0.5rem; }
+.mt-2        { margin-top: 1rem; }
+.mb-1        { margin-bottom: 0.5rem; }
+.mb-2        { margin-bottom: 1rem; }
+.p-1         { padding: 0.5rem; }
+.p-2         { padding: 1rem; }
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+.truncate    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
