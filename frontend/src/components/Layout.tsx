@@ -307,7 +307,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
       }}>
-        <span>DEEPSEA DASHBOARD v2.0</span>
+        <span>DEEPSEA DASHBOARD v2.0.1</span>
         <a
           href="https://x.com/DJObleezy"
           target="_blank"
