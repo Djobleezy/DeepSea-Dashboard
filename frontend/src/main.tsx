@@ -95,15 +95,50 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Service Worker
+// Service Worker — full lifecycle with update detection
 // ---------------------------------------------------------------------------
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/service-worker.js')
-      .catch((err) => console.warn('[SW] Registration failed:', err))
-  })
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/service-worker.js');
+      console.log('[SW] Registered:', registration.scope);
+
+      // Listen for a new SW found during update checks
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener('statechange', () => {
+          // New SW installed and waiting — notify the app so it can prompt user
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('[SW] Update available — new service worker waiting');
+            window.dispatchEvent(new CustomEvent('sw-update-available', {
+              detail: {
+                /**
+                 * Call this from the app's update prompt to activate the new SW.
+                 * The SW will call skipWaiting() → triggers controllerchange →
+                 * we reload the page with the latest assets.
+                 */
+                acceptUpdate: () => {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                },
+              },
+            }));
+          }
+        });
+      });
+
+      // When the SW controller changes (new SW took over), reload for fresh assets
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('[SW] Controller changed — reloading for fresh assets');
+        window.location.reload();
+      });
+
+    } catch (err) {
+      console.warn('[SW] Registration failed:', err);
+    }
+  });
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

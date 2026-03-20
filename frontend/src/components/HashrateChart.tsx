@@ -74,14 +74,42 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     const defs: Record<string, AnnotationOptions> = {};
 
     entries.forEach((entry, idx) => {
-      if (!labelSet.has(entry.label)) return;
+      // Find matching label: exact match first, then nearest by timestamp
+      let matchLabel = entry.label;
+      if (!labelSet.has(matchLabel) && labels.length > 0) {
+        // Parse label times to find nearest
+        const entryDate = new Date(entry.timestamp);
+        let bestDist = Infinity;
+        let bestLabel = labels[0];
+        for (const l of labels) {
+          // Parse "h:mm:ss AM" style label back to today's date
+          const parts = l.match(/(\d+):(\d+):(\d+)\s*(AM|PM)/i);
+          if (!parts) continue;
+          let h = parseInt(parts[1], 10);
+          const m = parseInt(parts[2], 10);
+          const s = parseInt(parts[3], 10);
+          if (parts[4].toUpperCase() === 'PM' && h !== 12) h += 12;
+          if (parts[4].toUpperCase() === 'AM' && h === 12) h = 0;
+          const labelDate = new Date(entryDate);
+          labelDate.setHours(h, m, s, 0);
+          const dist = Math.abs(labelDate.getTime() - entryDate.getTime());
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestLabel = l;
+          }
+        }
+        // Only use nearest if within 2 minutes
+        if (bestDist > 120_000) return;
+        matchLabel = bestLabel;
+      }
       defs[`blockEvent${idx}`] = {
         type: 'line',
-        xMin: entry.label,
-        xMax: entry.label,
+        xMin: matchLabel,
+        xMax: matchLabel,
         borderColor: BLOCK_COLOR,
         borderWidth: 2,
         borderDash: [4, 2],
+
         label: {
           display: true,
           content: '⛏️ BLOCK',
@@ -190,7 +218,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 300 },
+        animation: false,  // no animation on initial build (prevents diagonal annotations)
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
@@ -231,6 +259,12 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
           },
         },
       },
+    });
+    // Re-enable animation after first render so data updates are smooth
+    requestAnimationFrame(() => {
+      if (chartRef.current) {
+        chartRef.current.options.animation = { duration: 300 };
+      }
     });
   }, [data60s, data3hr, avg24hr, blockAnnotations, lowHashrateMode, buildAnnotations]);
 

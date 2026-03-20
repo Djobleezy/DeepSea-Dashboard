@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/store';
+import { fetchPoolBlocks } from '../api/client';
 
 const STORAGE_KEY = 'blockAnnotations_v2';
 const DEFAULT_WINDOW_MIN = 180;
@@ -176,19 +177,59 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
   const [annotations, setAnnotations] = useState<AnnotationEntry[]>([]);
   const initialized = useRef(false);
 
-  // Load persisted annotations on mount (and when annotation window changes)
-  // Clear v2 storage once to flush false positives from network-block bug
+  // Load persisted annotations on mount, then backfill from pool blocks API
   useEffect(() => {
+    let cancelled = false;
+
+    // One-time migration: flush false positives from network-block bug
     const MIGRATION_KEY = 'blockAnnotations_v2_migrated_pool';
+    let stored: AnnotationEntry[] = [];
     if (!localStorage.getItem(MIGRATION_KEY)) {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.setItem(MIGRATION_KEY, '1');
-      setAnnotations([]);
     } else {
-      const loaded = loadFromStorage(windowMinutes);
-      setAnnotations(loaded);
+      stored = loadFromStorage(windowMinutes);
     }
+
+    // Seed from storage immediately so we don't briefly render empty state
+    setAnnotations(stored);
+
+    // Backfill: fetch recent Ocean pool blocks and merge with latest state.
+    // Functional state update avoids race conditions with live block events.
+    const hours = Math.ceil(windowMinutes / 60);
+    fetchPoolBlocks(hours)
+      .then(({ blocks }) => {
+        if (cancelled) return;
+        const cutoff = Date.now() - windowMinutes * 60 * 1000;
+
+        setAnnotations((prev) => {
+          let merged = [...prev];
+          for (const b of blocks) {
+            if (b.timestamp < cutoff) continue;
+            const alreadyTracked = merged.some(
+              (e) => Math.abs(e.timestamp - b.timestamp) < 60_000,
+            );
+            if (alreadyTracked) continue;
+            merged.push({
+              timestamp: b.timestamp,
+              label: new Date(b.timestamp).toLocaleTimeString(),
+            });
+          }
+          merged = pruneEntries(merged, windowMinutes);
+          saveToStorage(merged);
+          return merged;
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fallback already seeded from local storage
+      });
+
     initialized.current = true;
+
+    return () => {
+      cancelled = true;
+    };
   }, [windowMinutes]);
 
   // Detect new block events when last_block_height changes
@@ -196,12 +237,13 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     if (!initialized.current) return;
     // Need both current and previous metrics
     if (!metrics || !prevMetrics) return;
-    // Use blocks_found (Ocean pool block count), NOT last_block_height (network-wide).
-    // last_block_height changes every ~10min when ANY miner finds a block.
-    // blocks_found only increments when OUR pool finds one.
-    if (!prevMetrics.blocks_found) return;
-    // No change — or decreased (pool stat reset)
-    if (metrics.blocks_found <= prevMetrics.blocks_found) return;
+    // last_block_height comes from Ocean's /v1/blocks endpoint (pool blocks only,
+    // NOT network blocks). It only changes when Ocean finds a block.
+    if (!prevMetrics.last_block_height) return;
+    // No change
+    if (metrics.last_block_height === prevMetrics.last_block_height) return;
+    // Only celebrate height increases (not decreases from reorgs/resets)
+    if (metrics.last_block_height <= prevMetrics.last_block_height) return;
 
     const now = Date.now();
     // Label must match the format used in the chart's x-axis
