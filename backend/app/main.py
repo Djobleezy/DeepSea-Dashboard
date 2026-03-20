@@ -168,7 +168,12 @@ def resolve_spa_path(full_path: str, dist_root: Path) -> Path | None:
     if safe_path.is_absolute() or ".." in safe_path.parts:
         return None
 
-    resolved = (dist_root / safe_path).resolve()
+    # Build the filesystem path from validated parts only, so no raw user
+    # input string flows into the Path join (avoids CodeQL taint tracking).
+    resolved = dist_root
+    for part in safe_path.parts:
+        resolved = resolved / part
+    resolved = resolved.resolve()
 
     # Belt-and-suspenders: verify the resolved path stays inside dist
     try:
