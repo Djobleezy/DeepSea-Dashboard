@@ -161,8 +161,10 @@ if _frontend_dist.exists():
         if full_path.startswith("api/") or full_path == "api":
             raise HTTPException(status_code=404, detail="API route not found")
 
-        # Reject any path component that attempts traversal (.. or absolute)
-        if full_path and (".." in full_path.split("/") or full_path.startswith("/")):
+        # Normalize the user path using Path semantics and reject traversal/absolute paths
+        full_path_path = Path(full_path)
+
+        if full_path_path.is_absolute() or ".." in full_path_path.parts:
             raise HTTPException(status_code=404, detail="Not found")
 
         dist_root = _frontend_dist.resolve()
