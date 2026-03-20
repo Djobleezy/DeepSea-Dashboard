@@ -109,6 +109,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
         borderColor: BLOCK_COLOR,
         borderWidth: 2,
         borderDash: [4, 2],
+
         label: {
           display: true,
           content: '⛏️ BLOCK',
@@ -237,7 +238,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
               label: (c) => ` ${(c.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
             },
           },
-          annotation: { annotations: annotationDefs },
+          annotation: { animations: {}, annotations: annotationDefs },
         },
         scales: {
           x: {
