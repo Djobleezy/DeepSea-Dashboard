@@ -176,6 +176,6 @@ if _frontend_dist.exists():
         except ValueError:
             raise HTTPException(status_code=404, detail="Not found")
 
-        if full_path and requested.is_file():
+        if safe_path.parts and requested.is_file():
             return FileResponse(str(requested))
         return FileResponse(str(_index_html))
