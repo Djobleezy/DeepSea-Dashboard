@@ -177,9 +177,17 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
   const initialized = useRef(false);
 
   // Load persisted annotations on mount (and when annotation window changes)
+  // Clear v2 storage once to flush false positives from network-block bug
   useEffect(() => {
-    const loaded = loadFromStorage(windowMinutes);
-    setAnnotations(loaded);
+    const MIGRATION_KEY = 'blockAnnotations_v2_migrated_pool';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(MIGRATION_KEY, '1');
+      setAnnotations([]);
+    } else {
+      const loaded = loadFromStorage(windowMinutes);
+      setAnnotations(loaded);
+    }
     initialized.current = true;
   }, [windowMinutes]);
 
@@ -188,10 +196,12 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     if (!initialized.current) return;
     // Need both current and previous metrics
     if (!metrics || !prevMetrics) return;
-    // Skip if previous had no real block height (first load, container restart, etc.)
-    if (!prevMetrics.last_block_height) return;
-    // No change
-    if (metrics.last_block_height === prevMetrics.last_block_height) return;
+    // Use blocks_found (Ocean pool block count), NOT last_block_height (network-wide).
+    // last_block_height changes every ~10min when ANY miner finds a block.
+    // blocks_found only increments when OUR pool finds one.
+    if (!prevMetrics.blocks_found) return;
+    // No change — or decreased (pool stat reset)
+    if (metrics.blocks_found <= prevMetrics.blocks_found) return;
 
     const now = Date.now();
     // Label must match the format used in the chart's x-axis

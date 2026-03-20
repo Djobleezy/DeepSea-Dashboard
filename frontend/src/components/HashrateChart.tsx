@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   Chart,
   LineController,
@@ -51,52 +51,31 @@ function autoScale(ths: number): { divisor: number; unit: string } {
   return { divisor: 1, unit: 'TH/s' };
 }
 
+const BLOCK_COLOR = '#f7931a'; // Bitcoin orange
+
 export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, blockAnnotations = [], lowHashrateMode = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const theme = useAppStore((s) => s.theme);
+  // Track what triggered a rebuild vs an in-place update
+  const prevThemeRef = useRef(theme);
+  const prevLowHashrateRef = useRef(lowHashrateMode);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    // Read live CSS vars — these update when theme changes
-    const style = getComputedStyle(document.documentElement);
-    const primary = style.getPropertyValue('--primary').trim() || '#0088cc';
-    const primaryDim = style.getPropertyValue('--primary-dim').trim() || '#005580';
-    const textDim = style.getPropertyValue('--text-dim').trim() || '#4a8fa8';
-    const bgCard = style.getPropertyValue('--bg-card').trim() || '#0d1a24';
-    const text = style.getPropertyValue('--text').trim() || '#a0d4f5';
-
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
-
-    const labels = data60s.map((d) => d.label);
-    const rawValues60s = data60s.map((d) => d.value);
-    const rawValues3hr = data3hr.map((d) => d.value);
+  const buildAnnotations = useCallback((
+    labels: string[],
+    scaledAvg: number | undefined,
+    displayUnit: string,
+    primary: string,
+    primaryDim: string,
+    bgCard: string,
+    entries: AnnotationEntry[],
+  ): Record<string, AnnotationOptions> => {
     const labelSet = new Set(labels);
+    const defs: Record<string, AnnotationOptions> = {};
 
-    // Determine display unit from peak value (all values are in TH/s internally)
-    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
-    const { divisor, unit: displayUnit } = autoScale(peakThs);
-    const values60s = rawValues60s.map((v) => v / divisor);
-    const values3hr = rawValues3hr.map((v) => v / divisor);
-    const scaledAvg = avg24hr !== undefined ? avg24hr / divisor : undefined;
-
-    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, `${primary}44`);
-    gradient.addColorStop(1, `${primary}00`);
-
-    // --- Block annotation vertical lines ---
-    const BLOCK_COLOR = '#f7931a'; // Bitcoin orange — always stands out
-    const annotationDefs: Record<string, AnnotationOptions> = {};
-
-    blockAnnotations.forEach((entry, idx) => {
+    entries.forEach((entry, idx) => {
       if (!labelSet.has(entry.label)) return;
-      annotationDefs[`blockEvent${idx}`] = {
+      defs[`blockEvent${idx}`] = {
         type: 'line',
         xMin: entry.label,
         xMax: entry.label,
@@ -108,11 +87,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
           content: '⛏️ BLOCK',
           backgroundColor: 'rgba(0,0,0,0.85)',
           color: BLOCK_COLOR,
-          font: {
-            family: "'VT323', monospace",
-            size: 14,
-            weight: 'bold',
-          },
+          font: { family: "'VT323', monospace", size: 14, weight: 'bold' },
           padding: { top: 4, bottom: 4, left: 6, right: 6 },
           borderRadius: 0,
           position: 'start',
@@ -120,9 +95,8 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       };
     });
 
-    // --- 24hr average annotation ---
     if (scaledAvg !== undefined && scaledAvg > 0) {
-      annotationDefs['avg24hr'] = {
+      defs['avg24hr'] = {
         type: 'line',
         yMin: scaledAvg,
         yMax: scaledAvg,
@@ -134,10 +108,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
           content: `24H AVG: ${scaledAvg.toFixed(2)} ${displayUnit}`,
           backgroundColor: `${bgCard}dd`,
           color: `${primary}cc`,
-          font: {
-            family: "'Share Tech Mono', monospace",
-            size: 10,
-          },
+          font: { family: "'Share Tech Mono', monospace", size: 10 },
           padding: { top: 2, bottom: 2, left: 6, right: 6 },
           borderRadius: 0,
           position: 'end',
@@ -145,9 +116,43 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       };
     }
 
-    // In low hashrate mode (BitAxe / small miners), the 3hr average is the
-    // truthful reading while the 60sec line bounces erratically.  Swap which
-    // dataset is the "hero" filled line vs the secondary dashed line.
+    return defs;
+  }, []);
+
+  // Full chart build — only on mount, theme change, or low-hashrate mode toggle
+  const buildChart = useCallback(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) {
+      chartRef.current.destroy();
+      chartRef.current = null;
+    }
+
+    const style = getComputedStyle(document.documentElement);
+    const primary = style.getPropertyValue('--primary').trim() || '#0088cc';
+    const primaryDim = style.getPropertyValue('--primary-dim').trim() || '#005580';
+    const textDim = style.getPropertyValue('--text-dim').trim() || '#4a8fa8';
+    const bgCard = style.getPropertyValue('--bg-card').trim() || '#0d1a24';
+    const text = style.getPropertyValue('--text').trim() || '#a0d4f5';
+
+    const labels = data60s.map((d) => d.label);
+    const rawValues60s = data60s.map((d) => d.value);
+    const rawValues3hr = data3hr.map((d) => d.value);
+
+    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
+    const { divisor, unit: displayUnit } = autoScale(peakThs);
+    const values60s = rawValues60s.map((v) => v / divisor);
+    const values3hr = rawValues3hr.map((v) => v / divisor);
+    const scaledAvg = avg24hr !== undefined ? avg24hr / divisor : undefined;
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, `${primary}44`);
+    gradient.addColorStop(1, `${primary}00`);
+
+    const annotationDefs = buildAnnotations(labels, scaledAvg, displayUnit, primary, primaryDim, bgCard, blockAnnotations);
+
     const primaryData = lowHashrateMode ? values3hr : values60s;
     const secondaryData = lowHashrateMode ? values60s : values3hr;
     const primaryLabel = lowHashrateMode ? '3hr Hashrate' : '60s Hashrate';
@@ -205,9 +210,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
               label: (c) => ` ${(c.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
             },
           },
-          annotation: {
-            annotations: annotationDefs,
-          },
+          annotation: { annotations: annotationDefs },
         },
         scales: {
           x: {
@@ -229,12 +232,82 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
         },
       },
     });
+  }, [data60s, data3hr, avg24hr, blockAnnotations, lowHashrateMode, buildAnnotations]);
 
-    return () => {
-      chartRef.current?.destroy();
-    };
-    // theme in deps → chart rebuilds with new CSS vars on theme change
-  }, [data60s, data3hr, avg24hr, blockAnnotations, theme, lowHashrateMode]);
+  useEffect(() => {
+    const themeChanged = prevThemeRef.current !== theme;
+    const modeChanged = prevLowHashrateRef.current !== lowHashrateMode;
+    prevThemeRef.current = theme;
+    prevLowHashrateRef.current = lowHashrateMode;
+
+    // Full rebuild needed on first render, theme change, or mode change
+    if (!chartRef.current || themeChanged || modeChanged) {
+      buildChart();
+      // No cleanup here — the separate unmount effect handles teardown.
+      // Returning a cleanup would destroy the chart when the next data tick
+      // re-runs this effect, causing a one-frame disappearance.
+      return;
+    }
+
+    // --- In-place update: just swap data + annotations, no destroy ---
+    const chart = chartRef.current;
+    // Guard: canvas may have been unmounted between renders
+    if (!chart.canvas?.ownerDocument) {
+      chartRef.current = null;
+      return;
+    }
+    const labels = data60s.map((d) => d.label);
+    const rawValues60s = data60s.map((d) => d.value);
+    const rawValues3hr = data3hr.map((d) => d.value);
+
+    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
+    const { divisor, unit: displayUnit } = autoScale(peakThs);
+    const values60s = rawValues60s.map((v) => v / divisor);
+    const values3hr = rawValues3hr.map((v) => v / divisor);
+    const scaledAvg = avg24hr !== undefined ? avg24hr / divisor : undefined;
+
+    const primaryData = lowHashrateMode ? values3hr : values60s;
+    const secondaryData = lowHashrateMode ? values60s : values3hr;
+
+    // Update labels + datasets in place
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = primaryData;
+    chart.data.datasets[1].data = secondaryData;
+
+    // Update annotations (24hr avg + block events)
+    const style = getComputedStyle(document.documentElement);
+    const primary = style.getPropertyValue('--primary').trim() || '#0088cc';
+    const primaryDim = style.getPropertyValue('--primary-dim').trim() || '#005580';
+    const bgCard = style.getPropertyValue('--bg-card').trim() || '#0d1a24';
+    const annotationDefs = buildAnnotations(labels, scaledAvg, displayUnit, primary, primaryDim, bgCard, blockAnnotations);
+
+    if (chart.options.plugins?.annotation) {
+      (chart.options.plugins.annotation as { annotations: Record<string, AnnotationOptions> }).annotations = annotationDefs;
+    }
+
+    // Update Y-axis tick callback for potentially changed unit
+    const yAxis = chart.options.scales?.y;
+    if (yAxis && 'ticks' in yAxis && yAxis.ticks) {
+      yAxis.ticks.callback = (v: string | number) => `${Number(v).toFixed(2)} ${displayUnit}`;
+    }
+
+    // Update tooltip callback
+    const tooltipPlugin = chart.options.plugins?.tooltip;
+    if (tooltipPlugin && 'callbacks' in tooltipPlugin && tooltipPlugin.callbacks) {
+      tooltipPlugin.callbacks.label = (c) => ` ${(c.parsed.y ?? 0).toFixed(2)} ${displayUnit}`;
+    }
+
+    // Smooth transition — 'none' means no animation on data swap (instant, no flicker)
+    chart.update('none');
+
+    // No cleanup here — in-place updates don't need teardown.
+    // Chart is only destroyed on full rebuild (theme/mode change) or unmount.
+  }, [data60s, data3hr, avg24hr, blockAnnotations, theme, lowHashrateMode, buildChart, buildAnnotations]);
+
+  // Unmount cleanup — separate effect with empty deps
+  useEffect(() => {
+    return () => { chartRef.current?.destroy(); };
+  }, []);
 
   return (
     <div className="chart-container">

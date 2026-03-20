@@ -157,6 +157,10 @@ if _frontend_dist.exists():
         if full_path in _API_DOC_PATHS:
             raise HTTPException(status_code=404, detail="Not found")
 
+        # Never intercept API routes — they're handled by routers mounted above
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404, detail="API route not found")
+
         dist_root = _frontend_dist.resolve()
         requested = (dist_root / full_path).resolve()
 
