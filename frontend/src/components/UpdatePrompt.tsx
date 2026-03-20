@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 
 export const UpdatePrompt: React.FC = () => {
   const [show, setShow] = useState(false);
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  // Store the acceptUpdate callback dispatched by the SW lifecycle in main.tsx
+  const [acceptUpdate, setAcceptUpdate] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     const handleUpdateAvailable = (e: Event) => {
-      const customEvent = e as CustomEvent<{ registration: ServiceWorkerRegistration }>;
-      if (customEvent.detail?.registration) {
-        setRegistration(customEvent.detail.registration);
+      const customEvent = e as CustomEvent<{ acceptUpdate: () => void }>;
+      if (typeof customEvent.detail?.acceptUpdate === 'function') {
+        // Wrap in an arrow so React state setter doesn't call it immediately
+        setAcceptUpdate(() => customEvent.detail.acceptUpdate);
       }
       setShow(true);
     };
@@ -18,12 +20,15 @@ export const UpdatePrompt: React.FC = () => {
   }, []);
 
   const handleRefresh = () => {
-    if (registration?.waiting) {
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    if (acceptUpdate) {
+      // Posts SKIP_WAITING → SW calls skipWaiting() → controllerchange fires
+      // → main.tsx reloads with fresh assets.
+      acceptUpdate();
+    } else {
+      // Fallback: no callback captured (shouldn't happen in normal flow)
+      window.location.reload();
     }
-    // controllerchange event in main.tsx will trigger reload
-    // But also set a fallback in case no controllerchange fires
-    window.location.reload();
+    setShow(false);
   };
 
   if (!show) return null;
@@ -93,7 +98,11 @@ export const UpdatePrompt: React.FC = () => {
         <button className="update-prompt-btn" onClick={handleRefresh}>
           Refresh
         </button>
-        <button className="update-prompt-dismiss" onClick={() => setShow(false)}>
+        <button
+          className="update-prompt-dismiss"
+          onClick={() => setShow(false)}
+          aria-label="Dismiss update prompt"
+        >
           ✕
         </button>
       </div>
