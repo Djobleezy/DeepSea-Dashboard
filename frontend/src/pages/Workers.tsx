@@ -112,7 +112,17 @@ const WorkerCard: React.FC<{
           }}>
             {worker.name}
           </div>
-          <div style={{ fontSize: '12px', color: override?.asicId ? 'var(--primary)' : 'var(--text-dim)' }}>{resolveModel(worker, override)}</div>
+          <div
+            style={{
+              fontSize: '12px',
+              color:
+                override?.asicId && resolveModel(worker, override) !== worker.model
+                  ? 'var(--primary)'
+                  : 'var(--text-dim)',
+            }}
+          >
+            {resolveModel(worker, override)}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <button
