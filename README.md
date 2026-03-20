@@ -3,7 +3,7 @@
 Real-time Bitcoin mining dashboard for [Ocean.xyz](https://ocean.xyz) pool miners. Track hashrate, earnings, workers, and blocks — all in a retro CRT terminal aesthetic.
 
 [![CI](https://github.com/Djobleezy/DeepSea-Dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Djobleezy/DeepSea-Dashboard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/v2.0.0-React%20%2B%20FastAPI-blue)
+![Version](https://img.shields.io/badge/v2.0.3-React%20%2B%20FastAPI-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
