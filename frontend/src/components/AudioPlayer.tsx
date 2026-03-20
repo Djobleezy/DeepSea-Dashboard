@@ -187,7 +187,6 @@ export const AudioPlayer: React.FC = () => {
     if (wasPlaying) {
       cur.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadTrack, playlist.length, theme]);
 
   // ── volume sync ───────────────────────────────────────────────────────────
