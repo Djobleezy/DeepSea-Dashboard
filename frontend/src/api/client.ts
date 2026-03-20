@@ -145,6 +145,14 @@ export const fetchWorkers = (
 export const fetchBlocks = (page = 0, pageSize = 20) =>
   get<BlocksResponse>('/blocks', { page, page_size: pageSize });
 
+export interface PoolBlock {
+  height: number;
+  timestamp: number; // unix ms
+  time_ago: string;
+}
+export const fetchPoolBlocks = (hours = 6) =>
+  get<{ blocks: PoolBlock[] }>('/pool-blocks', { hours });
+
 // Earnings
 export const fetchEarnings = (days = 90) =>
   get<EarningsResponse>('/earnings', { days });

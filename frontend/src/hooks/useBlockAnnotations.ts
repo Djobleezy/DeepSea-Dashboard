@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/store';
+import { fetchPoolBlocks } from '../api/client';
 
 const STORAGE_KEY = 'blockAnnotations_v2';
 const DEFAULT_WINDOW_MIN = 180;
@@ -176,18 +177,45 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
   const [annotations, setAnnotations] = useState<AnnotationEntry[]>([]);
   const initialized = useRef(false);
 
-  // Load persisted annotations on mount (and when annotation window changes)
-  // Clear v2 storage once to flush false positives from network-block bug
+  // Load persisted annotations on mount, then backfill from pool blocks API
   useEffect(() => {
+    // One-time migration: flush false positives from network-block bug
     const MIGRATION_KEY = 'blockAnnotations_v2_migrated_pool';
+    let stored: AnnotationEntry[] = [];
     if (!localStorage.getItem(MIGRATION_KEY)) {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.setItem(MIGRATION_KEY, '1');
-      setAnnotations([]);
     } else {
-      const loaded = loadFromStorage(windowMinutes);
-      setAnnotations(loaded);
+      stored = loadFromStorage(windowMinutes);
     }
+
+    // Backfill: fetch recent Ocean pool blocks and seed any within window
+    const hours = Math.ceil(windowMinutes / 60);
+    fetchPoolBlocks(hours)
+      .then(({ blocks }) => {
+        const cutoff = Date.now() - windowMinutes * 60 * 1000;
+        const existingTs = new Set(stored.map((e) => e.timestamp));
+        let merged = [...stored];
+        for (const b of blocks) {
+          // Skip if already tracked (within 60s tolerance)
+          const alreadyTracked = stored.some(
+            (e) => Math.abs(e.timestamp - b.timestamp) < 60_000,
+          );
+          if (alreadyTracked || b.timestamp < cutoff) continue;
+          merged.push({
+            timestamp: b.timestamp,
+            label: new Date(b.timestamp).toLocaleTimeString(),
+          });
+        }
+        merged = pruneEntries(merged, windowMinutes);
+        saveToStorage(merged);
+        setAnnotations(merged);
+      })
+      .catch(() => {
+        // Fallback to local storage only
+        setAnnotations(stored);
+      });
+
     initialized.current = true;
   }, [windowMinutes]);
 

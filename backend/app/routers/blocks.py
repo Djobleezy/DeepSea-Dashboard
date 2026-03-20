@@ -113,3 +113,44 @@ async def get_blocks(
     except Exception as e:
         _log.exception("Unexpected blocks endpoint error: %s", e)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/pool-blocks", tags=["blocks"])
+async def get_pool_blocks(
+    hours: int = Query(default=6, ge=1, le=72),
+):
+    """Return recent Ocean pool blocks within the last *hours*.
+
+    Used by the chart annotation hook to retroactively mark pool blocks
+    that were found while the user wasn't watching.
+    """
+    from app import background
+
+    client = background._client
+    if client is None:
+        return {"blocks": []}
+    blocks = await client.get_blocks(page=0, page_size=20)
+    cutoff = time.time() - hours * 3600
+    result = []
+    for b in blocks:
+        ts_raw = b.get("ts") or b.get("time") or b.get("timestamp")
+        if not ts_raw:
+            continue
+        try:
+            ts_str = str(ts_raw)
+            try:
+                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                epoch = dt.timestamp()
+            except (ValueError, TypeError):
+                epoch = float(ts_str)
+        except (ValueError, TypeError):
+            continue
+        if epoch >= cutoff:
+            result.append({
+                "height": b.get("height"),
+                "timestamp": int(epoch * 1000),  # JS milliseconds
+                "time_ago": _time_ago(int(epoch)),
+            })
+    return {"blocks": result}
