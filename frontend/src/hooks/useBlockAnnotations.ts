@@ -196,12 +196,13 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
     if (!initialized.current) return;
     // Need both current and previous metrics
     if (!metrics || !prevMetrics) return;
-    // Use blocks_found (Ocean pool block count), NOT last_block_height (network-wide).
-    // last_block_height changes every ~10min when ANY miner finds a block.
-    // blocks_found only increments when OUR pool finds one.
-    if (!prevMetrics.blocks_found) return;
-    // No change — or decreased (pool stat reset)
-    if (metrics.blocks_found <= prevMetrics.blocks_found) return;
+    // last_block_height comes from Ocean's /v1/blocks endpoint (pool blocks only,
+    // NOT network blocks). It only changes when Ocean finds a block.
+    if (!prevMetrics.last_block_height) return;
+    // No change
+    if (metrics.last_block_height === prevMetrics.last_block_height) return;
+    // Only celebrate height increases (not decreases from reorgs/resets)
+    if (metrics.last_block_height <= prevMetrics.last_block_height) return;
 
     const now = Date.now();
     // Label must match the format used in the chart's x-axis
