@@ -179,6 +179,8 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
 
   // Load persisted annotations on mount, then backfill from pool blocks API
   useEffect(() => {
+    let cancelled = false;
+
     // One-time migration: flush false positives from network-block bug
     const MIGRATION_KEY = 'blockAnnotations_v2_migrated_pool';
     let stored: AnnotationEntry[] = [];
@@ -189,34 +191,45 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
       stored = loadFromStorage(windowMinutes);
     }
 
-    // Backfill: fetch recent Ocean pool blocks and seed any within window
+    // Seed from storage immediately so we don't briefly render empty state
+    setAnnotations(stored);
+
+    // Backfill: fetch recent Ocean pool blocks and merge with latest state.
+    // Functional state update avoids race conditions with live block events.
     const hours = Math.ceil(windowMinutes / 60);
     fetchPoolBlocks(hours)
       .then(({ blocks }) => {
+        if (cancelled) return;
         const cutoff = Date.now() - windowMinutes * 60 * 1000;
-        const existingTs = new Set(stored.map((e) => e.timestamp));
-        let merged = [...stored];
-        for (const b of blocks) {
-          // Skip if already tracked (within 60s tolerance)
-          const alreadyTracked = stored.some(
-            (e) => Math.abs(e.timestamp - b.timestamp) < 60_000,
-          );
-          if (alreadyTracked || b.timestamp < cutoff) continue;
-          merged.push({
-            timestamp: b.timestamp,
-            label: new Date(b.timestamp).toLocaleTimeString(),
-          });
-        }
-        merged = pruneEntries(merged, windowMinutes);
-        saveToStorage(merged);
-        setAnnotations(merged);
+
+        setAnnotations((prev) => {
+          let merged = [...prev];
+          for (const b of blocks) {
+            if (b.timestamp < cutoff) continue;
+            const alreadyTracked = merged.some(
+              (e) => Math.abs(e.timestamp - b.timestamp) < 60_000,
+            );
+            if (alreadyTracked) continue;
+            merged.push({
+              timestamp: b.timestamp,
+              label: new Date(b.timestamp).toLocaleTimeString(),
+            });
+          }
+          merged = pruneEntries(merged, windowMinutes);
+          saveToStorage(merged);
+          return merged;
+        });
       })
       .catch(() => {
-        // Fallback to local storage only
-        setAnnotations(stored);
+        if (cancelled) return;
+        // Fallback already seeded from local storage
       });
 
     initialized.current = true;
+
+    return () => {
+      cancelled = true;
+    };
   }, [windowMinutes]);
 
   // Detect new block events when last_block_height changes

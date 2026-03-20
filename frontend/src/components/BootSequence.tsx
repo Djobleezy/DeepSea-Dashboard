@@ -175,7 +175,7 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
           lineHeight: '1.7',
           color: 'var(--text)',
           maxHeight: '60vh',
-          overflowY: 'auto',
+          overflowY: 'hidden',
         }}
       >
         {lines.map((line, i) => (

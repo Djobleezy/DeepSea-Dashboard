@@ -129,28 +129,47 @@ async def get_pool_blocks(
     client = background._client
     if client is None:
         return {"blocks": []}
-    blocks = await client.get_blocks(page=0, page_size=20)
     cutoff = time.time() - hours * 3600
+
+    # Paginate so wider windows (e.g. 24-72h) do not silently truncate at 20 blocks.
+    page_size = 20
+    max_pages = 10
     result = []
-    for b in blocks:
-        ts_raw = b.get("ts") or b.get("time") or b.get("timestamp")
-        if not ts_raw:
-            continue
-        try:
-            ts_str = str(ts_raw)
+    for page in range(max_pages):
+        blocks = await client.get_blocks(page=page, page_size=page_size)
+        if not blocks:
+            break
+
+        reached_older_than_cutoff = False
+        for b in blocks:
+            ts_raw = b.get("ts") or b.get("time") or b.get("timestamp")
+            if not ts_raw:
+                continue
             try:
-                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-                epoch = dt.timestamp()
+                ts_str = str(ts_raw)
+                try:
+                    dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                    epoch = dt.timestamp()
+                except (ValueError, TypeError):
+                    epoch = float(ts_str)
             except (ValueError, TypeError):
-                epoch = float(ts_str)
-        except (ValueError, TypeError):
-            continue
-        if epoch >= cutoff:
+                continue
+
+            if epoch < cutoff:
+                reached_older_than_cutoff = True
+                continue
+
             result.append({
                 "height": b.get("height"),
                 "timestamp": int(epoch * 1000),  # JS milliseconds
                 "time_ago": _time_ago(int(epoch)),
             })
+
+        # Ocean blocks are returned newest-first per page; once we hit old rows,
+        # further pages are older and no longer relevant for this window.
+        if reached_older_than_cutoff:
+            break
+
     return {"blocks": result}
