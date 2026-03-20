@@ -58,13 +58,22 @@ export const AudioPlayer: React.FC = () => {
   const isCrossfadingRef = useRef(false);
   const trackIndexRef = useRef(0);
   const playingRef = useRef(false);
+  const prevThemeRef = useRef(theme);
+
   const volumeRef = useRef(0.5);
+  const mutedRef = useRef(false);
 
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(() => load('audioMuted', 'false') === 'true');
+  const [muted, setMuted] = useState(() => {
+    const m = load('audioMuted', 'false') === 'true';
+    mutedRef.current = m;
+    return m;
+  });
   const [volume, setVolume] = useState<number>(() => {
     const v = parseFloat(load('audioVolume', '0.5'));
-    return isNaN(v) ? 0.5 : v;
+    const resolved = isNaN(v) ? 0.5 : v;
+    volumeRef.current = resolved;
+    return resolved;
   });
   const [trackIndex, setTrackIndex] = useState<number>(() => {
     const idx = parseInt(load('audioTrackIndex', '0'), 10);
@@ -108,7 +117,7 @@ export const AudioPlayer: React.FC = () => {
     crossfadeIntervalRef.current = setInterval(() => {
       step++;
       const pct = step / steps;
-      const vol = volumeRef.current;
+      const vol = mutedRef.current ? 0 : volumeRef.current;
       cur.volume = Math.max(0, vol * (1 - pct));
       nxt.volume = Math.min(vol, vol * pct);
       if (step >= steps) {
@@ -130,8 +139,12 @@ export const AudioPlayer: React.FC = () => {
   // ── initial load (mount only) ────────────────────────────────────────────
   useEffect(() => {
     const cur = audioRef.current;
+    const nxt = nextRef.current;
+    const effectiveVol = mutedRef.current ? 0 : volumeRef.current;
+    cur.volume = effectiveVol;
+    nxt.volume = effectiveVol;
     loadTrack(cur, safeIndex);
-    loadTrack(nextRef.current, (safeIndex + 1) % playlist.length);
+    loadTrack(nxt, (safeIndex + 1) % playlist.length);
     cur.loop = playlist.length === 1;
 
     // Auto-resume if was playing before
@@ -166,15 +179,18 @@ export const AudioPlayer: React.FC = () => {
         crossfadeIntervalRef.current = null;
       }
     };
-  }, [playlist.length, startCrossfade]);
+  }, [playlist, startCrossfade]);
 
-  // Keep playingRef in sync
+  // Keep refs in sync with state
   useEffect(() => {
     playingRef.current = playing;
   }, [playing]);
 
-  // ── theme change → switch playlist ───────────────────────────────────────
+  // ── theme change → switch playlist (skip initial mount) ────────────────
   useEffect(() => {
+    if (prevThemeRef.current === theme) return;
+    prevThemeRef.current = theme;
+
     const cur = audioRef.current;
     const wasPlaying = playingRef.current;
     cur.pause();
@@ -187,11 +203,12 @@ export const AudioPlayer: React.FC = () => {
     if (wasPlaying) {
       cur.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     }
-  }, [loadTrack, playlist.length, theme]);
+  }, [loadTrack, playlist, theme]);
 
   // ── volume sync ───────────────────────────────────────────────────────────
   useEffect(() => {
     volumeRef.current = volume;
+    mutedRef.current = muted;
     audioRef.current.volume = muted ? 0 : volume;
     nextRef.current.volume = muted ? 0 : volume;
     persist('audioVolume', String(volume));
