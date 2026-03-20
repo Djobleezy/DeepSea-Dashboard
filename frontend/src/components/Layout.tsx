@@ -5,9 +5,13 @@ import { ThemeToggle } from './ThemeToggle';
 import { AudioPlayer } from './AudioPlayer';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useRetroRefresh } from '../hooks/useRetroRefresh';
+import { useThemeColor } from '../hooks/useThemeColor';
 import { EasterEgg } from './EasterEgg';
 import { UnderwaterBubbles } from './UnderwaterBubbles';
 import { MatrixRain } from './MatrixRain';
+import { OfflineIndicator } from './OfflineIndicator';
+import { UpdatePrompt } from './UpdatePrompt';
+import { InstallPrompt } from './InstallPrompt';
 
 const NAV_LINKS = [
   { to: '/dashboard', icon: '◈', label: 'DASHBOARD' },
@@ -25,6 +29,7 @@ interface Props {
 export const Layout: React.FC<Props> = ({ children }) => {
   useKeyboardShortcuts();
   useRetroRefresh();
+  useThemeColor();
   const sseConnected = useAppStore((s) => s.sseConnected);
   const unreadCount = useAppStore((s) => s.unreadCount);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -335,6 +340,9 @@ export const Layout: React.FC<Props> = ({ children }) => {
       </footer>
 
       <EasterEgg />
+      <UpdatePrompt />
+      <InstallPrompt />
+      <OfflineIndicator />
     </div>
   );
 };
