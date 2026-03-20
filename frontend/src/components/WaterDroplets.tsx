@@ -20,7 +20,7 @@ function createDroplet(): Droplet {
     y: 5 + Math.random() * 60,
     size: 12 + Math.random() * 24,
     dripping: false,
-    dripDuration: 3 + Math.random() * 3,
+    dripDuration: 5 + Math.random() * 4,
     condenseFadeDelay: Math.random() * 0.5,
   };
 }
@@ -52,6 +52,7 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
   const [droplets, setDroplets] = React.useState<Droplet[]>([]);
   const [condensation, setCondensation] = React.useState(false);
   const spawnTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dripStarted = useRef(false);
   const colors = THEME_COLORS[theme] ?? THEME_COLORS.deepsea;
 
   const removeDroplet = (id: number) => {
@@ -62,6 +63,7 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
     if (!active) {
       setDroplets([]);
       setCondensation(false);
+      dripStarted.current = false;
       return;
     }
 
@@ -74,11 +76,14 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
         if (spawnTimer.current) clearInterval(spawnTimer.current);
         return;
       }
-      setDroplets((prev) => [...prev, createDroplet()]);
+      const d = createDroplet();
+      if (dripStarted.current) d.dripping = true;
+      setDroplets((prev) => [...prev, d]);
       spawnCount++;
     }, 400);
 
     const dripTimer = setTimeout(() => {
+      dripStarted.current = true;
       setDroplets((prev) => prev.map((d) => ({ ...d, dripping: true })));
     }, 3000);
 
@@ -149,7 +154,7 @@ export const WaterDroplets: React.FC<Props> = ({ active = true }) => {
             backdropFilter: 'blur(2.5px) contrast(1.2)',
             WebkitBackdropFilter: 'blur(2.5px) contrast(1.2)',
             animation: d.dripping
-              ? `droplet-drip ${d.dripDuration}s linear forwards`
+              ? `droplet-drip ${d.dripDuration}s ease-in forwards`
               : `droplet-condense 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) ${d.condenseFadeDelay}s forwards`,
             opacity: d.dripping ? 1 : 0,
           }}
