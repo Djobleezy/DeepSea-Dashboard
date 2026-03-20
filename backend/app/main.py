@@ -169,7 +169,9 @@ if _frontend_dist.exists():
         requested = (dist_root / full_path).resolve()
 
         # Belt-and-suspenders: verify the resolved path stays inside dist
-        if not requested.is_relative_to(dist_root):
+        try:
+            requested.relative_to(dist_root)
+        except ValueError:
             raise HTTPException(status_code=404, detail="Not found")
 
         if full_path and requested.is_file():
