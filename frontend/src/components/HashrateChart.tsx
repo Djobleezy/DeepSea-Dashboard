@@ -232,7 +232,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
         },
       },
     });
-  }, [data60s, data3hr, avg24hr, blockAnnotations, lowHashrateMode, theme, buildAnnotations]);
+  }, [data60s, data3hr, avg24hr, blockAnnotations, lowHashrateMode, buildAnnotations]);
 
   useEffect(() => {
     const themeChanged = prevThemeRef.current !== theme;
