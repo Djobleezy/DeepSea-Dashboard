@@ -85,8 +85,9 @@ const WorkerCard: React.FC<{
   const earningsSats = Math.floor(worker.earnings * 1e8);
   const earningsFiat = worker.earnings * btcPrice;
 
-  // Apply overrides
-  const efficiency = override?.efficiency ?? worker.efficiency;
+  // Apply overrides — resolve ASIC profile efficiency when only asicId is set
+  const _asicProfile = override?.asicId ? _asicById.get(override.asicId) : undefined;
+  const efficiency = override?.efficiency ?? _asicProfile?.efficiency ?? worker.efficiency;
   const powerWatts = override?.powerConsumption ?? (
     efficiency > 0 && worker.hashrate_3hr > 0 ? Math.round(worker.hashrate_3hr * efficiency) : worker.power_consumption
   );
@@ -413,7 +414,8 @@ export const Workers: React.FC = () => {
   const computeWorkerPower = useCallback((w: Worker) => {
     const ov = overrides[w.name];
     if (ov?.powerConsumption !== undefined) return ov.powerConsumption;
-    if (ov?.efficiency !== undefined && w.hashrate_3hr > 0) return Math.round(w.hashrate_3hr * ov.efficiency);
+    const eff = ov?.efficiency ?? (ov?.asicId ? _asicById.get(ov.asicId)?.efficiency : undefined);
+    if (eff !== undefined && w.hashrate_3hr > 0) return Math.round(w.hashrate_3hr * eff);
     return w.power_consumption;
   }, [overrides]);
 
