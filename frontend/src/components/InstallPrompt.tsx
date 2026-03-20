@@ -33,11 +33,18 @@ export const InstallPrompt: React.FC = () => {
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    // Always clear the deferred prompt — per spec it can only be used once,
+    // regardless of whether the user accepts or dismisses.
+    const prompt = deferredPrompt;
+    setDeferredPrompt(null);
+    await prompt.prompt();
+    const { outcome } = await prompt.userChoice;
     if (outcome === 'accepted') {
       setShow(false);
-      setDeferredPrompt(null);
+    } else {
+      // User dismissed the browser prompt — also hide our custom UI
+      // and record the dismiss time so we don't nag immediately
+      handleDismiss();
     }
   };
 
