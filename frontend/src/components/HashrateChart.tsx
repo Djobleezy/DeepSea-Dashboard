@@ -218,7 +218,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 300 },
+        animation: false,  // no animation on initial build (prevents diagonal annotations)
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
@@ -238,7 +238,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
               label: (c) => ` ${(c.parsed.y ?? 0).toFixed(2)} ${displayUnit}`,
             },
           },
-          annotation: { animations: {}, annotations: annotationDefs },
+          annotation: { annotations: annotationDefs },
         },
         scales: {
           x: {
@@ -259,6 +259,12 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
           },
         },
       },
+    });
+    // Re-enable animation after first render so data updates are smooth
+    requestAnimationFrame(() => {
+      if (chartRef.current) {
+        chartRef.current.options.animation = { duration: 300 };
+      }
     });
   }, [data60s, data3hr, avg24hr, blockAnnotations, lowHashrateMode, buildAnnotations]);
 
