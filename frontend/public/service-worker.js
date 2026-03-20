@@ -105,6 +105,12 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      // Enable navigation preload if supported — eliminates the SW boot latency
+      // on navigation requests by fetching in parallel with SW startup.
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.enable();
+      }
+
       const keys = await caches.keys();
       const stale = keys.filter((k) => !ACTIVE_CACHES.includes(k));
 
@@ -156,7 +162,7 @@ self.addEventListener('fetch', (event) => {
 
   // --- Navigation requests: network-first, SPA shell fallback ---
   if (request.mode === 'navigate') {
-    event.respondWith(navigationHandler(request));
+    event.respondWith(navigationHandler(request, event));
     return;
   }
 
@@ -232,9 +238,13 @@ async function cacheFirstSWR(request, cacheName, maxEntries) {
 // Strategy: Navigation handler (SPA shell)
 // ---------------------------------------------------------------------------
 
-async function navigationHandler(request) {
+async function navigationHandler(request, fetchEvent) {
   try {
-    const response = await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
+    // Use navigation preload response when available (set up in activate).
+    // This allows the browser to begin the fetch in parallel with SW startup,
+    // avoiding an extra round-trip on navigations.
+    const preloadResponse = await fetchEvent?.preloadResponse;
+    const response = preloadResponse || await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
     if (response.ok) {
       // Cache the shell for offline
       const cache = await caches.open(STATIC_CACHE);
