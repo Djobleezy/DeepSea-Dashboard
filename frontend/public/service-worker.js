@@ -1,10 +1,10 @@
 /**
- * DeepSea Dashboard — Service Worker v2.0.2
+ * DeepSea Dashboard — Service Worker v2.0.3
  * Best-in-class PWA caching with network-first API, cache-first static assets,
  * LRU eviction, offline fallback, and background sync stub.
  */
 
-const CACHE_VERSION = 'deepsea-v2.0.2';
+const CACHE_VERSION = 'deepsea-v2.0.3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -136,8 +136,8 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle same-origin and known external (fonts, etc.)
   if (url.origin !== self.location.origin &&
-      !url.hostname.includes('fonts.googleapis.com') &&
-      !url.hostname.includes('fonts.gstatic.com')) {
+      url.hostname !== 'fonts.googleapis.com' &&
+      url.hostname !== 'fonts.gstatic.com') {
     return;
   }
 
