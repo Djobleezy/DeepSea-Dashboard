@@ -57,6 +57,16 @@ function fmtPower(w: number): string {
   return `${w.toFixed(0)} W`;
 }
 
+/** Resolve display model name: override ASIC selection wins over backend auto-detect. */
+const _asicById = new Map(ASIC_MODELS.map((m) => [m.id, m]));
+function resolveModel(worker: Worker, override?: WorkerOverride): string {
+  if (override?.asicId) {
+    const asic = _asicById.get(override.asicId);
+    if (asic) return asic.model;
+  }
+  return worker.model;
+}
+
 // ── Worker Card ─────────────────────────────────────────────────────────────
 const WorkerCard: React.FC<{
   worker: Worker;
@@ -75,14 +85,15 @@ const WorkerCard: React.FC<{
   const earningsSats = Math.floor(worker.earnings * 1e8);
   const earningsFiat = worker.earnings * btcPrice;
 
-  // Apply overrides
-  const efficiency = override?.efficiency ?? worker.efficiency;
+  // Apply overrides — resolve ASIC profile efficiency when only asicId is set
+  const _asicProfile = override?.asicId ? _asicById.get(override.asicId) : undefined;
+  const efficiency = override?.efficiency ?? _asicProfile?.efficiency ?? worker.efficiency;
   const powerWatts = override?.powerConsumption ?? (
     efficiency > 0 && worker.hashrate_3hr > 0 ? Math.round(worker.hashrate_3hr * efficiency) : worker.power_consumption
   );
   const dailyPowerCost = (powerWatts / 1000) * 24 * powerCost;
   const dailyProfit = earningsFiat - dailyPowerCost;
-  const hasOverride = override?.efficiency !== undefined || override?.powerConsumption !== undefined;
+  const hasOverride = override?.efficiency !== undefined || override?.powerConsumption !== undefined || override?.asicId !== undefined;
 
   return (
     <div
@@ -102,7 +113,17 @@ const WorkerCard: React.FC<{
           }}>
             {worker.name}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{worker.model}</div>
+          <div
+            style={{
+              fontSize: '12px',
+              color:
+                override?.asicId && resolveModel(worker, override) !== worker.model
+                  ? 'var(--primary)'
+                  : 'var(--text-dim)',
+            }}
+          >
+            {resolveModel(worker, override)}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <button
@@ -367,33 +388,34 @@ export const Workers: React.FC = () => {
     return workers.workers.filter(
       (w) =>
         w.name.toLowerCase().includes(q) ||
-        w.model.toLowerCase().includes(q) ||
+        resolveModel(w, overrides[w.name]).toLowerCase().includes(q) ||
         w.type.toLowerCase().includes(q),
     );
-  }, [workers, search]);
+  }, [workers, search, overrides]);
 
   const maxHashrate = useMemo(
     () => Math.max(...(filtered.map((w) => w.hashrate_3hr) || [1]), 1),
     [filtered],
   );
 
-  // Fleet composition breakdown
+  // Fleet composition breakdown (respects ASIC profile overrides)
   const modelCounts = useMemo(() => {
     const map: Record<string, { count: number; totalHr: number }> = {};
     for (const w of filtered) {
-      const m = w.model || 'Unknown';
+      const m = resolveModel(w, overrides[w.name]) || 'Unknown';
       if (!map[m]) map[m] = { count: 0, totalHr: 0 };
       map[m].count++;
       map[m].totalHr += w.hashrate_3hr;
     }
     return Object.entries(map).sort((a, b) => b[1].totalHr - a[1].totalHr);
-  }, [filtered]);
+  }, [filtered, overrides]);
 
   // Compute power with overrides applied
   const computeWorkerPower = useCallback((w: Worker) => {
     const ov = overrides[w.name];
     if (ov?.powerConsumption !== undefined) return ov.powerConsumption;
-    if (ov?.efficiency !== undefined && w.hashrate_3hr > 0) return Math.round(w.hashrate_3hr * ov.efficiency);
+    const eff = ov?.efficiency ?? (ov?.asicId ? _asicById.get(ov.asicId)?.efficiency : undefined);
+    if (eff !== undefined && w.hashrate_3hr > 0) return Math.round(w.hashrate_3hr * eff);
     return w.power_consumption;
   }, [overrides]);
 

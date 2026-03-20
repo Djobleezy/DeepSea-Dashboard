@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     # Emit startup banner after services are initialised
     from app.config import get_wallet
     log_startup_banner(
-        version="2.0.2",
+        version="2.0.3",
         wallet_configured=bool(get_wallet()),
         redis_connected=await is_redis_connected(),
     )
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DeepSea Dashboard API",
-    version="2.0.2",
+    version="2.0.3",
     description="Ocean.xyz mining monitoring dashboard",
     lifespan=lifespan,
 )
@@ -161,13 +161,17 @@ if _frontend_dist.exists():
         if full_path.startswith("api/") or full_path == "api":
             raise HTTPException(status_code=404, detail="API route not found")
 
+        # Reject any path component that attempts traversal (.. or absolute)
+        if full_path and (".." in full_path.split("/") or full_path.startswith("/")):
+            raise HTTPException(status_code=404, detail="Not found")
+
         dist_root = _frontend_dist.resolve()
         requested = (dist_root / full_path).resolve()
 
-        # Prevent path traversal outside frontend/dist.
-        if full_path and not requested.is_relative_to(dist_root):
+        # Belt-and-suspenders: verify the resolved path stays inside dist
+        if not requested.is_relative_to(dist_root):
             raise HTTPException(status_code=404, detail="Not found")
 
-        if full_path and requested.exists() and requested.is_file():
+        if full_path and requested.is_file():
             return FileResponse(str(requested))
         return FileResponse(str(_index_html))
