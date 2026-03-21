@@ -77,6 +77,7 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
   const [lines, setLines] = useState<Array<{ text: string; status: Status }>>([]);
   const [cursor, setCursor] = useState(true);
   const [done, setDone] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -99,7 +100,9 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         queueTimeout(addLine, delay + jitter);
       } else {
         setDone(true);
-        queueTimeout(onComplete, 1200);
+        // Show quote briefly, then fade out, then unmount
+        queueTimeout(() => setFadingOut(true), 800);
+        queueTimeout(onComplete, 1600);
       }
     };
 
@@ -124,6 +127,8 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         gap: '0',
         padding: '40px 20px',
         position: 'relative',
+        opacity: fadingOut ? 0 : 1,
+        transition: 'opacity 0.8s ease',
       }}
     >
       <WaterDroplets active={!done} />

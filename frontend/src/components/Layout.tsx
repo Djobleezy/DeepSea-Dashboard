@@ -49,7 +49,7 @@ export const Layout: React.FC<Props> = ({ children }) => {
   const theme = useAppStore((s) => s.theme);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', animation: 'layout-fade-in 0.6s ease' }}>
       {theme === 'deepsea' && <UnderwaterBubbles />}
       {theme === 'matrix' && <MatrixRain />}
 
