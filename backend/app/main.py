@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     # Emit startup banner after services are initialised
     from app.config import get_wallet
     log_startup_banner(
-        version="2.0.3",
+        version="2.0.4",
         wallet_configured=bool(get_wallet()),
         redis_connected=await is_redis_connected(),
     )
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="DeepSea Dashboard API",
-    version="2.0.3",
+    version="2.0.4",
     description="Ocean.xyz mining monitoring dashboard",
     lifespan=lifespan,
 )

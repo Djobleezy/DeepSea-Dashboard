@@ -10,7 +10,7 @@ type BootEntry = [string, number, Status];
 
 const BOOT_SCRIPT: BootEntry[] = [
   // Phase 1 — System init
-  ['DEEPSEA DASHBOARD v2.0', 300, 'info'],
+  ['DEEPSEA DASHBOARD v2.0.4', 300, 'info'],
   ['KERNEL LOADED — ARM64 / DARWIN 25.3.0', 150, 'ok'],
   ['INITIALIZING RUNTIME ENVIRONMENT...', 250, 'ok'],
   ['MOUNTING ENCRYPTED VOLUMES...', 200, 'ok'],

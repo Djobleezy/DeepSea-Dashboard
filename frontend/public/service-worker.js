@@ -1,10 +1,10 @@
 /**
- * DeepSea Dashboard — Service Worker v2.0.3
+ * DeepSea Dashboard — Service Worker v2.0.4
  * Best-in-class PWA caching with network-first API, cache-first static assets,
  * LRU eviction, offline fallback, and background sync stub.
  */
 
-const CACHE_VERSION = 'deepsea-v2.0.3';
+const CACHE_VERSION = 'deepsea-v2.0.4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
