@@ -8,7 +8,8 @@ import os
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
-from pathlib import Path
+import re
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -138,6 +139,51 @@ app.include_router(client_errors.router, prefix=api_prefix, tags=["client-errors
 app.include_router(worker_settings.router, prefix=api_prefix, tags=["worker-settings"])
 app.include_router(batch.router, prefix=api_prefix, tags=["system"])
 
+# Windows drive-letter pattern (e.g. "C:" or "D:")
+_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+
+
+def resolve_spa_path(full_path: str, dist_root: Path) -> Path | None:
+    """Validate *full_path* and return the resolved filesystem ``Path`` inside
+    *dist_root*, or ``None`` when the path is empty (root request) or invalid.
+
+    The function is deliberately separated from the route handler so it can be
+    unit-tested without mounting the full application.
+    """
+    if not full_path:
+        return None
+
+    # Reject backslashes — PurePosixPath ignores them, but the OS Path join
+    # on Windows would treat them as separators, bypassing traversal checks.
+    if "\\" in full_path:
+        return None
+
+    # Reject Windows drive-letter (C:…) and UNC (//server/…) prefixes that
+    # PurePosixPath does not recognise as absolute.
+    if _DRIVE_RE.search(full_path) or full_path.startswith("//"):
+        return None
+
+    safe_path = PurePosixPath(full_path)
+
+    if safe_path.is_absolute() or ".." in safe_path.parts:
+        return None
+
+    # Build the filesystem path from validated parts only, so no raw user
+    # input string flows into the Path join (avoids CodeQL taint tracking).
+    resolved = dist_root
+    for part in safe_path.parts:
+        resolved = resolved / part
+    resolved = resolved.resolve()
+
+    # Belt-and-suspenders: verify the resolved path stays inside dist
+    try:
+        resolved.relative_to(dist_root)
+    except ValueError:
+        return None
+
+    return resolved
+
+
 # Serve built frontend (if present) with SPA fallback
 _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if _frontend_dist.exists():
@@ -161,21 +207,7 @@ if _frontend_dist.exists():
         if full_path.startswith("api/") or full_path == "api":
             raise HTTPException(status_code=404, detail="API route not found")
 
-        # Normalize the user path using Path semantics and reject traversal/absolute paths
-        full_path_path = Path(full_path)
-
-        if full_path_path.is_absolute() or ".." in full_path_path.parts:
-            raise HTTPException(status_code=404, detail="Not found")
-
-        dist_root = _frontend_dist.resolve()
-        requested = (dist_root / full_path).resolve()
-
-        # Belt-and-suspenders: verify the resolved path stays inside dist
-        try:
-            requested.relative_to(dist_root)
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Not found")
-
-        if full_path and requested.is_file():
-            return FileResponse(str(requested))
+        resolved = resolve_spa_path(full_path, _frontend_dist.resolve())
+        if resolved is not None and resolved.is_file():
+            return FileResponse(str(resolved))
         return FileResponse(str(_index_html))
