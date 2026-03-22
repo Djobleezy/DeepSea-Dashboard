@@ -100,9 +100,10 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         queueTimeout(addLine, delay + jitter);
       } else {
         setDone(true);
-        // Show quote briefly, then fade out, then unmount
-        queueTimeout(() => setFadingOut(true), 800);
-        queueTimeout(onComplete, 1600);
+        // Quote animates in over 0.9s (0.3s delay + 0.6s duration),
+        // then lingers for 0.6s before the 0.8s container fade-out begins.
+        queueTimeout(() => setFadingOut(true), 1500);
+        queueTimeout(onComplete, 2300);
       }
     };
 
