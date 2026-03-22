@@ -513,7 +513,7 @@ export const Workers: React.FC = () => {
       )}
 
       {/* Fleet composition */}
-      {modelCounts.length > 1 && (
+      {modelCounts.length >= 1 && (
         <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '10px' }}>FLEET COMPOSITION</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

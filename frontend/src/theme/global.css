@@ -324,6 +324,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ---- Animations ---- */
+@keyframes layout-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 /* ── Stagger entrance animations ──────────────────────────────────────────── */
 @keyframes stagger-in {
   from { opacity: 0; transform: translateY(14px); }

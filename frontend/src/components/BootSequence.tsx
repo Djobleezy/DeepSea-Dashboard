@@ -10,7 +10,7 @@ type BootEntry = [string, number, Status];
 
 const BOOT_SCRIPT: BootEntry[] = [
   // Phase 1 — System init
-  ['DEEPSEA DASHBOARD v2.0', 300, 'info'],
+  ['DEEPSEA DASHBOARD v2.0.4', 300, 'info'],
   ['KERNEL LOADED — ARM64 / DARWIN 25.3.0', 150, 'ok'],
   ['INITIALIZING RUNTIME ENVIRONMENT...', 250, 'ok'],
   ['MOUNTING ENCRYPTED VOLUMES...', 200, 'ok'],
@@ -77,6 +77,7 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
   const [lines, setLines] = useState<Array<{ text: string; status: Status }>>([]);
   const [cursor, setCursor] = useState(true);
   const [done, setDone] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -99,7 +100,10 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         queueTimeout(addLine, delay + jitter);
       } else {
         setDone(true);
-        queueTimeout(onComplete, 1200);
+        // Quote animates in over 0.9s (0.3s delay + 0.6s duration),
+        // then lingers for 0.6s before the 0.8s container fade-out begins.
+        queueTimeout(() => setFadingOut(true), 1500);
+        queueTimeout(onComplete, 2300);
       }
     };
 
@@ -124,6 +128,8 @@ export const BootSequence: React.FC<Props> = ({ onComplete }) => {
         gap: '0',
         padding: '40px 20px',
         position: 'relative',
+        opacity: fadingOut ? 0 : 1,
+        transition: 'opacity 0.8s ease',
       }}
     >
       <WaterDroplets active={!done} />
