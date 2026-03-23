@@ -1,0 +1,21 @@
+changelog:
+  categories:
+    - title: "🆕 What's New"
+      labels:
+        - enhancement
+        - feature
+    - title: "🐛 Bug Fixes"
+      labels:
+        - bug
+        - fix
+    - title: "🔐 Security"
+      labels:
+        - security
+    - title: "📦 Packaging"
+      labels:
+        - packaging
+        - docker
+    - title: "🧹 Maintenance"
+      labels:
+        - chore
+        - dependencies
