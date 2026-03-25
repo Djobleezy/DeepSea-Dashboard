@@ -1,5 +1,5 @@
-# Build GHCR container image + Umbrel + Start9 packaging assets on tagged releases.
-# You own the image. Retropex grabs pre-built assets and submits to stores.
+# Build GHCR container image + generate packaging reference assets on tagged releases.
+# Kevin owns the image. Packaging assets are reference material, not canonical.
 name: Release Packaging
 
 on:
@@ -58,23 +58,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Umbrel ────────────────────────────────────────────────
-  umbrel:
-    name: Umbrel Package
+  # ── Packaging Reference Assets ───────────────────────────
+  packaging-assets:
+    name: Packaging Reference Assets
     needs: docker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Umbrel assets
+      - name: Build reference assets
         run: |
-          mkdir -p dist/umbrel
+          mkdir -p dist
           VERSION="${DEEPSEA_VERSION#v}"
           DIGEST="${{ needs.docker.outputs.digest }}"
 
-          # Volume paths must match Dockerfile: /data for DB, /config for config
-          # User 1000:1000 matches Umbrel convention; Dockerfile creates 'app' user
-          cat > dist/umbrel/docker-compose.yml <<EOF
+          # Umbrel reference docker-compose
+          cat > dist/umbrel-docker-compose.yml <<EOF
           version: "3.7"
           services:
             app_proxy:
@@ -93,170 +92,21 @@ jobs:
                 - DB_PATH=/data/deepsea.db
                 - CONFIG_PATH=/config/config.json
           EOF
-          sed -i 's/^          //' dist/umbrel/docker-compose.yml
+          sed -i 's/^          //' dist/umbrel-docker-compose.yml
 
-          cat > dist/umbrel/umbrel-app.yml <<EOF
-          manifestVersion: 1.1
-          id: deepsea
-          category: bitcoin
-          name: DeepSea Dashboard
-          version: "${VERSION}"
-          tagline: Retro style Ocean dashboard
-          description: >-
-            This open-source dashboard monitors Ocean.xyz pool miners in real time.
-            It presents hashrate, profitability, worker status and network metrics
-            through a retro terminal interface. The goal is to keep miners fully
-            informed with minimal fuss.
-          developer: Djobleezy
-          website: https://github.com/Djobleezy/DeepSea-Dashboard
-          dependencies: []
-          repo: https://github.com/Djobleezy/DeepSea-Dashboard
-          support: https://github.com/Djobleezy/DeepSea-Dashboard/issues
-          port: 8000
-          path: ""
-          defaultUsername: ""
-          defaultPassword: ""
-          releaseNotes: >-
-            Update to ${DEEPSEA_VERSION}. Full notes at
-            https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
-          submitter: Djobleezy
-          submission: https://github.com/getumbrel/umbrel-apps/pull/2635
+          # Version + digest reference for packagers
+          cat > dist/packaging-info.txt <<EOF
+          DeepSea Dashboard ${DEEPSEA_VERSION}
+          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          Digest: ${DIGEST}
+          Platforms: linux/amd64, linux/arm64
+          Release: https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
           EOF
-          sed -i 's/^          //' dist/umbrel/umbrel-app.yml
+          sed -i 's/^          //' dist/packaging-info.txt
 
-      - name: Upload Umbrel assets
+      - name: Upload packaging assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/umbrel/docker-compose.yml
-            dist/umbrel/umbrel-app.yml
-
-  # ── Start9 ───────────────────────────────────────────────
-  start9:
-    name: Start9 Package
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Start9 assets
-        run: |
-          mkdir -p dist/start9
-          VERSION="${DEEPSEA_VERSION#v}"
-
-          # Core metadata only — Retropex adds health-checks, interfaces,
-          # volumes, backup, migrations from his wrapper repo.
-          cat > dist/start9/manifest.yaml <<EOF
-          id: deepsea-dashboard
-          title: "DeepSea Dashboard"
-          version: "${VERSION}"
-          release-notes: |
-            Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
-          license: MIT
-          wrapper-repo: "https://github.com/Retropex/DeepSea-startos"
-          upstream-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
-          support-site: "https://github.com/Djobleezy/DeepSea-Dashboard/issues"
-          marketing-site: "https://github.com/Djobleezy/DeepSea-Dashboard"
-          build: ["make"]
-          description:
-            short: Mining dashboard for Ocean.xyz
-            long: |
-              Real-time Ocean.xyz Bitcoin mining pool dashboard with hashrate,
-              profitability, worker status, and network metrics through a retro
-              terminal interface.
-          EOF
-          sed -i 's/^          //' dist/start9/manifest.yaml
-
-          # Dockerfile for Start9 wrapper (submodule-based paths)
-          cat > dist/start9/Dockerfile <<'EOF'
-          FROM node:22-alpine AS frontend-builder
-          WORKDIR /app/frontend
-          COPY DeepSea-Dashboard/frontend/package.json DeepSea-Dashboard/frontend/package-lock.json ./
-          RUN npm ci
-          COPY DeepSea-Dashboard/frontend/ ./
-          RUN npm run build
-
-          FROM python:3.12-slim AS runtime
-          ENV PYTHONUNBUFFERED=1 PYTHONPATH=/app/backend DB_PATH=/root/.data/deepsea.db
-          RUN apt-get update && apt-get install -y --no-install-recommends libxml2 libxslt1.1 && rm -rf /var/lib/apt/lists/*
-          WORKDIR /app
-          COPY DeepSea-Dashboard/backend/requirements.txt ./
-          RUN pip install --no-cache-dir -r requirements.txt
-          COPY DeepSea-Dashboard/backend/ ./backend/
-          COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-          COPY DeepSea-Dashboard/config.json.example /config/config.json
-          ADD ./docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
-          RUN chmod a+x /usr/local/bin/docker_entrypoint.sh
-          EXPOSE 8000
-          EOF
-          sed -i 's/^          //' dist/start9/Dockerfile
-
-          cat > dist/start9/docker_entrypoint.sh <<'EOF'
-          #!/bin/sh
-          printf "\n\n [i] Starting DeepSea dashboard ...\n\n"
-          mkdir -p /root/.config /root/.data
-          exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
-          EOF
-          sed -i 's/^          //' dist/start9/docker_entrypoint.sh
-          chmod +x dist/start9/docker_entrypoint.sh
-
-      - name: Upload Start9 assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/start9/manifest.yaml
-            dist/start9/Dockerfile
-            dist/start9/docker_entrypoint.sh
-
-  # ── Notify ───────────────────────────────────────────────
-  notify:
-    name: Notify Packager
-    needs: [docker, umbrel, start9]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create packaging issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const version = context.payload.release.tag_name;
-            const releaseUrl = context.payload.release.html_url;
-            const digest = "${{ needs.docker.outputs.digest }}";
-
-            try {
-              await github.rest.issues.getLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: 'packaging'
-              });
-            } catch {
-              await github.rest.issues.createLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name: 'packaging',
-                color: '0e8a16',
-                description: 'Store packaging (Umbrel, Start9)'
-              });
-            }
-
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `📦 Packaging assets ready for ${version}`,
-              body: [
-                `Release **${version}** published with container image + packaging assets.`,
-                ``,
-                `**Container image:** \`ghcr.io/djobleezy/deepsea-dashboard:${version.replace('v','')}\``,
-                `**Digest:** \`${digest}\``,
-                `**Platforms:** linux/amd64, linux/arm64`,
-                ``,
-                `**Release assets:**`,
-                `- \`docker-compose.yml\` + \`umbrel-app.yml\` → PR to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps)`,
-                `- \`manifest.yaml\` + \`Dockerfile\` + \`docker_entrypoint.sh\` → [DeepSea-startos](https://github.com/Retropex/DeepSea-startos)`,
-                ``,
-                `> Umbrel docker-compose uses the official \`ghcr.io/djobleezy\` image with pinned digest.`,
-                `> Start9 manifest is core metadata only — wrapper repo adds health checks, interfaces, backup, etc.`,
-                ``,
-                `cc @Retropex`
-              ].join('\n'),
-              labels: ['packaging']
-            });
+            dist/umbrel-docker-compose.yml
+            dist/packaging-info.txt
