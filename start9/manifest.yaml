@@ -80,7 +80,7 @@ backup:
       - duplicity
       - create
       - /mnt/backup
-      - /root/.data
+      - /root
     mounts:
       BACKUP: "/mnt/backup"
       main: "/root"
@@ -93,7 +93,7 @@ backup:
       - duplicity
       - restore
       - /mnt/backup
-      - /root/.data
+      - /root
     mounts:
       BACKUP: "/mnt/backup"
       main: "/root"

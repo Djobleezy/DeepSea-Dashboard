@@ -72,8 +72,8 @@ jobs:
           VERSION="${DEEPSEA_VERSION#v}"
           DIGEST="${{ needs.docker.outputs.digest }}"
 
-          # Generate docker-compose with pinned image digest
-          sed "s|ghcr.io/djobleezy/deepsea-dashboard:2.0.4|ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}|" \
+          # Generate docker-compose with pinned image digest (regex matches any tag)
+          sed "s|ghcr.io/djobleezy/deepsea-dashboard:[^ ]*|ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}|" \
             umbrel/docker-compose.yml > dist/umbrel/docker-compose.yml
 
           # Update version in umbrel-app.yml

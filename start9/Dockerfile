@@ -35,7 +35,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Copy example config as fallback
+# Copy example config as default (entrypoint copies to config.json if missing)
+COPY config.json.example /root/.config/config.json.default
 COPY config.json.example /root/.config/config.json
 
 # Start9 entrypoint
