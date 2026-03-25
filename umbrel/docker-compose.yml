@@ -1,0 +1,44 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: ${APP_DEEPSEA_DASHBOARD_IP}
+      APP_PORT: 8000
+
+  redis:
+    image: redis:7-alpine@sha256:eaea8264f74a95ea9a0767c794c4c68b48f10870e8e4e196f21c8f36053a2e94
+    user: "999:999"
+    restart: on-failure
+    command: >
+      sh -c 'redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru'
+    volumes:
+      - ${APP_DATA_DIR}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  deepsea:
+    image: ghcr.io/djobleezy/deepsea-dashboard:2.0.4
+    user: "1000:1000"
+    restart: on-failure
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/config:/config
+    environment:
+      - DB_PATH=/data/deepsea.db
+      - CONFIG_PATH=/config/config.json
+      - REDIS_URL=redis://redis:6379/0
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python3", "/app/backend/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

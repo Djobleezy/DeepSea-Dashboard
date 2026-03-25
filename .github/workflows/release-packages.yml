@@ -58,55 +58,110 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Packaging Reference Assets ───────────────────────────
-  packaging-assets:
-    name: Packaging Reference Assets
+  # ── Umbrel Package ──────────────────────────────────────
+  umbrel:
+    name: Umbrel Package
     needs: docker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build reference assets
+      - name: Build Umbrel package
         run: |
-          mkdir -p dist
+          mkdir -p dist/umbrel
           VERSION="${DEEPSEA_VERSION#v}"
           DIGEST="${{ needs.docker.outputs.digest }}"
 
-          # Umbrel reference docker-compose
-          cat > dist/umbrel-docker-compose.yml <<EOF
-          version: "3.7"
-          services:
-            app_proxy:
-              environment:
-                APP_HOST: deepsea_deepsea_1
-                APP_PORT: 8000
+          # Generate docker-compose with pinned image digest
+          sed "s|ghcr.io/djobleezy/deepsea-dashboard:2.0.4|ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}|" \
+            umbrel/docker-compose.yml > dist/umbrel/docker-compose.yml
 
-            deepsea:
-              image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}
-              user: 1000:1000
-              restart: on-failure
-              volumes:
-                - \${APP_DATA_DIR}/data:/data
-                - \${APP_DATA_DIR}/config:/config
-              environment:
-                - DB_PATH=/data/deepsea.db
-                - CONFIG_PATH=/config/config.json
+          # Update version in umbrel-app.yml
+          sed "s/^version: .*/version: \"${VERSION}\"/" \
+            umbrel/umbrel-app.yml > dist/umbrel/umbrel-app.yml
+
+          # Create tarball
+          tar -czf dist/deepsea-umbrel-${VERSION}.tar.gz -C dist/umbrel .
+
+      - name: Upload Umbrel assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/deepsea-umbrel-*.tar.gz
+            dist/umbrel/docker-compose.yml
+            dist/umbrel/umbrel-app.yml
+
+  # ── Start9 Package ─────────────────────────────────────
+  start9:
+    name: Start9 Package
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Start9 metadata
+        run: |
+          mkdir -p dist/start9
+          VERSION="${DEEPSEA_VERSION#v}"
+          DIGEST="${{ needs.docker.outputs.digest }}"
+
+          # Update version in manifest.yaml
+          sed "s/^version: .*/version: \"${VERSION}\"/" \
+            start9/manifest.yaml > dist/start9/manifest.yaml
+
+          # Copy all Start9 files
+          cp start9/Dockerfile dist/start9/
+          cp start9/docker_entrypoint.sh dist/start9/
+          cp start9/Makefile dist/start9/
+          cp start9/instructions.md dist/start9/
+          cp start9/icon.png dist/start9/
+          cp start9/LICENSE dist/start9/
+          cp -r start9/scripts dist/start9/
+
+          # Create packaging info for Start9 packagers
+          cat > dist/start9/IMAGE_INFO.md <<EOF
+          # DeepSea Dashboard ${DEEPSEA_VERSION} - Start9 Image Reference
+          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          Digest: ${DIGEST}
+          Platforms: linux/amd64, linux/arm64
+
+          To build the .s9pk, run \`make\` in this directory with start-sdk installed.
           EOF
-          sed -i 's/^          //' dist/umbrel-docker-compose.yml
+          sed -i 's/^          //' dist/start9/IMAGE_INFO.md
 
-          # Version + digest reference for packagers
-          cat > dist/packaging-info.txt <<EOF
+          # Create tarball
+          tar -czf dist/deepsea-start9-${VERSION}.tar.gz -C dist/start9 .
+
+      - name: Upload Start9 assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/deepsea-start9-*.tar.gz
+
+  # ── Packaging Info ──────────────────────────────────────
+  notify:
+    name: Packaging Info
+    needs: [docker, umbrel, start9]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create packaging summary
+        run: |
+          VERSION="${DEEPSEA_VERSION#v}"
+          DIGEST="${{ needs.docker.outputs.digest }}"
+
+          cat > packaging-info.txt <<EOF
           DeepSea Dashboard ${DEEPSEA_VERSION}
           Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
           Digest: ${DIGEST}
           Platforms: linux/amd64, linux/arm64
           Release: https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
-          EOF
-          sed -i 's/^          //' dist/packaging-info.txt
 
-      - name: Upload packaging assets
+          Packages:
+          - Umbrel: deepsea-umbrel-${VERSION}.tar.gz (ready to submit to getumbrel/umbrel-apps)
+          - Start9: deepsea-start9-${VERSION}.tar.gz (contains all files for start-sdk pack)
+          EOF
+
+      - name: Upload packaging info
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/umbrel-docker-compose.yml
-            dist/packaging-info.txt
+          files: packaging-info.txt

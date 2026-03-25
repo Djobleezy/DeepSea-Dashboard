@@ -1,0 +1,41 @@
+manifestVersion: 1
+id: deepsea-dashboard
+name: DeepSea Dashboard
+tagline: Real-time Bitcoin mining dashboard for Ocean.xyz
+icon: https://raw.githubusercontent.com/Djobleezy/DeepSea-Dashboard/main/frontend/public/favicon.svg
+category: bitcoin
+version: "2.0.4"
+port: 8000
+description: >-
+  DeepSea Dashboard is a feature-rich, real-time Bitcoin mining dashboard
+  for Ocean.xyz pool miners. Track hashrate, earnings, workers, and blocks —
+  all in a retro CRT terminal aesthetic.
+
+
+  Features include live hashrate monitoring (60s, 10min, 3hr, 24hr with
+  auto-scaling), interactive charts, per-worker management with ASIC model
+  detection, a Bitcoin block explorer with pool attribution, earnings and
+  payout tracking, customizable notifications, three themes (DeepSea,
+  Bitcoin, Matrix), an audio player, and full PWA support for mobile.
+
+
+  Built with React 18 + TypeScript frontend and FastAPI Python backend,
+  backed by Redis caching and SQLite persistence.
+developer: Djobleezy
+website: https://github.com/Djobleezy/DeepSea-Dashboard
+dependencies: []
+repo: https://github.com/Djobleezy/DeepSea-Dashboard
+support: https://github.com/Djobleezy/DeepSea-Dashboard/issues
+gallery: []
+# Add screenshots to screenshots/ directory, then update URLs here:
+# - https://raw.githubusercontent.com/Djobleezy/DeepSea-Dashboard/main/screenshots/dashboard.png
+# - https://raw.githubusercontent.com/Djobleezy/DeepSea-Dashboard/main/screenshots/workers.png
+
+releaseNotes: >-
+  v2.0.4: React 18 + FastAPI rewrite with interactive charts, batch API,
+  worker management, block explorer, notification engine, three themes,
+  audio player, and PWA support.
+defaultUsername: ""
+defaultPassword: ""
+submitter: Djobleezy
+submission: https://github.com/getumbrel/umbrel-apps/pull/new
