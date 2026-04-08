@@ -18,6 +18,7 @@ Real-time Bitcoin mining dashboard for [Ocean.xyz](https://ocean.xyz) pool miner
 - [API Reference](#api-reference)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Screenshots](#screenshots)
+- [Self-Hosting (Umbrel & Start9)](#self-hosting-umbrel--start9)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -299,6 +300,48 @@ The `/api/stream` endpoint emits these server-sent events:
 | Blocks | _(placeholder)_ |
 | Earnings | _(placeholder)_ |
 | Boot Sequence | _(placeholder)_ |
+
+---
+
+## Self-Hosting (Umbrel & Start9)
+
+DeepSea Dashboard includes packaging for both **Umbrel** and **Start9 (StartOS)** sovereign computing platforms.
+
+### Umbrel
+
+The `umbrel/` directory contains a ready-to-use Umbrel app package:
+
+1. **From the Umbrel App Store** — Search for "DeepSea Dashboard" (once accepted into the store)
+2. **Manual install** — Copy the `umbrel/` directory contents to your Umbrel's app directory:
+   ```bash
+   # On your Umbrel node
+   cd ~/umbrel/app-data
+   mkdir -p deepsea-dashboard
+   # Copy umbrel-app.yml and docker-compose.yml into the directory
+   ```
+
+The Umbrel package uses the pre-built multi-platform image from `ghcr.io/djobleezy/deepsea-dashboard` and runs as non-root user (UID 1000). Data is persisted in the Umbrel app data directory.
+
+### Start9 (StartOS)
+
+The `start9/` directory contains a full StartOS service wrapper:
+
+1. **From the Start9 Marketplace** — Search for "DeepSea Dashboard" (once accepted)
+2. **Build from source** — Requires [start-sdk](https://github.com/Start9Labs/start-os) and Deno:
+   ```bash
+   cd start9/
+   make          # Builds the .s9pk package
+   make install  # Installs to your StartOS server
+   ```
+
+The Start9 package includes Tor and LAN access, automatic SSL, health checks, and backup/restore support. Data is stored at `/root/.data/` following StartOS conventions.
+
+### Release Assets
+
+Each [GitHub Release](https://github.com/Djobleezy/DeepSea-Dashboard/releases) includes:
+- `deepsea-umbrel-<version>.tar.gz` — Complete Umbrel package with pinned image digest
+- `deepsea-start9-<version>.tar.gz` — Complete Start9 wrapper files for `start-sdk pack`
+- `packaging-info.txt` — Image digest and platform info for packagers
 
 ---
 

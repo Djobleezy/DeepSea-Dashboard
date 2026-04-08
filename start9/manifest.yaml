@@ -1,0 +1,108 @@
+id: deepsea-dashboard
+title: "DeepSea Dashboard"
+version: "2.0.4"
+release-notes: |
+  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.0.4
+  - React 18 + FastAPI rewrite
+  - Interactive charts with block annotations
+  - Per-worker management with ASIC model detection
+  - Bitcoin block explorer with pool attribution
+  - Notification engine (block found, hashrate, worker, payout)
+  - Three themes: DeepSea, Bitcoin, Matrix
+  - PWA support with offline caching
+license: MIT
+wrapper-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
+upstream-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
+support-site: "https://github.com/Djobleezy/DeepSea-Dashboard/issues"
+marketing-site: "https://github.com/Djobleezy/DeepSea-Dashboard"
+build: ["make"]
+description:
+  short: Real-time Bitcoin mining dashboard for Ocean.xyz
+  long: |
+    DeepSea Dashboard is a feature-rich, real-time Bitcoin mining dashboard
+    for Ocean.xyz pool miners. Track hashrate, earnings, workers, and blocks —
+    all in a retro CRT terminal aesthetic.
+
+    Features include live hashrate monitoring (60s, 10min, 3hr, 24hr),
+    interactive charts, per-worker management with ASIC model detection,
+    a Bitcoin block explorer with pool attribution, earnings and payout
+    tracking, customizable notifications, three themes, audio player,
+    and full PWA support.
+assets:
+  license: LICENSE
+  icon: icon.png
+  instructions: instructions.md
+main:
+  type: docker
+  image: main
+  entrypoint: "docker_entrypoint.sh"
+  args: []
+  mounts:
+    main: /root
+  gpu-acceleration: false
+hardware-requirements:
+  arch:
+    - x86_64
+    - aarch64
+health-checks:
+  web-ui:
+    name: Web Interface
+    success-message: DeepSea Dashboard is accessible
+    type: script
+config: ~
+properties: ~
+volumes:
+  main:
+    type: data
+interfaces:
+  main:
+    name: User Interface
+    description: DeepSea Dashboard web interface
+    tor-config:
+      port-mapping:
+        80: "8000"
+    lan-config:
+      443:
+        ssl: true
+        internal: 8000
+    ui: true
+    protocols:
+      - tcp
+      - http
+dependencies: {}
+backup:
+  create:
+    type: docker
+    image: compat
+    system: true
+    entrypoint: compat
+    args:
+      - duplicity
+      - create
+      - /mnt/backup
+      - /root
+    mounts:
+      BACKUP: "/mnt/backup"
+      main: "/root"
+  restore:
+    type: docker
+    image: compat
+    system: true
+    entrypoint: compat
+    args:
+      - duplicity
+      - restore
+      - /mnt/backup
+      - /root
+    mounts:
+      BACKUP: "/mnt/backup"
+      main: "/root"
+migrations:
+  from:
+    "*":
+      type: script
+      args: ["from"]
+  to:
+    "*":
+      type: script
+      args: ["to"]

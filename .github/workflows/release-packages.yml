@@ -1,0 +1,167 @@
+# Build GHCR container image + generate packaging reference assets on tagged releases.
+# Kevin owns the image. Packaging assets are reference material, not canonical.
+name: Release Packaging
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write          # push to GHCR
+
+env:
+  DEEPSEA_VERSION: ${{ github.event.release.tag_name }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/deepsea-dashboard
+
+jobs:
+  # ── Docker Image (GHCR) ─────────────────────────────────
+  docker:
+    name: Build & Push Container Image
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern=v{{version}}
+            type=raw,value=latest
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Umbrel Package ──────────────────────────────────────
+  umbrel:
+    name: Umbrel Package
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Umbrel package
+        run: |
+          mkdir -p dist/umbrel
+          VERSION="${DEEPSEA_VERSION#v}"
+          DIGEST="${{ needs.docker.outputs.digest }}"
+
+          # Generate docker-compose with pinned image digest (regex matches any tag)
+          sed "s|ghcr.io/djobleezy/deepsea-dashboard:[^ ]*|ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}|" \
+            umbrel/docker-compose.yml > dist/umbrel/docker-compose.yml
+
+          # Update version in umbrel-app.yml
+          sed "s/^version: .*/version: \"${VERSION}\"/" \
+            umbrel/umbrel-app.yml > dist/umbrel/umbrel-app.yml
+
+          # Create tarball
+          tar -czf dist/deepsea-umbrel-${VERSION}.tar.gz -C dist/umbrel .
+
+      - name: Upload Umbrel assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/deepsea-umbrel-*.tar.gz
+            dist/umbrel/docker-compose.yml
+            dist/umbrel/umbrel-app.yml
+
+  # ── Start9 Package ─────────────────────────────────────
+  start9:
+    name: Start9 Package
+    needs: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Start9 metadata
+        run: |
+          mkdir -p dist/start9
+          VERSION="${DEEPSEA_VERSION#v}"
+          DIGEST="${{ needs.docker.outputs.digest }}"
+
+          # Update version in manifest.yaml
+          sed "s/^version: .*/version: \"${VERSION}\"/" \
+            start9/manifest.yaml > dist/start9/manifest.yaml
+
+          # Copy all Start9 files
+          cp start9/Dockerfile dist/start9/
+          cp start9/docker_entrypoint.sh dist/start9/
+          cp start9/Makefile dist/start9/
+          cp start9/instructions.md dist/start9/
+          cp start9/icon.png dist/start9/
+          cp start9/LICENSE dist/start9/
+          cp -r start9/scripts dist/start9/
+
+          # Create packaging info for Start9 packagers
+          cat > dist/start9/IMAGE_INFO.md <<EOF
+          # DeepSea Dashboard ${DEEPSEA_VERSION} - Start9 Image Reference
+          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          Digest: ${DIGEST}
+          Platforms: linux/amd64, linux/arm64
+
+          To build the .s9pk, run \`make\` in this directory with start-sdk installed.
+          EOF
+          sed -i 's/^          //' dist/start9/IMAGE_INFO.md
+
+          # Create tarball
+          tar -czf dist/deepsea-start9-${VERSION}.tar.gz -C dist/start9 .
+
+      - name: Upload Start9 assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/deepsea-start9-*.tar.gz
+
+  # ── Packaging Info ──────────────────────────────────────
+  notify:
+    name: Packaging Info
+    needs: [docker, umbrel, start9]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create packaging summary
+        run: |
+          VERSION="${DEEPSEA_VERSION#v}"
+          DIGEST="${{ needs.docker.outputs.digest }}"
+
+          cat > packaging-info.txt <<EOF
+          DeepSea Dashboard ${DEEPSEA_VERSION}
+          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          Digest: ${DIGEST}
+          Platforms: linux/amd64, linux/arm64
+          Release: https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
+
+          Packages:
+          - Umbrel: deepsea-umbrel-${VERSION}.tar.gz (ready to submit to getumbrel/umbrel-apps)
+          - Start9: deepsea-start9-${VERSION}.tar.gz (contains all files for start-sdk pack)
+          EOF
+
+      - name: Upload packaging info
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging-info.txt
