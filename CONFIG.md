@@ -90,6 +90,34 @@ anything other than `"USD"`. Leave empty if you only need USD display.
 
 ---
 
+### `datum_gateway_url`
+- **Type:** `string` (URL)
+- **Default:** `""` (disabled)
+- **Examples:**
+  - UmbrelOS (DATUM app installed): `"http://datum_datum_1:21000"`
+  - Stock self-build on the same host: `"http://127.0.0.1:7152"`
+  - Bare metal on the LAN: `"http://192.168.1.50:21000"`
+- **Environment override:** `DATUM_GATEWAY_URL`
+
+Optional URL of a local [DATUM Gateway](https://github.com/OCEAN-xyz/datum_gateway). When set,
+the dashboard probes the gateway directly (via its `/umbrel-api` JSON endpoint and a TCP
+stratum-port check as a fallback) to render a **real-time** DATUM connection badge.
+
+**Why this matters:** the default DATUM badge is derived from `pool_fees_percentage`, which is
+an *average* of historical work as reported on Ocean's stats page. After a user enables DATUM
+that average can take **hours or days** to land inside the 0.9%–1.3% "DATUM range" — during
+that window the badge would show OFFLINE even though the gateway is fully operational. Setting
+`datum_gateway_url` gives the dashboard a current-state signal so it can show a clearly
+labelled "DATUM ACTIVE (fees settling)" badge during that transition window.
+
+The environment variable `DATUM_GATEWAY_URL` overrides this field at request time, which is
+useful for Docker / Umbrel compose setups where you'd rather wire the URL via the service
+rather than the JSON file.
+
+Probe traffic is small (one ~2 s HTTP `GET` cached for 15 s) and never leaves your network.
+
+---
+
 ### `low_hashrate_threshold_ths`
 - **Type:** `float` (TH/s)
 - **Default:** `3.0`
@@ -121,6 +149,7 @@ match the upper end of your expected operating range.
   "network_fee": 2.0,
   "extended_history": false,
   "exchange_rate_api_key": "",
+  "datum_gateway_url": "",
   "low_hashrate_threshold_ths": 3.0,
   "high_hashrate_threshold_ths": 20.0
 }

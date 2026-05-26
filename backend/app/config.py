@@ -36,6 +36,14 @@ _DEFAULTS: dict[str, Any] = {
     "network_fee": 0.5,
     "extended_history": False,
     "exchange_rate_api_key": "",
+    # Optional URL of a local DATUM Gateway (e.g.
+    # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
+    # for a stock self-build).  Used by the dashboard to render a
+    # *live* DATUM connection badge that doesn't depend on the lagging
+    # ``pool_fees_percentage`` signal.  Leave blank to keep legacy
+    # fee-only behaviour.  Environment variable ``DATUM_GATEWAY_URL``
+    # overrides this field at request time.
+    "datum_gateway_url": "",
 }
 
 
@@ -108,3 +116,22 @@ def get_network_fee() -> float:
 
 def get_exchange_rate_api_key() -> str:
     return load_config().get("exchange_rate_api_key", "")
+
+
+def get_datum_gateway_url() -> str:
+    """Return the configured DATUM gateway base URL (env > config).
+
+    The env override exists so Docker/Umbrel deployments can wire this
+    via compose without touching the JSON file.
+    """
+    import os
+
+    env_url = os.environ.get("DATUM_GATEWAY_URL", "").strip().rstrip("/")
+    if env_url:
+        return env_url
+    # Strip + rstrip the config value too so /api/health reports
+    # ``datum_gateway_configured`` consistently with the probe, which
+    # also normalises whitespace and trailing slashes in
+    # ``datum_gateway_client._resolve_gateway_url``.
+    cfg_url = (load_config().get("datum_gateway_url") or "").strip().rstrip("/")
+    return cfg_url

@@ -141,6 +141,10 @@ export interface AppConfig {
   timezone: string;
   network_fee: number;
   extended_history: boolean;
+  /** Optional URL of a local DATUM Gateway (e.g. http://datum_datum_1:21000
+   *  on UmbrelOS).  Empty string disables the live probe and falls back
+   *  to the legacy pool_fees-only DATUM badge. */
+  datum_gateway_url?: string;
 }
 
 export type Theme = 'deepsea' | 'bitcoin' | 'matrix';
@@ -158,4 +162,27 @@ export interface HealthStatus {
   last_refresh?: number;
   uptime_seconds: number;
   server_timestamp?: number;
+  /** True when a DATUM gateway URL is set (env or config).  The
+   *  Dashboard uses this to decide whether to poll /api/datum/status. */
+  datum_gateway_configured?: boolean;
+}
+
+/** Live DATUM Gateway reachability + lagging-fee state.
+ *  Returned by GET /api/datum/status. */
+export type DatumStatusLabel = 'connected' | 'transitioning' | 'offline' | 'unknown';
+
+export interface DatumStatus {
+  status: DatumStatusLabel;
+  probe_reachable: boolean;
+  probe_method: 'umbrel-api' | 'stratum-tcp' | 'none';
+  gateway_url?: string | null;
+  connections?: number | null;
+  hashrate_ths?: number | null;
+  pool_fees_percentage: number;
+  fees_in_datum_band: boolean;
+  fee_band_low: number;
+  fee_band_high: number;
+  explanation: string;
+  last_check: number;
+  probe_error?: string | null;
 }

@@ -1,5 +1,6 @@
-import React, { Suspense, lazy, useEffect, useRef } from 'react';
-import { fetchMetricHistory } from '../api/client';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { fetchDatumStatus, fetchHealth, fetchMetricHistory } from '../api/client';
+import type { DatumStatus, HealthStatus as HealthStatusType } from '../types';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
@@ -15,9 +16,100 @@ const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
 );
 
-// DATUM Gateway: pool_fees between 0.9% and 1.3% = connected via DATUM protocol
-function isDatumConnected(poolFeesPct: number): boolean {
+// Legacy fee-only DATUM signal.  We keep this as a fallback so users
+// who never configure a DATUM_GATEWAY_URL still get the old badge
+// behaviour — no regression.
+//
+// IMPORTANT: this signal LAGS reality.  pool_fees_percentage is an
+// average of historical work as reported by Ocean's stats page, so a
+// user who just enabled DATUM may not see their fee % land in the
+// 0.9%-1.3% band for hours or days.  During that window the badge
+// will say OFFLINE even though DATUM is fully operational.  This is
+// the bug that motivated the live /api/datum/status endpoint — see
+// backend/app/routers/datum.py.
+//
+// Keep these bounds in sync with DATUM_FEE_BAND_LOW/HIGH in datum.py.
+function isDatumFeeInBand(poolFeesPct: number): boolean {
   return poolFeesPct >= 0.9 && poolFeesPct <= 1.3;
+}
+
+// Poll the live DATUM probe at the same rough cadence as the metrics
+// refresh so the badge stays current without piling on requests.
+const DATUM_POLL_MS = 30_000;
+
+type DatumBadgeState = {
+  label: string;
+  className: 'badge-online' | 'badge-offline' | 'badge-warning';
+  dotColor: string;
+  glow: boolean;
+  tooltip: string;
+};
+
+function deriveDatumBadge(
+  health: HealthStatusType | null,
+  datum: DatumStatus | null,
+  poolFeesPct: number,
+): DatumBadgeState {
+  // 1) Live probe is configured — trust it as the primary signal and
+  //    use the fee-band as the secondary signal that nuances the label.
+  if (health?.datum_gateway_configured && datum) {
+    if (datum.status === 'connected') {
+      return {
+        label: 'DATUM CONNECTED',
+        className: 'badge-online',
+        dotColor: 'var(--color-success)',
+        glow: true,
+        tooltip: datum.explanation,
+      };
+    }
+    if (datum.status === 'transitioning') {
+      // Headline UX fix for the bug report: gateway is up, fees just
+      // haven't caught up yet.  Show a distinct "warming up" state so
+      // the user knows it's expected.
+      return {
+        label: datum.probe_reachable ? 'DATUM ACTIVE (fees settling)' : 'DATUM FEES ONLY',
+        className: 'badge-warning',
+        dotColor: 'var(--color-warning, #f0a020)',
+        glow: true,
+        tooltip: datum.explanation,
+      };
+    }
+    if (datum.status === 'offline') {
+      return {
+        label: 'DATUM OFFLINE',
+        className: 'badge-offline',
+        dotColor: 'var(--color-error)',
+        glow: false,
+        tooltip: datum.explanation,
+      };
+    }
+    // 'unknown' — the probe couldn't say one way or the other.  Fall
+    // through to the legacy fee check so we still show *something*.
+  }
+
+  // 2) No live probe configured (or probe returned 'unknown') —
+  //    legacy fee-only behaviour.  Note the tooltip nudges the user
+  //    toward configuring the probe if their fees aren't in band.
+  const feeBand = isDatumFeeInBand(poolFeesPct);
+  if (feeBand) {
+    return {
+      label: 'DATUM CONNECTED',
+      className: 'badge-online',
+      dotColor: 'var(--color-success)',
+      glow: true,
+      tooltip:
+        'Pool fees in the DATUM range (0.9%–1.3%). For a real-time status, set DATUM_GATEWAY_URL.',
+    };
+  }
+  return {
+    label: 'DATUM OFFLINE',
+    className: 'badge-offline',
+    dotColor: 'var(--color-error)',
+    glow: false,
+    tooltip:
+      'Pool fees are outside the DATUM range. If you just enabled DATUM, this can take hours\u2014 ' +
+      'Ocean averages over historical work. Set DATUM_GATEWAY_URL to see a live status.',
+  };
 }
 
 export const Dashboard: React.FC = () => {
@@ -31,6 +123,8 @@ export const Dashboard: React.FC = () => {
   const hydrateChart = useAppStore((s) => s.hydrateChart);
   const { annotations: blockAnnotations } = useBlockAnnotations();
   const hydrationAttempted = useRef(false);
+  const [health, setHealth] = useState<HealthStatusType | null>(null);
+  const [datum, setDatum] = useState<DatumStatus | null>(null);
 
   // Hydrate chart from server history on first load
   useEffect(() => {
@@ -43,6 +137,64 @@ export const Dashboard: React.FC = () => {
       })
       .catch(() => {});
   }, [chartHydrated, hydrateChart]);
+
+  // Fetch /health to find out whether DATUM_GATEWAY_URL is set.
+  // If it isn't, we don't poll /api/datum/status at all — the legacy
+  // fee-only badge is enough for users who never configured a probe.
+  //
+  // Retry with exponential backoff if the initial request fails: a
+  // single fetch failure (transient network blip, startup race against
+  // the backend, or a slow proxy) used to leave ``health`` null for
+  // the entire session, which permanently disabled DATUM polling.
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    const MAX_ATTEMPTS = 4; // ~ 0s, 500ms, 1.5s, 3.5s → ≊5.5s total
+
+    const attempt = (n: number) => {
+      fetchHealth()
+        .then((h) => {
+          if (!cancelled) setHealth(h);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (n + 1 >= MAX_ATTEMPTS) return; // give up silently
+          const delay = 500 * Math.pow(2, n);
+          timeoutId = window.setTimeout(() => attempt(n + 1), delay);
+        });
+    };
+
+    attempt(0);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  // Poll /api/datum/status whenever a gateway URL is configured.  The
+  // backend caches the underlying probe for ~15s, so this is cheap.
+  useEffect(() => {
+    if (!health?.datum_gateway_configured) return;
+    let cancelled = false;
+
+    const tick = () => {
+      fetchDatumStatus()
+        .then((s) => {
+          if (!cancelled) setDatum(s);
+        })
+        .catch(() => {
+          // Swallow — next tick will retry.  We don't want a probe blip
+          // to take down the dashboard.
+        });
+    };
+    tick();
+    const id = window.setInterval(tick, DATUM_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [health?.datum_gateway_configured]);
 
   useEffect(() => {
     if (!metrics) return;
@@ -65,7 +217,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  const datumActive = isDatumConnected(metrics.pool_fees_percentage);
+  const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
   const hr60 = autoScaleHashrate(metrics.hashrate_60sec, metrics.hashrate_60sec_unit);
   const hr10 = autoScaleHashrate(metrics.hashrate_10min, metrics.hashrate_10min_unit);
   const hr3 = autoScaleHashrate(metrics.hashrate_3hr, metrics.hashrate_3hr_unit);
@@ -78,24 +230,27 @@ export const Dashboard: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>MINING DASHBOARD</h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* DATUM Gateway badge */}
+          {/* DATUM Gateway badge — derived from the live probe when a
+              gateway URL is configured, otherwise falls back to the
+              legacy pool_fees_percentage band check. */}
           <span
-            className={`badge ${datumActive ? 'badge-online' : 'badge-offline'}`}
+            className={`badge ${datumBadge.className}`}
             style={{ fontSize: '12px', padding: '4px 12px' }}
+            title={datumBadge.tooltip}
           >
             <span
               style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: datumActive ? 'var(--color-success)' : 'var(--color-error)',
+                background: datumBadge.dotColor,
                 display: 'inline-block',
-                boxShadow: datumActive ? '0 0 6px var(--color-success)' : 'none',
-                animation: datumActive ? 'pulse-glow 2s infinite' : 'none',
+                boxShadow: datumBadge.glow ? `0 0 6px ${datumBadge.dotColor}` : 'none',
+                animation: datumBadge.glow ? 'pulse-glow 2s infinite' : 'none',
                 marginRight: '6px',
               }}
             />
-            DATUM {datumActive ? 'CONNECTED' : 'OFFLINE'}
+            {datumBadge.label}
           </span>
           {metrics.low_hashrate_mode && (
             <span

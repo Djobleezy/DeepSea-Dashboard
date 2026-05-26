@@ -34,7 +34,7 @@ Real-time Bitcoin mining dashboard for [Ocean.xyz](https://ocean.xyz) pool miner
 - **3 Themes** — DeepSea (blue), Bitcoin (orange), Matrix (green) with CRT scanlines and phosphor glow
 - **Audio Player** — Theme-aware playlists with crossfade transitions
 - **PWA Support** — Service worker, offline caching, cross-tab sync via BroadcastChannel
-- **DATUM Gateway** — Connection status indicator for Ocean's DATUM protocol
+- **DATUM Gateway** — Real-time connection status indicator for Ocean's DATUM protocol, with optional direct gateway probe to avoid the lagging `pool_fees_percentage` signal
 - **Batch API** — Dashboard loads metrics + workers + blocks in a single HTTP call
 - **Mobile First** — Hamburger nav, responsive grid, touch-optimized
 
@@ -352,6 +352,37 @@ Each [GitHub Release](https://github.com/Djobleezy/DeepSea-Dashboard/releases) i
 - **Wallet not configured** — edit `config.json` and set `wallet` to your Ocean.xyz payout address
 - **Ocean.xyz API unreachable** — check your network; the backend logs will show HTTP errors
 - Check `docker compose logs app` for error details
+
+### DATUM badge says OFFLINE but my gateway is running
+
+This is the most common DATUM-related question. The default badge is derived from
+`pool_fees_percentage`, which Ocean computes as an **average over historical work**. After you
+enable DATUM on a gateway that previously mined non-DATUM (or on a brand-new wallet with no
+history), that average can take **hours or days** to land inside the 0.9%–1.3% "DATUM range".
+During that transition window the legacy badge incorrectly reports OFFLINE.
+
+**Fix:** point the dashboard at your DATUM Gateway so it can probe it directly.
+
+- **UmbrelOS:** set `DATUM_GATEWAY_URL=http://datum_datum_1:21000` in the deepsea-dashboard
+  service environment (or `datum_gateway_url` in `config.json`).
+- **Stock self-build:** `DATUM_GATEWAY_URL=http://127.0.0.1:7152` (or wherever your gateway's
+  `api.listen_port` is bound).
+- **Bare metal on LAN:** use the gateway machine's IP + API port.
+
+With a probe configured the badge becomes:
+
+| Probe | Fees in 0.9–1.3% band | Badge |
+|---|---|---|
+| reachable | yes | `DATUM CONNECTED` (green) |
+| reachable | no | `DATUM ACTIVE (fees settling)` (amber) — this is the transition window |
+| unreachable | yes | `DATUM FEES ONLY` (amber) — your gateway process may have died |
+| unreachable | no | `DATUM OFFLINE` (red) |
+
+Without `DATUM_GATEWAY_URL` set the dashboard falls back to the legacy fee-only behaviour, so
+no setup is *required* — just recommended for anyone who recently switched on DATUM.
+
+Probe traffic is one ~2-second HTTP `GET` cached for 15 s; it never leaves your network. See
+`CONFIG.md` for the full `datum_gateway_url` reference.
 
 ### Redis connection errors
 
