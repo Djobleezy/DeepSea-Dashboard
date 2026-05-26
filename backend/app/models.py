@@ -231,6 +231,11 @@ class AppConfig(BaseModel):
     timezone: str = "America/Los_Angeles"
     network_fee: float = Field(default=0.5, ge=0, le=100)
     extended_history: bool = False
+    # Optional base URL of a local DATUM Gateway (e.g.
+    # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
+    # for a stock self-build).  Empty string disables the live probe.
+    # See CONFIG.md and the DATUM section of README.md for details.
+    datum_gateway_url: str = Field(default="", max_length=500)
 
     @field_validator("currency", mode="before")
     @classmethod
@@ -252,6 +257,7 @@ class ConfigUpdate(BaseModel):
     timezone: Optional[str] = None
     network_fee: Optional[float] = Field(default=None, ge=0, le=100)
     extended_history: Optional[bool] = None
+    datum_gateway_url: Optional[str] = Field(default=None, max_length=500)
 
     @field_validator("currency", mode="before")
     @classmethod
@@ -279,6 +285,10 @@ class HealthStatus(BaseModel):
     last_refresh: Optional[float] = None
     uptime_seconds: float = 0.0
     server_timestamp: Optional[float] = None  # Unix timestamp (seconds) for client time sync
+    # True when a DATUM gateway URL is set (env or config).  The
+    # frontend uses this to decide whether to query /api/datum/status
+    # for the live badge, or fall back to the legacy fee-only check.
+    datum_gateway_configured: bool = False
 
 
 # ---------------------------------------------------------------------------

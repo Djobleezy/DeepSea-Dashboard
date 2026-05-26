@@ -7,6 +7,7 @@
   "network_fee": 2.0,
   "extended_history": false,
   "exchange_rate_api_key": "",
+  "datum_gateway_url": "",
   "low_hashrate_threshold_ths": 3.0,
   "high_hashrate_threshold_ths": 20.0
 }

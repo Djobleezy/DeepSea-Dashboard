@@ -4,6 +4,7 @@ import type {
   AppConfig,
   BlocksResponse,
   DashboardMetrics,
+  DatumStatus,
   EarningsResponse,
   HealthStatus,
   Notification,
@@ -189,6 +190,11 @@ export const fetchTimezones = () =>
 
 // Health
 export const fetchHealth = () => get<HealthStatus>('/health');
+
+// DATUM gateway status — direct probe of the local DATUM gateway, with
+// the lagging pool_fees_percentage signal folded in.  See backend
+// app/routers/datum.py for the state machine.
+export const fetchDatumStatus = () => get<DatumStatus>('/datum/status');
 
 // Exchange rates
 export const fetchExchangeRates = () =>
