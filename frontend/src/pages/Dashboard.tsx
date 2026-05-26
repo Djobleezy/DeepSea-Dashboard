@@ -138,18 +138,37 @@ export const Dashboard: React.FC = () => {
       .catch(() => {});
   }, [chartHydrated, hydrateChart]);
 
-  // Fetch /health once to find out whether DATUM_GATEWAY_URL is set.
+  // Fetch /health to find out whether DATUM_GATEWAY_URL is set.
   // If it isn't, we don't poll /api/datum/status at all — the legacy
   // fee-only badge is enough for users who never configured a probe.
+  //
+  // Retry with exponential backoff if the initial request fails: a
+  // single fetch failure (transient network blip, startup race against
+  // the backend, or a slow proxy) used to leave ``health`` null for
+  // the entire session, which permanently disabled DATUM polling.
   useEffect(() => {
     let cancelled = false;
-    fetchHealth()
-      .then((h) => {
-        if (!cancelled) setHealth(h);
-      })
-      .catch(() => {});
+    let timeoutId: number | undefined;
+    const MAX_ATTEMPTS = 4; // ~ 0s, 500ms, 1.5s, 3.5s → ≊5.5s total
+
+    const attempt = (n: number) => {
+      fetchHealth()
+        .then((h) => {
+          if (!cancelled) setHealth(h);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (n + 1 >= MAX_ATTEMPTS) return; // give up silently
+          const delay = 500 * Math.pow(2, n);
+          timeoutId = window.setTimeout(() => attempt(n + 1), delay);
+        });
+    };
+
+    attempt(0);
+
     return () => {
       cancelled = true;
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     };
   }, []);
 

@@ -50,10 +50,97 @@ def test_parse_hashrate_ths_handles_bad_input():
     assert dgc._parse_hashrate_ths(None, "TH/s") is None  # type: ignore[arg-type]
 
 
-def test_parse_hashrate_ths_returns_raw_for_unknown_unit():
-    # We surface the raw number rather than silently dropping it; the
-    # caller can still inspect the original unit if it really cares.
-    assert dgc._parse_hashrate_ths("42", "WIDGETS/s") == 42.0
+def test_parse_hashrate_ths_returns_none_for_unknown_unit():
+    # Unknown units must return None rather than the raw value.  The
+    # result lands in ``hashrate_ths`` so passing through an
+    # unconverted number would silently misreport magnitude if the
+    # gateway ever ships a unit we don't recognise.
+    assert dgc._parse_hashrate_ths("42", "WIDGETS/s") is None
+    assert dgc._parse_hashrate_ths("42", "") is None
+
+
+# ---------------------------------------------------------------------------
+# SSRF guard on _resolve_gateway_url / _validate_gateway_url
+# ---------------------------------------------------------------------------
+
+class TestGatewayUrlValidation:
+    """The DATUM gateway URL is user-controlled via /api/config, so we
+    must refuse to probe arbitrary destinations."""
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://127.0.0.1:7152",
+            "http://127.0.0.1:21000/",
+            "http://10.0.0.5:21000",
+            "http://192.168.1.42:7152",
+            "http://172.16.5.5:7152",
+            "http://[::1]:7152",
+            "http://datum_datum_1:21000",
+            "https://datum_datum_1:21000",
+        ],
+    )
+    def test_accepts_safe_hosts(self, url):
+        assert dgc._validate_gateway_url(url) is not None
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            # Link-local / cloud metadata
+            "http://169.254.169.254/latest/meta-data/",
+            "http://169.254.0.1:80",
+            # Public Internet
+            "http://8.8.8.8:80",
+            "http://example.com:80",
+            "http://attacker.example/",
+            # Bad schemes
+            "file:///etc/passwd",
+            "gopher://127.0.0.1:21000",
+            "ftp://127.0.0.1:21000",
+            # Multicast / unspecified / reserved
+            "http://224.0.0.1:80",
+            "http://0.0.0.0:80",
+            # Garbage
+            "not-a-url",
+            "",
+            "   ",
+        ],
+    )
+    def test_rejects_unsafe_hosts(self, url):
+        assert dgc._validate_gateway_url(url) is None
+
+    def test_resolve_drops_unsafe_env(self, monkeypatch):
+        """An attacker-controlled env var pointing at metadata IP is rejected."""
+        monkeypatch.setenv("DATUM_GATEWAY_URL", "http://169.254.169.254/")
+        monkeypatch.setattr(dgc, "load_config", lambda: {"datum_gateway_url": ""})
+        assert dgc._resolve_gateway_url() is None
+
+    def test_resolve_drops_unsafe_config(self, monkeypatch):
+        """Same protection for a /api/config-supplied value."""
+        monkeypatch.delenv("DATUM_GATEWAY_URL", raising=False)
+        monkeypatch.setattr(
+            dgc,
+            "load_config",
+            lambda: {"datum_gateway_url": "http://attacker.example/"},
+        )
+        assert dgc._resolve_gateway_url() is None
+
+    def test_resolve_normalises_trailing_slash(self, monkeypatch):
+        monkeypatch.setenv("DATUM_GATEWAY_URL", "http://127.0.0.1:7152/")
+        assert dgc._resolve_gateway_url() == "http://127.0.0.1:7152"
+
+
+def test_clear_cache_is_public_alias():
+    """``clear_cache`` is the production-safe public name; the
+    legacy ``_reset_cache_for_tests`` alias stays for backcompat."""
+    assert callable(dgc.clear_cache)
+    assert callable(dgc._reset_cache_for_tests)
+    # Populate the cache, then both names should clear it.
+    dgc._cached_result = object()  # type: ignore[assignment]
+    dgc._cached_at = 1.0
+    dgc.clear_cache()
+    assert dgc._cached_result is None
+    assert dgc._cached_at == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -212,8 +299,10 @@ async def test_get_datum_status_no_config_returns_unknown(monkeypatch):
 @pytest.mark.asyncio
 async def test_get_datum_status_uses_env_override(monkeypatch):
     """Env var beats config file."""
-    monkeypatch.setenv("DATUM_GATEWAY_URL", "http://gateway.local:7152")
-    monkeypatch.setattr(dgc, "load_config", lambda: {"datum_gateway_url": "http://other:1234"})
+    # Use loopback / RFC1918 hosts because the SSRF guard rejects
+    # arbitrary hostnames — the env override behaviour is unchanged.
+    monkeypatch.setenv("DATUM_GATEWAY_URL", "http://127.0.0.1:7152")
+    monkeypatch.setattr(dgc, "load_config", lambda: {"datum_gateway_url": "http://10.0.0.5:1234"})
 
     body = {"items": [{"title": "Connections", "text": "1"}, {"title": "Hashrate", "text": "1", "subtext": "TH/s"}]}
     seen_urls = []
@@ -227,8 +316,8 @@ async def test_get_datum_status_uses_env_override(monkeypatch):
 
     result = await dgc.get_datum_status(force=True)
     assert result.reachable is True
-    assert result.gateway_url == "http://gateway.local:7152"
-    assert seen_urls == ["http://gateway.local:7152/umbrel-api"]
+    assert result.gateway_url == "http://127.0.0.1:7152"
+    assert seen_urls == ["http://127.0.0.1:7152/umbrel-api"]
 
 
 @pytest.mark.asyncio

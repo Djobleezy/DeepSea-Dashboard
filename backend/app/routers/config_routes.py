@@ -52,9 +52,9 @@ async def update_config(payload: ConfigUpdate) -> AppConfig:
     # instead of waiting up to CACHE_TTL for the stale result to age out.
     if "datum_gateway_url" in update:
         try:
-            from app.services.datum_gateway_client import _reset_cache_for_tests
+            from app.services.datum_gateway_client import clear_cache
 
-            _reset_cache_for_tests()
+            clear_cache()
         except Exception:  # pragma: no cover — defensive import guard
             pass
 

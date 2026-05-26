@@ -49,6 +49,7 @@ present that to the user.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import socket
@@ -126,18 +127,127 @@ _cached_at: float = 0.0
 _probe_lock = asyncio.Lock()
 
 
+# Hostnames that resolve to in-cluster Docker services we expect users to
+# point at on Umbrel / Start9 / docker-compose setups.  These bypass the
+# IP-literal allowlist because Docker's embedded DNS only resolves them
+# inside the user's own container network.
+_TRUSTED_DOCKER_HOSTS: frozenset[str] = frozenset(
+    {
+        "datum_datum_1",
+        "datum_gateway",
+        "datum",
+        "datum_web_1",
+    }
+)
+
+
+def _is_safe_gateway_host(host: str) -> tuple[bool, str]:
+    """Return ``(ok, reason)`` for a candidate gateway host.
+
+    The DATUM gateway URL is user-controlled via the unauthenticated
+    ``/api/config`` endpoint, and the resolved URL is fed directly into
+    outbound HTTP and TCP connects.  Without this guard the probe is an
+    SSRF and port-scan primitive: an attacker who can reach
+    ``/api/config`` could point the dashboard at cloud-metadata
+    endpoints (``169.254.169.254``), an arbitrary LAN host, or an
+    internal API on localhost.
+
+    Policy: allow only loopback, RFC1918 private ranges, and a small
+    set of well-known Docker service names.  Reject link-local,
+    multicast, public IPs, and anything we can't classify.
+    """
+    if not host:
+        return False, "empty-host"
+
+    h = host.strip().lower()
+
+    # Strip an optional ``[ipv6]`` bracket form that urlparse already
+    # removes, but be defensive in case callers pass a raw string.
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+
+    # Allow a curated list of Docker service hostnames — these only
+    # resolve inside the user's own container network.
+    if h in _TRUSTED_DOCKER_HOSTS:
+        return True, "docker-service"
+
+    # If it parses as an IP literal, classify it.
+    try:
+        ip = ipaddress.ip_address(h)
+    except ValueError:
+        # Not an IP — reject unrecognised hostnames.  We don't do DNS
+        # lookups here because (a) that's another network round-trip
+        # before the probe, and (b) an attacker controls the hostname
+        # and could trivially defeat a one-shot resolve via TTL games.
+        return False, "unrecognised-host"
+
+    if ip.is_loopback:
+        return True, "loopback"
+    if ip.is_link_local:
+        return False, "link-local"  # blocks 169.254.169.254 metadata
+    if ip.is_multicast:
+        return False, "multicast"
+    if ip.is_unspecified:
+        return False, "unspecified"  # 0.0.0.0 / ::
+    if ip.is_reserved:
+        return False, "reserved"
+    if ip.is_private:
+        return True, "private"
+    return False, "public-ip"
+
+
+def _validate_gateway_url(url: str) -> Optional[str]:
+    """Normalise + validate a candidate gateway URL.
+
+    Returns the cleaned URL string when the URL is shaped like
+    ``http(s)://<safe-host>[:port][/...]``, otherwise ``None``.  Logs a
+    warning when a URL is rejected so misconfiguration is debuggable.
+    """
+    if not url:
+        return None
+    cleaned = url.strip().rstrip("/")
+    if not cleaned:
+        return None
+    try:
+        parsed = urlparse(cleaned)
+    except ValueError:
+        _log.warning("DATUM gateway URL rejected (unparseable): %r", url)
+        return None
+    if parsed.scheme not in {"http", "https"}:
+        _log.warning("DATUM gateway URL rejected (bad scheme %r)", parsed.scheme)
+        return None
+    host = parsed.hostname or ""
+    ok, reason = _is_safe_gateway_host(host)
+    if not ok:
+        _log.warning(
+            "DATUM gateway URL rejected (host=%r reason=%s)", host, reason
+        )
+        return None
+    return cleaned
+
+
 def _resolve_gateway_url() -> Optional[str]:
-    """Return the configured DATUM gateway base URL, or None."""
+    """Return the configured DATUM gateway base URL, or None.
+
+    Validates against :func:`_is_safe_gateway_host` so a user-supplied
+    ``datum_gateway_url`` cannot turn the probe into an SSRF / port
+    scanner.  Invalid URLs are logged and treated as "not configured".
+    """
     env_url = os.environ.get("DATUM_GATEWAY_URL", "").strip()
     if env_url:
-        return env_url.rstrip("/")
+        validated = _validate_gateway_url(env_url)
+        if validated:
+            return validated
+        # Fall through to config if env was invalid; this matches the
+        # "env > config" precedence while still letting a sane config
+        # value win if the env is garbage.
     try:
         cfg = load_config()
     except Exception:  # pragma: no cover — load_config is defensive itself
         return None
     cfg_url = (cfg.get("datum_gateway_url") or "").strip()
     if cfg_url:
-        return cfg_url.rstrip("/")
+        return _validate_gateway_url(cfg_url)
     return None
 
 
@@ -169,10 +279,12 @@ def _parse_hashrate_ths(text: str, unit: str) -> Optional[float]:
     }
     factor = multipliers.get(unit_u)
     if factor is None:
-        # Unknown unit — surface the raw number so we don't lie about
-        # magnitude.  Callers should check the unit field separately
-        # if they need certainty.
-        return value
+        # Unknown unit — return None rather than the raw number, which
+        # would silently misreport hashrate magnitude (the result is
+        # stored in ``hashrate_ths``).  If the gateway ever ships a new
+        # unit we'd rather show "unknown" than a wrong number.
+        _log.warning("DATUM probe: unknown hashrate unit %r (value=%r)", unit, text)
+        return None
     return value * factor
 
 
@@ -380,8 +492,21 @@ async def get_datum_status(force: bool = False) -> DatumProbeResult:
         return result
 
 
-def _reset_cache_for_tests() -> None:
-    """Clear the module cache.  Tests should call this between scenarios."""
+def clear_cache() -> None:
+    """Invalidate the module-level probe cache.
+
+    Public API — call this whenever the gateway URL or any other input
+    to ``_do_probe`` changes (e.g. ``/api/config`` updates the URL) so
+    the next ``get_datum_status`` call runs a fresh probe instead of
+    waiting up to :data:`CACHE_TTL` for the stale result to age out.
+    """
     global _cached_result, _cached_at
     _cached_result = None
     _cached_at = 0.0
+
+
+# Backwards-compatible alias.  Tests imported this name before
+# ``clear_cache`` existed; keep it working until external tests catch up.
+def _reset_cache_for_tests() -> None:
+    """Deprecated alias for :func:`clear_cache` — kept for test backcompat."""
+    clear_cache()

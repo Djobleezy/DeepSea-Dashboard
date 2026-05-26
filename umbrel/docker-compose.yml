@@ -37,8 +37,9 @@ services:
       # Live DATUM Gateway probe — point at the Umbrel DATUM app's API
       # listener so the dashboard can render a real-time DATUM badge
       # instead of relying on the lagging pool_fees_percentage signal.
-      # Empty / unset disables the probe and falls back to fee-only.
-      - DATUM_GATEWAY_URL=${DATUM_GATEWAY_URL:-http://datum_datum_1:21000}
+      # Only truly unset uses the default; pass DATUM_GATEWAY_URL=""
+      # (explicit empty) to disable the probe and fall back to fee-only.
+      - DATUM_GATEWAY_URL=${DATUM_GATEWAY_URL-http://datum_datum_1:21000}
     security_opt:
       - no-new-privileges:true
     healthcheck:
