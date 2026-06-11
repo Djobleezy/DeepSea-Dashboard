@@ -53,7 +53,7 @@ jobs:
         run: npx tsc --noEmit
       - name: Test frontend
         working-directory: frontend
-        run: npm test -- --passWithNoTests
+        run: npm test
       - name: Build frontend
         working-directory: frontend
         run: npm run build

@@ -86,19 +86,22 @@ async def test_ocean_scraper_fallback_selector_parses_rows(monkeypatch):
     assert result["workers"][0]["hashrate_3hr"] == 120.0
 
 
-def _payouts_html() -> str:
+def _payouts_html(include_lightning: bool = True) -> str:
     from datetime import datetime, timedelta, timezone
 
     recent = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
     older = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
-    return f"""
-<html><body>
-  <table><tbody id="payouts-tablerows">
+    lightning_row = f"""
     <tr class="table-row">
       <td class="table-cell">{recent}</td>
       <td class="table-cell"><a href="/info/tx/lightning/ln-abc123">⚡ ln-abc123</a></td>
       <td class="table-cell">0.00150000 BTC</td>
     </tr>
+    """
+    return f"""
+<html><body>
+  <table><tbody id="payouts-tablerows">
+    {lightning_row if include_lightning else ""}
     <tr class="table-row">
       <td class="table-cell">{older}</td>
       <td class="table-cell"><a href="https://mempool.space/tx/deadbeef">deadbeef</a></td>
@@ -157,35 +160,69 @@ async def test_payment_history_scrape_respects_days_window(monkeypatch):
     assert payments == []
 
 
+def _earnpay_response(ts: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        json=lambda: {
+            "result": {
+                "payouts": [
+                    {
+                        "ts": ts,
+                        "on_chain_txid": "deadbeef",
+                        "total_satoshis_net_paid": 200_000,
+                    }
+                ]
+            }
+        }
+    )
+
+
 @pytest.mark.asyncio
-async def test_payment_history_prefers_api_when_it_has_payouts(monkeypatch):
+async def test_payment_history_merges_lightning_payouts_with_api_results(monkeypatch):
+    """A miner with on-chain history in the API and newer Lightning payouts
+    only visible on the stats page must see both, without duplicates."""
+    import time
+
     client = OceanClient(wallet="test-wallet")
-    scrape_called = False
+    seven_days_ago = int(time.time()) - 7 * 86400
 
     async def fake_get(url, timeout=None, headers=None):
-        nonlocal scrape_called
         if "earnpay" in url:
-            return SimpleNamespace(
-                json=lambda: {
-                    "result": {
-                        "payouts": [
-                            {
-                                "ts": 1764547200,
-                                "on_chain_txid": "abcd",
-                                "total_satoshis_net_paid": 100,
-                            }
-                        ]
-                    }
-                }
-            )
-        scrape_called = True
+            return _earnpay_response(seven_days_ago)
+        if "ppage=0" in url:
+            return SimpleNamespace(text=_payouts_html())
         return SimpleNamespace(text=EMPTY_PAYOUTS_HTML)
 
     monkeypatch.setattr(client, "_get", fake_get)
 
     payments = await client.get_payment_history(days=360)
 
+    assert len(payments) == 2
+    assert payments[0]["lightning_txid"] == "ln-abc123"  # newer, sorted first
+    assert payments[1]["txid"] == "deadbeef"
+    assert sum(1 for p in payments if p["txid"] == "deadbeef") == 1
+
+
+@pytest.mark.asyncio
+async def test_payment_history_scrape_stops_when_api_already_covers_history(monkeypatch):
+    """On-chain-only miners pay for a single extra page fetch: every row on
+    page 0 is already known from the API, so pagination stops immediately."""
+    import time
+
+    client = OceanClient(wallet="test-wallet")
+    seven_days_ago = int(time.time()) - 7 * 86400
+    pages_fetched = []
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            return _earnpay_response(seven_days_ago)
+        pages_fetched.append(url)
+        return SimpleNamespace(text=_payouts_html(include_lightning=False))
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    payments = await client.get_payment_history(days=360)
+
     assert len(payments) == 1
-    assert payments[0]["txid"] == "abcd"
-    assert payments[0]["amount_sats"] == 100
-    assert scrape_called is False
+    assert payments[0]["txid"] == "deadbeef"
+    assert len(pages_fetched) == 1
+    assert "ppage=0" in pages_fetched[0]

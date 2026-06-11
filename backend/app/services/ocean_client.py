@@ -386,9 +386,11 @@ class OceanClient:
 
         Calls ``/v1/earnpay/<wallet>/<start>/<end>`` with a date range derived
         from ``days``.  The earnpay endpoint only reports on-chain payouts, so
-        when it returns no entries the stats page payout table is scraped as a
-        fallback — that table also lists Lightning payouts.  Results are capped
-        at ``MAX_PAYOUT_HISTORY`` entries.
+        the stats page payout table — which also lists Lightning payouts — is
+        scraped as well, and any entries the API did not return are merged in.
+        The scraper stops at the first page that yields nothing new, so miners
+        with on-chain-only history cost a single extra page fetch.  Results
+        are capped at ``MAX_PAYOUT_HISTORY`` entries.
 
         Args:
             days: Number of historical days to include (default 360).
@@ -398,13 +400,20 @@ class OceanClient:
         Returns:
             List of payment dicts with fields: ``date``, ``date_iso``, ``txid``,
             ``lightning_txid``, ``amount_btc``, ``amount_sats``, ``status``,
-            and optionally ``rate`` / ``fiat_value``.
+            and optionally ``rate`` / ``fiat_value``, sorted newest first.
         """
-        payments = await self._get_payment_history_api(days=days, btc_price=btc_price)
-        if payments:
-            return payments
-        _log.info("API payment history empty, trying scraper")
-        return await self._get_payment_history_scrape(days=days, btc_price=btc_price)
+        api_payments = await self._get_payment_history_api(days=days, btc_price=btc_price)
+        scraped = await self._get_payment_history_scrape(
+            days=days,
+            btc_price=btc_price,
+            exclude_txids={p["txid"] for p in api_payments if p["txid"]},
+            exclude_keys={(p["date"], p["amount_sats"]) for p in api_payments},
+        )
+        if not scraped:
+            return api_payments
+        merged = api_payments + scraped
+        merged.sort(key=lambda p: p["date"], reverse=True)
+        return merged[:MAX_PAYOUT_HISTORY]
 
     async def _get_payment_history_api(
         self, days: int, btc_price: Optional[float] = None
@@ -461,7 +470,11 @@ class OceanClient:
             return []
 
     async def _get_payment_history_scrape(
-        self, days: int, btc_price: Optional[float] = None
+        self,
+        days: int,
+        btc_price: Optional[float] = None,
+        exclude_txids: Optional[set[str]] = None,
+        exclude_keys: Optional[set[tuple[str, int]]] = None,
     ) -> list[dict]:
         """Scrape payout history from the stats page payout table.
 
@@ -470,6 +483,15 @@ class OceanClient:
         ``/info/tx/lightning/<id>`` (on-chain rows link to a regular txid).
         Pages are fetched via the ``?ppage=N`` query parameter, newest first,
         until the requested ``days`` window is exhausted.
+
+        Args:
+            days: Number of historical days to include.
+            btc_price: If provided, adds ``rate`` / ``fiat_value`` per payment.
+            exclude_txids: On-chain txids already known (e.g. from the API);
+                matching rows are skipped and do not count as page progress,
+                so pagination stops once it reaches already-covered history.
+            exclude_keys: ``(date, amount_sats)`` pairs already known, used to
+                skip rows that carry no parseable txid link.
         """
         tz = get_timezone()
         cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
@@ -542,6 +564,11 @@ class OceanClient:
                     date_str = local_dt.strftime("%Y-%m-%d %H:%M")
                 except ValueError as e:
                     _log.debug("Could not parse payout date %r: %s", date_text, e)
+
+                if exclude_txids and txid and txid in exclude_txids:
+                    continue
+                if exclude_keys and (date_str, sats) in exclude_keys:
+                    continue
 
                 key = (date_text, txid, lightning_txid, sats)
                 if key in seen:

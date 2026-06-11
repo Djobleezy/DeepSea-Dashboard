@@ -183,12 +183,14 @@ export const Earnings: React.FC = () => {
                   <th>AMOUNT (SATS)</th>
                   <th>BTC</th>
                   <th style={{ textAlign: 'right' }}>FIAT VALUE</th>
+                  <th>TYPE</th>
                   <th>TRANSACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {payments.map((p, i) => {
                   const link = txLink(p.txid, p.lightning_txid);
+                  const isLightning = Boolean(p.lightning_txid && !p.txid);
                   return (
                     <tr key={i} style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px', whiteSpace: 'nowrap' }}>
@@ -200,6 +202,9 @@ export const Earnings: React.FC = () => {
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{p.amount_btc.toFixed(8)}</td>
                       <td style={{ textAlign: 'right', color: '#f7931a' }}>
                         {p.fiat_value ? formatFiat(p.fiat_value) : '—'}
+                      </td>
+                      <td style={{ fontSize: '11px', whiteSpace: 'nowrap', color: isLightning ? '#ffd700' : 'var(--text-dim)' }}>
+                        {isLightning ? '⚡ LIGHTNING' : '⛓ ON-CHAIN'}
                       </td>
                       <td>
                         {link ? (
@@ -215,7 +220,6 @@ export const Earnings: React.FC = () => {
                             }}
                           >
                             {(p.txid || p.lightning_txid).slice(0, 8)}…{(p.txid || p.lightning_txid).slice(-6)}
-                            {p.lightning_txid && !p.txid && ' ⚡'}
                           </a>
                         ) : (
                           <span style={{ color: 'var(--text-dim)' }}>—</span>
