@@ -11,11 +11,12 @@ services:
     user: "999:999"
     restart: on-failure
     command: >
-      sh -c 'redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru'
+      sh -c 'redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+      --requirepass "${APP_SEED:-deepsea-umbrel}"'
     volumes:
       - ${APP_DATA_DIR}/redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"${APP_SEED:-deepsea-umbrel}\" ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -33,7 +34,7 @@ services:
     environment:
       - DB_PATH=/data/deepsea.db
       - CONFIG_PATH=/config/config.json
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${APP_SEED:-deepsea-umbrel}@redis:6379/0
     security_opt:
       - no-new-privileges:true
     healthcheck:

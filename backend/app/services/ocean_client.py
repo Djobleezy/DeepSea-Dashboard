@@ -388,9 +388,10 @@ class OceanClient:
         from ``days``.  The earnpay endpoint only reports on-chain payouts, so
         the stats page payout table — which also lists Lightning payouts — is
         scraped as well, and any entries the API did not return are merged in.
-        The scraper stops at the first page that yields nothing new, so miners
-        with on-chain-only history cost a single extra page fetch.  Results
-        are capped at ``MAX_PAYOUT_HISTORY`` entries.
+        Pagination walks the requested window and stops at the first page with
+        no unseen rows; when the API already returned data the scrape runs
+        under a 20 s budget so a slow stats page cannot stall the endpoint.
+        Results are capped at ``MAX_PAYOUT_HISTORY`` entries.
 
         Args:
             days: Number of historical days to include (default 360).
@@ -403,12 +404,24 @@ class OceanClient:
             and optionally ``rate`` / ``fiat_value``, sorted newest first.
         """
         api_payments = await self._get_payment_history_api(days=days, btc_price=btc_price)
-        scraped = await self._get_payment_history_scrape(
-            days=days,
-            btc_price=btc_price,
-            exclude_txids={p["txid"] for p in api_payments if p["txid"]},
-            exclude_keys={(p["date"], p["amount_sats"]) for p in api_payments},
-        )
+        exclude_txids = {p["txid"] for p in api_payments if p["txid"]}
+        exclude_keys = {(p["date"], p["amount_sats"]) for p in api_payments}
+        try:
+            if api_payments:
+                # Enrichment is best-effort once the API has data: don't let a
+                # slow stats page stall the earnings endpoint.
+                async with asyncio.timeout(20):
+                    scraped = await self._get_payment_history_scrape(
+                        days=days,
+                        btc_price=btc_price,
+                        exclude_txids=exclude_txids,
+                        exclude_keys=exclude_keys,
+                    )
+            else:
+                scraped = await self._get_payment_history_scrape(days=days, btc_price=btc_price)
+        except TimeoutError:
+            _log.warning("Payout scrape timed out; returning API payouts only")
+            scraped = []
         if not scraped:
             return api_payments
         merged = api_payments + scraped
@@ -488,8 +501,8 @@ class OceanClient:
             days: Number of historical days to include.
             btc_price: If provided, adds ``rate`` / ``fiat_value`` per payment.
             exclude_txids: On-chain txids already known (e.g. from the API);
-                matching rows are skipped and do not count as page progress,
-                so pagination stops once it reaches already-covered history.
+                matching rows are omitted from the result but still count as
+                pagination progress so older Lightning payouts are reached.
             exclude_keys: ``(date, amount_sats)`` pairs already known, used to
                 skip rows that carry no parseable txid link.
         """
@@ -520,7 +533,7 @@ class OceanClient:
                 break
 
             rows = table.find_all("tr", class_="table-row") or table.find_all("tr")
-            page_added = 0
+            page_progress = 0  # unseen rows, including API-known ones
             out_of_window = False
 
             for row in rows:
@@ -565,15 +578,19 @@ class OceanClient:
                 except ValueError as e:
                     _log.debug("Could not parse payout date %r: %s", date_text, e)
 
-                if exclude_txids and txid and txid in exclude_txids:
-                    continue
-                if exclude_keys and (date_str, sats) in exclude_keys:
-                    continue
-
                 key = (date_text, txid, lightning_txid, sats)
                 if key in seen:
                     continue
                 seen.add(key)
+                page_progress += 1
+
+                # Rows the API already returned are merged from there, but
+                # they still count as pagination progress so Lightning eras
+                # buried behind a page of on-chain payouts are reached.
+                if exclude_txids and txid and txid in exclude_txids:
+                    continue
+                if exclude_keys and (date_str, sats) in exclude_keys:
+                    continue
 
                 payment = {
                     "date": date_str,
@@ -588,13 +605,12 @@ class OceanClient:
                     payment["rate"] = btc_price
                     payment["fiat_value"] = amount_btc * btc_price
                 payments.append(payment)
-                page_added += 1
                 if len(payments) >= MAX_PAYOUT_HISTORY:
                     return payments
 
-            # Stop on the first page that yields nothing new (end of history or
-            # the server ignoring ppage) or once rows fall outside the window.
-            if out_of_window or page_added == 0:
+            # A page with no unseen rows means the end of history (or the
+            # server ignoring ppage); out-of-window rows mean the rest is older.
+            if out_of_window or page_progress == 0:
                 break
 
         return payments

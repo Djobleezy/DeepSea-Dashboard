@@ -203,9 +203,9 @@ async def test_payment_history_merges_lightning_payouts_with_api_results(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_payment_history_scrape_stops_when_api_already_covers_history(monkeypatch):
-    """On-chain-only miners pay for a single extra page fetch: every row on
-    page 0 is already known from the API, so pagination stops immediately."""
+async def test_payment_history_scrape_stops_when_pages_repeat(monkeypatch):
+    """API-known rows are deduped from the result, and pagination stops as
+    soon as a page yields no unseen rows (here: page 1 repeats page 0)."""
     import time
 
     client = OceanClient(wallet="test-wallet")
@@ -224,5 +224,45 @@ async def test_payment_history_scrape_stops_when_api_already_covers_history(monk
 
     assert len(payments) == 1
     assert payments[0]["txid"] == "deadbeef"
-    assert len(pages_fetched) == 1
-    assert "ppage=0" in pages_fetched[0]
+    assert len(pages_fetched) == 2  # page 1 has no unseen rows -> stop
+
+
+@pytest.mark.asyncio
+async def test_payment_history_finds_lightning_era_behind_onchain_page(monkeypatch):
+    """A miner who switched from Lightning to on-chain payouts: page 0 is
+    entirely API-known on-chain rows, but pagination must continue and pick
+    up the older Lightning payouts on page 1."""
+    import time
+    from datetime import datetime, timedelta, timezone
+
+    client = OceanClient(wallet="test-wallet")
+    seven_days_ago = int(time.time()) - 7 * 86400
+    old_ln_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d %H:%M")
+    page1_html = f"""
+<html><body>
+  <table><tbody id="payouts-tablerows">
+    <tr class="table-row">
+      <td class="table-cell">{old_ln_date}</td>
+      <td class="table-cell"><a href="/info/tx/lightning/ln-old456">⚡ ln-old456</a></td>
+      <td class="table-cell">0.00050000 BTC</td>
+    </tr>
+  </tbody></table>
+</body></html>
+"""
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            return _earnpay_response(seven_days_ago)
+        if "ppage=0" in url:
+            return SimpleNamespace(text=_payouts_html(include_lightning=False))
+        if "ppage=1" in url:
+            return SimpleNamespace(text=page1_html)
+        return SimpleNamespace(text=EMPTY_PAYOUTS_HTML)
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    payments = await client.get_payment_history(days=360)
+
+    assert len(payments) == 2
+    assert payments[0]["txid"] == "deadbeef"  # newer on-chain from API
+    assert payments[1]["lightning_txid"] == "ln-old456"
