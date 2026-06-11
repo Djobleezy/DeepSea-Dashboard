@@ -30,7 +30,7 @@ export const Earnings: React.FC = () => {
 
   const txLink = (txid: string, lightning_txid: string) => {
     if (txid) return `https://mempool.space/tx/${txid}`;
-    if (lightning_txid) return `https://mempool.space/tx/${lightning_txid}`;
+    if (lightning_txid) return `https://ocean.xyz/info/tx/lightning/${lightning_txid}`;
     return null;
   };
 

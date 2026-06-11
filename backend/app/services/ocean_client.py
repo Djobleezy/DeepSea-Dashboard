@@ -47,6 +47,7 @@ API_BASE = "https://api.ocean.xyz/v1"
 OCEAN_STATS_URL = "https://ocean.xyz/stats/{wallet}"
 SATS_PER_BTC = 100_000_000
 MAX_PAYOUT_HISTORY = 500
+MAX_PAYOUT_PAGES = 25
 
 _log = logging.getLogger(__name__)
 
@@ -384,7 +385,10 @@ class OceanClient:
         """Fetch confirmed payout history for the wallet.
 
         Calls ``/v1/earnpay/<wallet>/<start>/<end>`` with a date range derived
-        from ``days``.  Results are capped at ``MAX_PAYOUT_HISTORY`` entries.
+        from ``days``.  The earnpay endpoint only reports on-chain payouts, so
+        when it returns no entries the stats page payout table is scraped as a
+        fallback — that table also lists Lightning payouts.  Results are capped
+        at ``MAX_PAYOUT_HISTORY`` entries.
 
         Args:
             days: Number of historical days to include (default 360).
@@ -396,6 +400,16 @@ class OceanClient:
             ``lightning_txid``, ``amount_btc``, ``amount_sats``, ``status``,
             and optionally ``rate`` / ``fiat_value``.
         """
+        payments = await self._get_payment_history_api(days=days, btc_price=btc_price)
+        if payments:
+            return payments
+        _log.info("API payment history empty, trying scraper")
+        return await self._get_payment_history_scrape(days=days, btc_price=btc_price)
+
+    async def _get_payment_history_api(
+        self, days: int, btc_price: Optional[float] = None
+    ) -> list[dict]:
+        """Fetch payout history from ``/v1/earnpay/<wallet>/<start>/<end>``."""
         tz = get_timezone()
         end = datetime.now(ZoneInfo("UTC"))
         start = end - timedelta(days=days)
@@ -445,6 +459,118 @@ class OceanClient:
         except Exception as e:
             _log.error("Error parsing payment history: %s", e)
             return []
+
+    async def _get_payment_history_scrape(
+        self, days: int, btc_price: Optional[float] = None
+    ) -> list[dict]:
+        """Scrape payout history from the stats page payout table.
+
+        The earnpay API omits Lightning payouts, but the payouts table on
+        ``ocean.xyz/stats/<wallet>`` lists them with links of the form
+        ``/info/tx/lightning/<id>`` (on-chain rows link to a regular txid).
+        Pages are fetched via the ``?ppage=N`` query parameter, newest first,
+        until the requested ``days`` window is exhausted.
+        """
+        tz = get_timezone()
+        cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
+        base_url = OCEAN_STATS_URL.format(wallet=self.wallet)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; DeepSea/2.0)",
+            "Accept": "text/html",
+        }
+
+        payments: list[dict] = []
+        seen: set[tuple] = set()
+
+        for page in range(MAX_PAYOUT_PAGES):
+            url = f"{base_url}?ppage={page}#payouts-fulltable"
+            resp = await self._get(url, timeout=15, headers=headers)
+            if resp is None:
+                break
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            table = soup.find("tbody", id="payouts-tablerows") or soup.find(
+                "tbody", id="payout-tablerows"
+            )
+            if table is None:
+                if page == 0:
+                    _log.warning("Payout scrape table not found for wallet=%s", self.wallet)
+                break
+
+            rows = table.find_all("tr", class_="table-row") or table.find_all("tr")
+            page_added = 0
+            out_of_window = False
+
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) < 3:
+                    continue
+
+                date_text = cells[0].get_text(strip=True)
+                txid = cells[1].get_text(strip=True)
+                lightning_txid = ""
+                link = cells[1].find("a")
+                if link and link.get("href"):
+                    href = link["href"]
+                    tx_ref = href.rstrip("/").split("/")[-1]
+                    if "lightning" in href:
+                        lightning_txid = tx_ref
+                        txid = ""
+                    else:
+                        txid = tx_ref
+
+                amount_clean = (
+                    cells[-1].get_text(strip=True).replace("BTC", "").replace(",", "").strip()
+                )
+                try:
+                    amount_btc = float(amount_clean)
+                except ValueError:
+                    continue
+                sats = int(round(amount_btc * SATS_PER_BTC))
+
+                date_iso = None
+                date_str = date_text
+                try:
+                    dt = datetime.strptime(date_text, "%Y-%m-%d %H:%M").replace(
+                        tzinfo=ZoneInfo("UTC")
+                    )
+                    if dt < cutoff:
+                        out_of_window = True
+                        break
+                    local_dt = dt.astimezone(ZoneInfo(tz))
+                    date_iso = local_dt.isoformat()
+                    date_str = local_dt.strftime("%Y-%m-%d %H:%M")
+                except ValueError as e:
+                    _log.debug("Could not parse payout date %r: %s", date_text, e)
+
+                key = (date_text, txid, lightning_txid, sats)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                payment = {
+                    "date": date_str,
+                    "date_iso": date_iso,
+                    "txid": txid,
+                    "lightning_txid": lightning_txid,
+                    "amount_btc": amount_btc,
+                    "amount_sats": sats,
+                    "status": "confirmed",
+                }
+                if btc_price is not None:
+                    payment["rate"] = btc_price
+                    payment["fiat_value"] = amount_btc * btc_price
+                payments.append(payment)
+                page_added += 1
+                if len(payments) >= MAX_PAYOUT_HISTORY:
+                    return payments
+
+            # Stop on the first page that yields nothing new (end of history or
+            # the server ignoring ppage) or once rows fall outside the window.
+            if out_of_window or page_added == 0:
+                break
+
+        return payments
 
     async def get_worker_data(self) -> Optional[dict]:
         """Return enriched worker data, trying the API then the HTML scraper.
