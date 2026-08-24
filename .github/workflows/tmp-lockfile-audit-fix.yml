@@ -18,8 +18,10 @@ jobs:
           node-version: "22"
       - name: npm audit fix
         working-directory: frontend
+        # audit fix exits 1 while unfixable moderates remain; the gate below is
+        # the same one the security job enforces.
         run: |
-          npm audit fix
+          npm audit fix || true
           npm audit --audit-level=high
       - name: Verify frontend still builds and tests pass
         working-directory: frontend
