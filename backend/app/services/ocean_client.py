@@ -52,6 +52,19 @@ MAX_PAYOUT_PAGES = 25
 _log = logging.getLogger(__name__)
 
 
+def _safe_zoneinfo(name: str) -> ZoneInfo:
+    """Return the named timezone, falling back to UTC when it is invalid.
+
+    A bad ``timezone`` value in config.json must degrade payout dates to UTC
+    rather than turn the earnings endpoint into a 500.
+    """
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        _log.warning("Invalid timezone %r; falling back to UTC", name)
+        return ZoneInfo("UTC")
+
+
 def _elapsed_str(ts_seconds: float) -> str:
     """Convert a UTC unix timestamp to 'X mins ago' string."""
     delta = int(time.time() - ts_seconds)
@@ -432,7 +445,7 @@ class OceanClient:
         self, days: int, btc_price: Optional[float] = None
     ) -> list[dict]:
         """Fetch payout history from ``/v1/earnpay/<wallet>/<start>/<end>``."""
-        tz = get_timezone()
+        tzinfo = _safe_zoneinfo(get_timezone())
         end = datetime.now(ZoneInfo("UTC"))
         start = end - timedelta(days=days)
         url = f"{API_BASE}/earnpay/{self.wallet}/{start.strftime('%Y-%m-%d')}/{end.strftime('%Y-%m-%d')}"
@@ -456,7 +469,7 @@ class OceanClient:
                             dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC"))
                         else:
                             dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-                        local_dt = dt.astimezone(ZoneInfo(tz))
+                        local_dt = dt.astimezone(tzinfo)
                         date_iso = local_dt.isoformat()
                         date_str = local_dt.strftime("%Y-%m-%d %H:%M")
                     except (ValueError, TypeError, OSError) as e:
@@ -506,7 +519,7 @@ class OceanClient:
             exclude_keys: ``(date, amount_sats)`` pairs already known, used to
                 skip rows that carry no parseable txid link.
         """
-        tz = get_timezone()
+        tzinfo = _safe_zoneinfo(get_timezone())
         cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
         base_url = OCEAN_STATS_URL.format(wallet=self.wallet)
         headers = {
@@ -572,7 +585,7 @@ class OceanClient:
                     if dt < cutoff:
                         out_of_window = True
                         break
-                    local_dt = dt.astimezone(ZoneInfo(tz))
+                    local_dt = dt.astimezone(tzinfo)
                     date_iso = local_dt.isoformat()
                     date_str = local_dt.strftime("%Y-%m-%d %H:%M")
                 except ValueError as e:
