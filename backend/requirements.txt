@@ -11,6 +11,6 @@ sse-starlette>=2.1.0
 pytz>=2024.1
 pytest>=8.2.0
 pytest-asyncio>=0.23.0
-ruff>=0.4.0
+ruff==0.15.8  # pinned: ruff 0.16 changed default lint rules
 lxml>=5.2.0
 pygments==2.20.0
