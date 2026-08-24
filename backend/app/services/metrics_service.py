@@ -232,7 +232,7 @@ async def fetch_full_metrics(
     # the primary chart line from 60-sec to 3-hr data, notification
     # thresholds use the 3-hr window, and the "60 SEC" card is de-emphasised.
     #
-    # Threshold: < 1 TH/s on the *3-hour* window.  We use the 3-hr reading
+    # Threshold: < 3 TH/s on the *3-hour* window.  We use the 3-hr reading
     # because 60-sec is unreliable at low hashrates — that's the whole point
     # of the mode.
     hr_3hr = float(merged.get("hashrate_3hr") or 0)

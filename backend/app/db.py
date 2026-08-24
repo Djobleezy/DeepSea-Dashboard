@@ -52,20 +52,6 @@ async def init_db() -> None:
             )
         """)
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS payout_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT,
-                date_iso TEXT,
-                txid TEXT UNIQUE,
-                lightning_txid TEXT,
-                amount_btc REAL,
-                amount_sats INTEGER,
-                fiat_value REAL,
-                rate REAL,
-                status TEXT DEFAULT 'confirmed'
-            )
-        """)
-        await db.execute("""
             CREATE TABLE IF NOT EXISTS block_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 height INTEGER UNIQUE,

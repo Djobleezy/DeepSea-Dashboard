@@ -106,11 +106,11 @@ cp config.json.example config.json
 docker compose up -d
 
 # 4. Open the dashboard
-open http://localhost:5000
+open http://localhost:5050
 ```
 
 The Docker setup starts:
-- `app` — FastAPI backend serving the frontend static files on port 5000
+- `app` — FastAPI backend serving the frontend static files on port 5050 (host) → 8000 (container)
 - `redis` — Redis 7 for caching and pub/sub
 
 ### Stop / Restart
@@ -204,9 +204,9 @@ ruff check .
 
 ## API Reference
 
-Base URL: `http://localhost:5000/api`
+Base URL: `http://localhost:5050/api`
 
-Interactive docs: [`/docs`](http://localhost:5000/docs) (Swagger UI) · [`/redoc`](http://localhost:5000/redoc)
+Interactive docs: [`/docs`](http://localhost:5050/docs) (Swagger UI) · [`/redoc`](http://localhost:5050/redoc)
 
 ### Metrics
 
@@ -385,7 +385,7 @@ docker compose logs redis   # check Redis
 
 Common issues:
 - `config.json` missing — copy from `config.json.example`
-- Port 5000 already in use — change `ports` in `docker-compose.yml`
+- Port 5050 already in use — change `ports` in `docker-compose.yml`
 
 ### Tests failing
 

@@ -53,7 +53,7 @@ jobs:
         run: npx tsc --noEmit
       - name: Test frontend
         working-directory: frontend
-        run: npm test -- --passWithNoTests
+        run: npm test
       - name: Build frontend
         working-directory: frontend
         run: npm run build
@@ -101,6 +101,10 @@ jobs:
       - name: Verify container starts
         run: |
           docker run -d --name test-app -p 8000:8000 deepsea-dashboard:test
-          sleep 10
-          curl -f http://localhost:8000/api/health || (docker logs test-app && exit 1)
+          healthy=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/health > /dev/null; then healthy=1; break; fi
+            sleep 2
+          done
+          if [ "$healthy" != "1" ]; then docker logs test-app; exit 1; fi
           docker stop test-app
