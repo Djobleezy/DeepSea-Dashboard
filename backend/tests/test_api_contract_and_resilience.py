@@ -89,8 +89,9 @@ async def test_ocean_scraper_fallback_selector_parses_rows(monkeypatch):
 def _payouts_html(include_lightning: bool = True) -> str:
     from datetime import datetime, timedelta, timezone
 
-    recent = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
-    older = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
+    now = datetime.now(timezone.utc)
+    recent = (now - timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
+    older = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
     lightning_row = f"""
     <tr class="table-row">
       <td class="table-cell">{recent}</td>
@@ -266,3 +267,27 @@ async def test_payment_history_finds_lightning_era_behind_onchain_page(monkeypat
     assert len(payments) == 2
     assert payments[0]["txid"] == "deadbeef"  # newer on-chain from API
     assert payments[1]["lightning_txid"] == "ln-old456"
+
+
+@pytest.mark.asyncio
+async def test_payment_history_survives_invalid_configured_timezone(monkeypatch):
+    """A bad timezone in config.json must degrade dates to UTC, not 500."""
+    from app.services import ocean_client as oc
+
+    monkeypatch.setattr(oc, "get_timezone", lambda: "Not/AZone")
+    client = OceanClient(wallet="test-wallet")
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            return SimpleNamespace(json=lambda: {"result": {"payouts": []}})
+        if "ppage=0" in url:
+            return SimpleNamespace(text=_payouts_html())
+        return SimpleNamespace(text=EMPTY_PAYOUTS_HTML)
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    payments = await client.get_payment_history(days=360)
+
+    assert len(payments) == 2
+    assert payments[0]["lightning_txid"] == "ln-abc123"
+    assert payments[0]["date_iso"] is not None
