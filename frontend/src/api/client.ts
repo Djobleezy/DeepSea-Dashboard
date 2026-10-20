@@ -166,6 +166,9 @@ export const fetchNotifications = (
 ) =>
   get<Notification[]>('/notifications', { category, unread_only: unreadOnly, limit });
 
+export const fetchUnreadCount = () =>
+  get<{ unread_count: number }>('/notifications/unread-count');
+
 export const markNotificationRead = (id: string) =>
   patch<{ ok: boolean }>(`/notifications/${id}/read`);
 
