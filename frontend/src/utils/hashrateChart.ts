@@ -68,7 +68,9 @@ export function chartUnit(peak: number) {
 }
 
 export function chartValue(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: value < 10 ? 2 : 1 }).format(value);
+  return new Intl.NumberFormat(undefined, value > 0 && value < 0.01
+    ? { maximumSignificantDigits: 3 }
+    : { maximumFractionDigits: value < 10 ? 2 : 1 }).format(value);
 }
 
 export function fullChartTime(timestamp: number): string {

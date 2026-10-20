@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartSamples, chartSeries, chartUnit, reduceChartSamples } from '../utils/hashrateChart';
+import { chartSamples, chartSeries, chartUnit, chartValue, reduceChartSamples } from '../utils/hashrateChart';
 
 const base = Date.UTC(2026, 9, 20);
 const point = (offset: number, value = 1, gapBefore?: boolean) => ({ ts: base + offset, value, gapBefore });
@@ -41,6 +41,11 @@ describe('Hashrate chart time geometry', () => {
     expect(Math.max(...reduced.map((r) => r.average!))).toBe(1500);
     expect(Math.min(...reduced.map((r) => r.average!))).toBe(0);
     expect(chartSeries(reduced, 'short', 1).some((p) => p.y === null)).toBe(true);
+  });
+
+  it('does not round a small positive reading to zero beside a much larger peak', () => {
+    expect(Number(chartValue(0.0001))).toBeGreaterThan(0);
+    expect(chartValue(0)).toBe('0');
   });
 
   it.each([[0, 'TH/s'], [0.0001, 'MH/s'], [0.1, 'GH/s'], [100, 'TH/s'], [1000, 'PH/s'], [1e6, 'EH/s']])('selects a readable scale for %s TH/s', (value, unit) => {
