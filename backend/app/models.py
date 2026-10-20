@@ -294,7 +294,7 @@ class HealthStatus(BaseModel):
     """
 
     status: str = "ok"
-    version: str = "2.0.4"
+    version: str = "2.1.0"
     wallet_configured: bool = False
     redis_connected: bool = False
     last_refresh: Optional[float] = None

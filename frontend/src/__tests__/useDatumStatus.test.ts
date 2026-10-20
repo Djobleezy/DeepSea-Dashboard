@@ -7,7 +7,7 @@ import type { DatumStatus, HealthStatus } from '../types';
 vi.mock('../api/client', () => ({ fetchHealth: vi.fn(), fetchDatumStatus: vi.fn() }));
 
 const health: HealthStatus = {
-  status: 'ok', version: '2.0.4', wallet_configured: true,
+  status: 'ok', version: '2.1.0', wallet_configured: true,
   redis_connected: false, uptime_seconds: 10, datum_gateway_configured: true,
 };
 const datum: DatumStatus = {

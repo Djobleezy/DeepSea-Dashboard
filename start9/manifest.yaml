@@ -1,15 +1,15 @@
 id: deepsea-dashboard
 title: "DeepSea Dashboard"
-version: "2.0.4"
+version: "2.1.0"
 release-notes: |
-  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.0.4
-  - React 18 + FastAPI rewrite
-  - Interactive charts with block annotations
-  - Per-worker management with ASIC model detection
-  - Bitcoin block explorer with pool attribution
-  - Notification engine (block found, hashrate, worker, payout)
-  - Three themes: DeepSea, Bitcoin, Matrix
-  - PWA support with offline caching
+  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.1.0
+  - Clearer dashboard, accessible controls, and improved mobile layouts
+  - Accurate daily profit, shared electricity rates, and reliable worker saves
+  - Wallet-scoped history and explicit fresh, stale, and unavailable data
+  - Combined Lightning and on-chain payouts, plus direct DATUM reachability checks
+  - Reliable audio playback and safer offline caching
+  - Persistent private configuration and corrected first-start packaging
+  - Updated dependencies and expanded regression coverage
 license: MIT
 wrapper-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
 upstream-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
