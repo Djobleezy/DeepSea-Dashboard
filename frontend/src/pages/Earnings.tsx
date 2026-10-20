@@ -82,11 +82,16 @@ export const Earnings: React.FC = () => {
           Loading {days}-day history. Showing the last completed {displayedDays}-day result.
         </div>
       )}
+      {data?.data_status === 'partial' && (
+        <div role="status" className="status-panel" style={{ color: 'var(--color-warning)' }}>
+          {data.data_error || 'Some payouts may be missing. Refresh to try loading the complete history.'}
+        </div>
+      )}
       {/* Retain the old range label until the replacement dataset arrives. */}
       {data && (
         <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
           <div className="card">
-            <div className="label">TOTAL EARNED</div>
+            <div className="label">{data.data_status === 'partial' ? 'TOTAL LOADED' : 'TOTAL EARNED'}</div>
             <div className="value glow" style={{ color: 'var(--color-success)' }}>
               {totalSats.toLocaleString()}
             </div>
@@ -99,7 +104,7 @@ export const Earnings: React.FC = () => {
             </div>
           </div>
           <div className="card">
-            <div className="label">PAYMENTS ({displayedDays}D)</div>
+            <div className="label">{data.data_status === 'partial' ? 'PAYMENTS LOADED' : 'PAYMENTS'} ({displayedDays}D)</div>
             <div className="value glow" style={{ color: 'var(--primary)' }}>{payments.length}</div>
           </div>
           <div className="card">
@@ -188,7 +193,7 @@ export const Earnings: React.FC = () => {
         ) : payments.length === 0 ? (
           <div className="text-center" style={{ padding: '40px', color: 'var(--text-dim)' }}>
             <span style={{ fontFamily: 'var(--font-vt323)', fontSize: '18px' }}>
-              NO PAYMENTS IN {displayedDays}-DAY WINDOW
+              {data?.data_status === 'partial' ? 'NO PAYMENTS LOADED — HISTORY IS INCOMPLETE' : `NO PAYMENTS IN ${displayedDays}-DAY WINDOW`}
             </span>
           </div>
         ) : (

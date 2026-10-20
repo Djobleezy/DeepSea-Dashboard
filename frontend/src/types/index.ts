@@ -124,6 +124,8 @@ export interface MonthlySummary {
 }
 
 export interface EarningsResponse {
+  data_status?: 'fresh' | 'partial' | 'unconfigured';
+  data_error?: string | null;
   payments: Payment[];
   total_btc: number;
   total_sats: number;

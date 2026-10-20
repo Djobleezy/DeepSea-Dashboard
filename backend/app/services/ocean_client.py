@@ -60,6 +60,21 @@ WORKER_SCRAPE_BUDGET_SECONDS = 12
 _log = logging.getLogger(__name__)
 
 
+class PaymentHistory(list[dict]):
+    """Payout rows with availability separate from a successful empty history."""
+
+    def __init__(self, payments=(), *, available: bool = True, complete: bool = True):
+        super().__init__(payments)
+        self.available = available
+        self.complete = complete
+
+    @property
+    def data_status(self) -> str:
+        if not self.available:
+            return "unavailable"
+        return "fresh" if self.complete else "partial"
+
+
 def _first_present(data: dict, *keys: str) -> Any:
     """Select a reported interval without replacing an explicit zero."""
     return next((data[key] for key in keys if data.get(key) is not None), None)
@@ -438,7 +453,7 @@ class OceanClient:
 
     async def get_payment_history(
         self, days: int = 360, btc_price: Optional[float] = None
-    ) -> list[dict]:
+    ) -> PaymentHistory:
         """Fetch confirmed payout history for the wallet.
 
         Calls ``/v1/earnpay/<wallet>/<start>/<end>`` with a date range derived
@@ -461,17 +476,26 @@ class OceanClient:
             ``lightning_txid``, ``amount_btc``, ``amount_sats``, ``status``,
             and optionally ``rate`` / ``fiat_value``, sorted newest first.
         """
-        async def fetch_api() -> list[dict]:
+        # The API accepts calendar dates, but both sources must observe the
+        # same rolling window, captured once before either request starts.
+        end = datetime.now(ZoneInfo("UTC"))
+        cutoff = end - timedelta(days=days)
+
+        async def fetch_api() -> PaymentHistory:
             try:
                 async with asyncio.timeout(PAYOUT_API_BUDGET_SECONDS):
-                    return await self._get_payment_history_api(days=days, btc_price=btc_price)
+                    return await self._get_payment_history_api(
+                        days=days, btc_price=btc_price, cutoff=cutoff, end=end
+                    )
             except TimeoutError:
                 _log.warning("Payout API timed out; returning available scraped payouts")
-                return []
+                return PaymentHistory(available=False, complete=False)
 
         api_payments, scraped = await asyncio.gather(
             fetch_api(),
-            self._get_payment_history_scrape(days=days, btc_price=btc_price),
+            self._get_payment_history_scrape(
+                days=days, btc_price=btc_price, cutoff=cutoff, end=end
+            ),
         )
         # Prefer API records (which include seconds in their timestamps) when
         # the same transaction also appears in the scraped minute-level data.
@@ -494,47 +518,67 @@ class OceanClient:
                 return float("-inf")
 
         merged.sort(key=timestamp, reverse=True)
-        return merged[:MAX_PAYOUT_HISTORY]
+        return PaymentHistory(
+            merged[:MAX_PAYOUT_HISTORY],
+            available=any(getattr(source, "available", True) for source in (api_payments, scraped)),
+            complete=len(merged) <= MAX_PAYOUT_HISTORY and all(
+                getattr(source, "available", True) and getattr(source, "complete", True)
+                for source in (api_payments, scraped)
+            ),
+        )
 
     async def _get_payment_history_api(
-        self, days: int, btc_price: Optional[float] = None
-    ) -> list[dict]:
+        self, days: int, btc_price: Optional[float] = None, *,
+        cutoff: Optional[datetime] = None, end: Optional[datetime] = None,
+    ) -> PaymentHistory:
         """Fetch payout history from ``/v1/earnpay/<wallet>/<start>/<end>``."""
         tzinfo = _safe_zoneinfo(get_timezone())
-        end = datetime.now(ZoneInfo("UTC"))
-        start = end - timedelta(days=days)
-        url = f"{API_BASE}/earnpay/{self.wallet}/{start.strftime('%Y-%m-%d')}/{end.strftime('%Y-%m-%d')}"
+        end = end or datetime.now(ZoneInfo("UTC"))
+        cutoff = cutoff or end - timedelta(days=days)
+        # Ocean resolves calendar dates in its own timezone, and its end date
+        # is midnight. Pad both ends so no UTC-window payouts are omitted,
+        # then apply the exact bounds below rather than relying on its clock.
+        request_start = cutoff - timedelta(days=1)
+        request_end = end + timedelta(days=1)
+        url = f"{API_BASE}/earnpay/{self.wallet}/{request_start.strftime('%Y-%m-%d')}/{request_end.strftime('%Y-%m-%d')}"
 
         resp = await self._get(url, timeout=15)
         if resp is None:
-            return []
+            return PaymentHistory(available=False, complete=False)
         try:
-            data = resp.json().get("result", {})
-            payouts = data.get("payouts", [])
-            payments = []
+            payload = resp.json()
+            data = payload.get("result") if isinstance(payload, dict) else None
+            payouts = data.get("payouts") if isinstance(data, dict) else None
+            if not isinstance(payouts, list):
+                return PaymentHistory(available=False, complete=False)
+            payments = PaymentHistory(available=not payouts)
             for item in payouts:
-                ts = item.get("ts")
-                sats = int(item.get("total_satoshis_net_paid", 0) or 0)
+                try:
+                    if not isinstance(item, dict):
+                        raise ValueError("Payout is not an object")
+                    ts = item.get("ts")
+                    sats = int(item["total_satoshis_net_paid"])
+                    if sats < 0:
+                        raise ValueError("Payout amount is negative")
+                    if isinstance(ts, (int, float)):
+                        dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC"))
+                    else:
+                        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                except (KeyError, ValueError, TypeError, OSError, OverflowError) as e:
+                    _log.debug("Could not parse payout record %r: %s", item, e)
+                    payments.complete = False
+                    continue
+                payments.available = True
+                if not cutoff <= dt <= end:
+                    continue
+                local_dt = dt.astimezone(tzinfo)
                 amount_btc = sats / SATS_PER_BTC
-                date_str = ""
-                date_iso = None
-                if ts is not None:
-                    try:
-                        if isinstance(ts, (int, float)):
-                            dt = datetime.fromtimestamp(ts, tz=ZoneInfo("UTC"))
-                        else:
-                            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-                            if dt.tzinfo is None:
-                                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-                        local_dt = dt.astimezone(tzinfo)
-                        date_iso = local_dt.isoformat()
-                        date_str = local_dt.strftime("%Y-%m-%d %H:%M")
-                    except (ValueError, TypeError, OSError) as e:
-                        _log.debug("Could not parse payout timestamp %r: %s", ts, e)
 
                 payment = {
-                    "date": date_str,
-                    "date_iso": date_iso,
+                    "date": local_dt.strftime("%Y-%m-%d %H:%M"),
+                    "date_iso": local_dt.isoformat(),
                     "txid": item.get("on_chain_txid") or "",
                     "lightning_txid": item.get("lightning_txid") or "",
                     "amount_btc": amount_btc,
@@ -546,17 +590,19 @@ class OceanClient:
                     payment["fiat_value"] = amount_btc * btc_price
                 payments.append(payment)
                 if len(payments) >= MAX_PAYOUT_HISTORY:
+                    payments.complete = False
                     break
             return payments
         except Exception as e:
             _log.error("Error parsing payment history: %s", e)
-            return []
+            return PaymentHistory(available=False, complete=False)
 
     async def _get_payment_history_scrape(
         self,
         days: int,
         btc_price: Optional[float] = None,
-    ) -> list[dict]:
+        *, cutoff: Optional[datetime] = None, end: Optional[datetime] = None,
+    ) -> PaymentHistory:
         """Scrape payout history from the stats page payout table.
 
         The earnpay API omits Lightning payouts, but the payouts table on
@@ -571,14 +617,16 @@ class OceanClient:
             btc_price: If provided, adds ``rate`` / ``fiat_value`` per payment.
         """
         tzinfo = _safe_zoneinfo(get_timezone())
-        cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
+        end = end or datetime.now(ZoneInfo("UTC"))
+        cutoff = cutoff or end - timedelta(days=days)
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; DeepSea/2.0)",
             "Accept": "text/html",
         }
 
-        payments: list[dict] = []
+        payments = PaymentHistory(available=False, complete=False)
         seen: set[tuple] = set()
+        malformed_rows = False
         deadline = time.monotonic() + PAYOUT_SCRAPE_BUDGET_SECONDS
 
         for page in range(MAX_PAYOUT_PAGES):
@@ -597,7 +645,10 @@ class OceanClient:
             if resp is None:
                 break
 
-            soup = BeautifulSoup(resp.text, "html.parser")
+            html = resp.text
+            if not isinstance(html, str):
+                break
+            soup = BeautifulSoup(html, "html.parser")
             table = soup.find("tbody", id="payouts-tablerows") or soup.find(
                 "tbody", id="payout-tablerows"
             )
@@ -608,6 +659,11 @@ class OceanClient:
             if not rows:
                 if page == 0:
                     _log.debug("Payout scrape returned no rows for wallet=%s", self.wallet)
+                # Empty table/fragments mean no payouts. An unrelated error
+                # page or changed markup must not erase earnings silently.
+                if table is not None or not html.strip():
+                    payments.available = True
+                    payments.complete = not malformed_rows
                 break
             page_progress = 0
             out_of_window = False
@@ -615,6 +671,7 @@ class OceanClient:
             for row in rows:
                 cells = row.find_all("td")
                 if len(cells) < 3:
+                    malformed_rows = True
                     continue
 
                 date_text = cells[0].get_text(strip=True)
@@ -636,10 +693,16 @@ class OceanClient:
                 try:
                     amount_btc = float(amount_clean)
                 except ValueError:
+                    malformed_rows = True
                     continue
                 if not math.isfinite(amount_btc) or amount_btc < 0:
+                    malformed_rows = True
                     continue
-                sats = int(round(amount_btc * SATS_PER_BTC))
+                amount_sats = amount_btc * SATS_PER_BTC
+                if not math.isfinite(amount_sats):
+                    malformed_rows = True
+                    continue
+                sats = int(round(amount_sats))
 
                 date_iso = None
                 date_str = date_text
@@ -647,14 +710,18 @@ class OceanClient:
                     dt = datetime.strptime(date_text, "%Y-%m-%d %H:%M").replace(
                         tzinfo=ZoneInfo("UTC")
                     )
+                    payments.available = True
                     if dt < cutoff:
                         out_of_window = True
                         break
+                    if dt > end:
+                        continue
                     local_dt = dt.astimezone(tzinfo)
                     date_iso = local_dt.isoformat()
                     date_str = local_dt.strftime("%Y-%m-%d %H:%M")
                 except ValueError as e:
                     _log.debug("Could not parse payout date %r: %s", date_text, e)
+                    malformed_rows = True
                     continue  # Unknown dates cannot be checked against the requested window.
 
                 key = (date_text, txid, lightning_txid, sats)
@@ -677,11 +744,15 @@ class OceanClient:
                     payment["fiat_value"] = amount_btc * btc_price
                 payments.append(payment)
                 if len(payments) >= MAX_PAYOUT_HISTORY:
+                    payments.complete = False
                     return payments
 
             # A page with no unseen rows means the end of history (or the
             # server ignoring page); out-of-window rows mean the rest is older.
             if out_of_window or page_progress == 0:
+                # A repeated page is not proof that the requested history is
+                # exhausted; retain its rows while reporting a partial result.
+                payments.complete = out_of_window and not malformed_rows
                 break
 
         return payments

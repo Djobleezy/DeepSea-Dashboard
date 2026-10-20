@@ -1,10 +1,10 @@
 /**
- * DeepSea Dashboard — Service Worker v2.1.1
+ * DeepSea Dashboard — Service Worker v2.2.0
  * Wallet-scoped snapshot caching with explicit stale data, cache-first static
  * assets, bounded eviction, and an offline navigation fallback.
  */
 
-const CACHE_VERSION = 'deepsea-v2.1.1-freshness-1';
+const CACHE_VERSION = 'deepsea-v2.2.0-freshness-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -21,13 +21,16 @@ const SCOPED_API_PATHS = new Set(['/api/metrics', '/api/workers']);
 const PUBLIC_API_PATHS = new Set(['/api/exchange-rates', '/api/pool-blocks']);
 let apiCacheGeneration = 0;
 
-// SPA shell routes to precache on install
+// SPA shell and brand fonts to precache on install. Fonts may have loaded
+// before this worker took control, so include them explicitly for offline use.
 const SHELL_URLS = [
   '/',
   '/workers',
   '/blocks',
   '/earnings',
   '/notifications',
+  '/fonts/share-tech-mono.ttf',
+  '/fonts/vt323.ttf',
 ];
 
 // Offline fallback HTML

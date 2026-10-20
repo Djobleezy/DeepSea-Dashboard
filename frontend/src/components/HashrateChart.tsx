@@ -46,6 +46,7 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
   const [showShort, setShowShort] = useState(true);
   const [showAverage, setShowAverage] = useState(true);
   const [showReference, setShowReference] = useState(true);
+  const [fontsReady, setFontsReady] = useState(() => !document.fonts || document.fonts.check('12px "Share Tech Mono"'));
   const windowStart = now - hours * 3_600_000;
   const samples = useMemo(() => chartSamples(data60s, data3hr, windowStart, now), [data60s, data3hr, windowStart, now]);
   const rendered = useMemo(() => reduceChartSamples(samples), [samples]);
@@ -59,6 +60,20 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
   const latest = samples[samples.length - 1];
 
   useEffect(() => {
+    if (!document.fonts) return;
+    let active = true;
+    const loaded = () => {
+      if (active && document.fonts.check('12px "Share Tech Mono"')) setFontsReady(true);
+    };
+    void document.fonts.ready.then(loaded);
+    document.fonts.addEventListener('loadingdone', loaded);
+    return () => {
+      active = false;
+      document.fonts.removeEventListener('loadingdone', loaded);
+    };
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -67,6 +82,9 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
     const text = style.getPropertyValue('--text').trim() || '#a0d4f5';
     const muted = style.getPropertyValue('--text-dim').trim() || '#93adbf';
     const background = style.getPropertyValue('--bg-card').trim() || '#0d1a24';
+    // Canvas cannot resolve CSS variables. Changing the family once loaded also
+    // invalidates Chart.js's cached fallback-font text measurements.
+    const fontFamily = fontsReady ? style.getPropertyValue('--font-mono').trim() || 'monospace' : 'monospace';
     const secondary = '#b8a4ff';
     const spansDates = new Date(start).toDateString() !== new Date(now).toDateString();
     const timeTicks = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -96,6 +114,10 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
     ];
     const options: ChartConfiguration<'line', { x: number; y: number | null }[]>['options'] = {
       responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
+      onResize: (chart, size) => {
+        const ticks = chart.options.scales?.x?.ticks;
+        if (ticks) ticks.maxTicksLimit = size.width < 500 ? 4 : 7;
+      },
       interaction: { mode: 'index', intersect: false, axis: 'x' },
       elements: { line: { tension: 0, spanGaps: false }, point: { hitRadius: 12 } },
       layout: { padding: { top: 10, right: 8 } },
@@ -103,7 +125,7 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
         tooltip: {
           backgroundColor: background, borderColor: primary, borderWidth: 1, padding: 12,
           titleColor: text, bodyColor: text, displayColors: true,
-          titleFont: { family: 'Share Tech Mono', size: 11 }, bodyFont: { family: 'Share Tech Mono', size: 12 },
+          titleFont: { family: fontFamily, size: 11 }, bodyFont: { family: fontFamily, size: 12 },
           callbacks: {
             title: (items) => items.length ? fullChartTime(items[0].parsed.x ?? 0) : '',
             label: (item) => ` ${item.dataset.label}: ${chartValue(item.parsed.y ?? 0)} ${unit}`,
@@ -116,16 +138,16 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
           type: 'linear', min: start, max: now,
           border: { display: false }, grid: { display: false },
           ticks: {
-            maxTicksLimit: canvas.clientWidth < 500 ? 4 : 7, maxRotation: 0, color: muted,
-            font: { family: 'Share Tech Mono', size: 11 },
+            maxTicksLimit: (canvas.parentElement?.clientWidth || canvas.clientWidth) < 500 ? 4 : 7, maxRotation: 0, color: muted,
+            font: { family: fontFamily, size: 11 },
             callback: (value) => spansDates ? [dateTicks.format(Number(value)), timeTicks.format(Number(value))] : timeTicks.format(Number(value)),
           },
         },
         y: {
           type: 'linear', beginAtZero: true, min: 0, max: peak > 0 ? peak / divisor * 1.12 : 1,
           border: { display: false }, grid: { color: `${muted}16`, drawTicks: false },
-          ticks: { maxTicksLimit: 5, includeBounds: false, padding: 10, color: muted, font: { family: 'Share Tech Mono', size: 11 }, callback: (value) => chartValue(Number(value)) },
-          title: { display: true, text: unit, color: muted, font: { family: 'Share Tech Mono', size: 11 } },
+          ticks: { maxTicksLimit: 5, includeBounds: false, padding: 10, color: muted, font: { family: fontFamily, size: 11 }, callback: (value) => chartValue(Number(value)) },
+          title: { display: true, text: unit, color: muted, font: { family: fontFamily, size: 11 } },
         },
       },
     };
@@ -136,7 +158,7 @@ export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = []
     } else {
       chartRef.current = new Chart(ctx, { type: 'line', data: { datasets }, options, plugins: [crosshair] });
     }
-  }, [rendered, samples.length, theme, divisor, unit, peak, lowHashrateMode, showShort, showAverage, showReference, validReference, avg24hr, blockAnnotations, start, now]);
+  }, [rendered, samples.length, theme, fontsReady, divisor, unit, peak, lowHashrateMode, showShort, showAverage, showReference, validReference, avg24hr, blockAnnotations, start, now]);
 
   useEffect(() => () => {
     chartRef.current?.destroy();

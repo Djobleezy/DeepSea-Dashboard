@@ -1,31 +1,139 @@
-# Build GHCR container image + generate packaging reference assets on tagged releases.
-# Kevin owns the image. Packaging assets are reference material, not canonical.
+# Prepare digest-pinned packages in a draft, then promote the same image on publish.
 name: Release Packaging
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to prepare (for example v2.2.0)
+        required: true
+        type: string
+      target_sha:
+        description: Full 40-character commit SHA that the release tag must resolve to
+        required: true
+        type: string
   release:
     types: [published]
 
 permissions:
   contents: write
-  packages: write          # push to GHCR
+  packages: write
+
+# Publication waits for any preparation of the same release to finish.
+concurrency:
+  group: release-packages-${{ inputs.release_tag || github.event.release.tag_name }}
+  cancel-in-progress: false
 
 env:
-  DEEPSEA_VERSION: ${{ github.event.release.tag_name }}
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/deepsea-dashboard
+  RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+  EXPECTED_SHA: ${{ inputs.target_sha }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # ── Docker Image (GHCR) ─────────────────────────────────
-  docker:
-    name: Build & Push Container Image
+  package:
+    name: Prepare or Promote Release Packages
     runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_sha || github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Validate the release and exact source commit
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo 'A stable vMAJOR.MINOR.PATCH release tag is required.' >&2; exit 1;
+          }
+          SOURCE_SHA=$(git rev-parse HEAD)
+          TAG_SHA=$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")
+          [[ "$SOURCE_SHA" == "$TAG_SHA" ]] || {
+            echo 'The checked-out commit does not match the release tag.' >&2; exit 1;
+          }
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            [[ "$EXPECTED_SHA" =~ ^[0-9a-fA-F]{40}$ && "${EXPECTED_SHA,,}" == "$SOURCE_SHA" ]] || {
+              echo 'target_sha must be the full commit SHA resolved by the release tag.' >&2; exit 1;
+            }
+          fi
+          if ! gh release view "$RELEASE_TAG" --json tagName,isDraft > "$RUNNER_TEMP/release.json"; then
+            [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]] || exit 1
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" \
+              --notes 'Release packages are being prepared and verified.'
+            gh release view "$RELEASE_TAG" --json tagName,isDraft > "$RUNNER_TEMP/release.json"
+          fi
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          release = json.loads((Path(os.environ['RUNNER_TEMP']) / 'release.json').read_text())
+          assert release['tagName'] == os.environ['RELEASE_TAG'], 'Wrong release target'
+          expected_draft = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          assert release['isDraft'] == expected_draft, 'Manual preparation requires a draft release'
+          PY
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/deepsea-dashboard"
+          CANDIDATE="candidate-${RELEASE_TAG}-${SOURCE_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "sha=$SOURCE_SHA"
+            echo "version=${RELEASE_TAG#v}"
+            echo "image=$IMAGE"
+            echo "candidate=$CANDIDATE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify any previously prepared packages
+        id: prepared
+        env:
+          SOURCE_SHA: ${{ steps.release.outputs.sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+          IMAGE: ${{ steps.release.outputs.image }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/asset-names.txt"
+          if ! grep -Fxq packaging-info.txt "$RUNNER_TEMP/asset-names.txt"; then
+            if [[ "$GITHUB_EVENT_NAME" == release && -s "$RUNNER_TEMP/asset-names.txt" ]]; then
+              echo 'Published release has incomplete packages; refusing to replace them.' >&2
+              exit 1
+            fi
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/prepared"
+          for asset in "deepsea-umbrel-${VERSION}.tar.gz" "deepsea-start9-${VERSION}.tar.gz" \
+            docker-compose.yml umbrel-app.yml packaging-info.txt; do
+            gh release download "$RELEASE_TAG" --pattern "$asset" --dir "$RUNNER_TEMP/prepared"
+          done
+          python3 - <<'PY'
+          import hashlib, os, re
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'prepared'
+          info = (root / 'packaging-info.txt').read_text()
+          def field(name):
+              matches = re.findall(rf'^{re.escape(name)}: (.+)$', info, re.M)
+              assert len(matches) == 1, f'Missing or duplicate {name}'
+              return matches[0]
+          assert info.splitlines()[0] == f"DeepSea Dashboard {os.environ['RELEASE_TAG']}"
+          assert field('Source commit') == os.environ['SOURCE_SHA'], 'Prepared packages use a different commit'
+          assert field('Release') == f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/tag/{os.environ['RELEASE_TAG']}"
+          digest = field('Digest')
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest), 'Invalid prepared image digest'
+          image_ref = field('Image')
+          prefix = os.environ['IMAGE'] + ':'
+          assert image_ref.startswith(prefix), 'Prepared image belongs to another repository'
+          candidate = image_ref[len(prefix):]
+          assert re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}', candidate), 'Invalid image tag'
+          version = os.environ['VERSION']
+          for name in (f'deepsea-umbrel-{version}.tar.gz', f'deepsea-start9-{version}.tar.gz',
+                       'docker-compose.yml', 'umbrel-app.yml'):
+              matches = re.findall(rf'^([0-9a-f]{{64}})  {re.escape(name)}$', info, re.M)
+              assert len(matches) == 1, f'Missing or duplicate checksum for {name}'
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == matches[0], f'Changed package: {name}'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'exists=true\ndigest={digest}\ncandidate={candidate}\n')
+          PY
 
       - name: Set up QEMU
+        if: steps.prepared.outputs.exists != 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -34,138 +142,195 @@ jobs:
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern=v{{version}}
-            type=raw,value=latest
-
-      - name: Build and push
+      # Unique candidate tags keep draft preparation away from stable aliases.
+      - name: Build and push candidate
+        if: steps.prepared.outputs.exists != 'true'
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.candidate }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
 
-  # ── Umbrel Package ──────────────────────────────────────
-  umbrel:
-    name: Umbrel Package
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Umbrel package
+      - name: Select and verify the immutable image
+        id: image
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          SOURCE_SHA: ${{ steps.release.outputs.sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+          DIGEST: ${{ steps.prepared.outputs.digest || steps.build.outputs.digest }}
+          CANDIDATE: ${{ steps.prepared.outputs.candidate || steps.release.outputs.candidate }}
+        shell: bash
         run: |
-          mkdir -p dist/umbrel
-          VERSION="${DEEPSEA_VERSION#v}"
-          DIGEST="${{ needs.docker.outputs.digest }}"
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+          docker buildx imagetools inspect --format '{{json .Manifest}}' "$IMAGE@$DIGEST" > "$RUNNER_TEMP/image-manifest.json"
+          docker buildx imagetools inspect --format '{{json .Image}}' "$IMAGE@$DIGEST" > "$RUNNER_TEMP/image-config.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          manifest = json.loads((root / 'image-manifest.json').read_text())
+          assert manifest['digest'] == os.environ['DIGEST'], 'Registry digest mismatch'
+          platforms = {(p['platform']['os'], p['platform']['architecture']) for p in manifest['manifests']}
+          assert {('linux', 'amd64'), ('linux', 'arm64')} <= platforms, 'Both image architectures are required'
+          configs = json.loads((root / 'image-config.json').read_text())
+          for platform in ('linux/amd64', 'linux/arm64'):
+              labels = configs[platform]['config']['Labels']
+              assert labels['org.opencontainers.image.revision'] == os.environ['SOURCE_SHA'], f'Wrong source: {platform}'
+              assert labels['org.opencontainers.image.version'] == os.environ['VERSION'], f'Wrong version: {platform}'
+          PY
+          {
+            echo "digest=$DIGEST"
+            echo "candidate=$CANDIDATE"
+          } >> "$GITHUB_OUTPUT"
 
-          # Generate docker-compose with pinned image digest (regex matches any tag)
-          sed "s|ghcr.io/djobleezy/deepsea-dashboard:[^ ]*|ghcr.io/djobleezy/deepsea-dashboard:${VERSION}@${DIGEST}|" \
+      - name: Build digest-pinned packages and checksum receipt
+        if: steps.prepared.outputs.exists != 'true'
+        env:
+          SOURCE_SHA: ${{ steps.release.outputs.sha }}
+          VERSION: ${{ steps.release.outputs.version }}
+          IMAGE: ${{ steps.release.outputs.image }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          CANDIDATE: ${{ steps.image.outputs.candidate }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/umbrel dist/start9
+          sed "s|ghcr.io/djobleezy/deepsea-dashboard:[^ ]*|${IMAGE}:${CANDIDATE}@${DIGEST}|g" \
             umbrel/docker-compose.yml > dist/umbrel/docker-compose.yml
-
-          # Update version in umbrel-app.yml
           sed "s/^version: .*/version: \"${VERSION}\"/" \
             umbrel/umbrel-app.yml > dist/umbrel/umbrel-app.yml
-
-          # Create tarball
-          tar -czf dist/deepsea-umbrel-${VERSION}.tar.gz -C dist/umbrel .
-
-      - name: Upload Umbrel assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/deepsea-umbrel-*.tar.gz
-            dist/umbrel/docker-compose.yml
-            dist/umbrel/umbrel-app.yml
-
-  # ── Start9 Package ─────────────────────────────────────
-  start9:
-    name: Start9 Package
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Start9 source bundle
-        run: |
-          mkdir -p dist/start9
-          VERSION="${DEEPSEA_VERSION#v}"
-          DIGEST="${{ needs.docker.outputs.digest }}"
-
-          # Preserve the source layout required by make -C start9 and its
-          # parent-directory Docker build context. Archive tracked files only.
+          [[ $(grep -Fc "${IMAGE}:${CANDIDATE}@${DIGEST}" dist/umbrel/docker-compose.yml) == 2 ]]
+          tar -czf "dist/deepsea-umbrel-${VERSION}.tar.gz" -C dist/umbrel .
+          cp dist/umbrel/docker-compose.yml dist/umbrel/umbrel-app.yml dist/
+          # Keep the parent-directory build context used by make -C start9.
           git archive HEAD | tar -x -C dist/start9
-
-          # Update the staged manifest without changing the checkout.
           sed "s/^version: .*/version: \"${VERSION}\"/" \
             dist/start9/start9/manifest.yaml > dist/start9/start9/manifest.yaml.tmp
           mv dist/start9/start9/manifest.yaml.tmp dist/start9/start9/manifest.yaml
-
-          # Create packaging info for Start9 packagers
           cat > dist/start9/IMAGE_INFO.md <<EOF
-          # DeepSea Dashboard ${DEEPSEA_VERSION} - Start9 Image Reference
-          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          # DeepSea Dashboard ${RELEASE_TAG} - Start9 Image Reference
+          Source commit: ${SOURCE_SHA}
+          Image: ${IMAGE}:${CANDIDATE}
           Digest: ${DIGEST}
           Platforms: linux/amd64, linux/arm64
 
           This source bundle builds the StartOS image from the included
           start9/Dockerfile; the GHCR image above is a separate image reference.
 
-          From the extracted bundle root, run \`make -C start9\` with Docker
+          From the extracted bundle root, run make -C start9 with Docker
           Buildx, Deno, yq, and start-sdk installed. The bundle includes the
           frontend, backend, default configuration, and StartOS wrapper.
           EOF
-          sed -i 's/^          //' dist/start9/IMAGE_INFO.md
-
-          # Create tarball
-          tar -czf dist/deepsea-start9-${VERSION}.tar.gz -C dist/start9 .
-
-      - name: Upload Start9 assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/deepsea-start9-*.tar.gz
-
-  # ── Packaging Info ──────────────────────────────────────
-  notify:
-    name: Packaging Info
-    needs: [docker, umbrel, start9]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create packaging summary
-        run: |
-          VERSION="${DEEPSEA_VERSION#v}"
-          DIGEST="${{ needs.docker.outputs.digest }}"
-
-          cat > packaging-info.txt <<EOF
-          DeepSea Dashboard ${DEEPSEA_VERSION}
-          Image: ghcr.io/djobleezy/deepsea-dashboard:${VERSION}
+          tar -czf "dist/deepsea-start9-${VERSION}.tar.gz" -C dist/start9 .
+          cat > dist/packaging-info.txt <<EOF
+          DeepSea Dashboard ${RELEASE_TAG}
+          Source commit: ${SOURCE_SHA}
+          Image: ${IMAGE}:${CANDIDATE}
           Digest: ${DIGEST}
           Platforms: linux/amd64, linux/arm64
-          Release: https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/${DEEPSEA_VERSION}
+          Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}
 
           Packages:
           - Umbrel: deepsea-umbrel-${VERSION}.tar.gz (ready to submit to getumbrel/umbrel-apps)
           - Start9: deepsea-start9-${VERSION}.tar.gz (source bundle; extract and run make -C start9)
-          EOF
 
-      - name: Upload packaging info
-        uses: softprops/action-gh-release@v2
-        with:
-          files: packaging-info.txt
+          Asset SHA256:
+          EOF
+          (cd dist && sha256sum "deepsea-umbrel-${VERSION}.tar.gz" "deepsea-start9-${VERSION}.tar.gz" \
+            docker-compose.yml umbrel-app.yml) >> dist/packaging-info.txt
+
+      - name: Confirm the release tag and state have not changed
+        env:
+          SOURCE_SHA: ${{ steps.release.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          [[ $(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}") == "$SOURCE_SHA" ]] || {
+            echo 'Release tag changed during preparation.' >&2; exit 1;
+          }
+          gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release-state.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          release = json.loads((Path(os.environ['RUNNER_TEMP']) / 'release-state.json').read_text())
+          expected_draft = os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch'
+          assert release['isDraft'] == expected_draft, 'Release state changed during preparation'
+          PY
+
+      - name: Upload the five release assets and verify downloaded bytes
+        if: steps.prepared.outputs.exists != 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSETS=("deepsea-umbrel-${VERSION}.tar.gz" "deepsea-start9-${VERSION}.tar.gz" \
+            docker-compose.yml umbrel-app.yml packaging-info.txt)
+          # Upload the receipt last; its presence marks a complete preparation.
+          for asset in "${ASSETS[@]}"; do
+            gh release upload "$RELEASE_TAG" "dist/$asset" --clobber
+          done
+          mkdir -p "$RUNNER_TEMP/uploaded"
+          for asset in "${ASSETS[@]}"; do
+            gh release download "$RELEASE_TAG" --pattern "$asset" --dir "$RUNNER_TEMP/uploaded"
+            cmp "dist/$asset" "$RUNNER_TEMP/uploaded/$asset"
+          done
+
+      - name: Promote the verified digest on publication
+        if: github.event_name == 'release'
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          VERSION: ${{ steps.release.outputs.version }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ALIASES=("$VERSION" "$RELEASE_TAG" "${VERSION%.*}" latest)
+          TAG_ARGS=()
+          for alias in "${ALIASES[@]}"; do TAG_ARGS+=(--tag "$IMAGE:$alias"); done
+          # A single existing index is copied without rebuilding its contents.
+          docker buildx imagetools create "${TAG_ARGS[@]}" "$IMAGE@$DIGEST"
+          for alias in "${ALIASES[@]}"; do
+            docker buildx imagetools inspect --format '{{json .Manifest}}' "$IMAGE:$alias" \
+              > "$RUNNER_TEMP/promoted-manifest.json"
+            python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads((Path(os.environ['RUNNER_TEMP']) / 'promoted-manifest.json').read_text())
+          assert manifest['digest'] == os.environ['DIGEST'], 'Promoted alias changed the image digest'
+          PY
+          done
+
+      - name: Summarize the prepared release
+        env:
+          SOURCE_SHA: ${{ steps.release.outputs.sha }}
+          IMAGE: ${{ steps.release.outputs.image }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          {
+            echo "### ${RELEASE_TAG} packages verified"
+            echo "- Source: ${SOURCE_SHA}"
+            echo "- Image: ${IMAGE}@${DIGEST}"
+            echo '- Architectures: linux/amd64 and linux/arm64'
+            echo '- Five release assets verified; Start9 is a source bundle.'
+            if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+              echo '- Release remains a draft. Stable image aliases were not moved.'
+            else
+              echo '- Published aliases now point to this same verified digest.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
