@@ -167,9 +167,9 @@ export interface HealthStatus {
   datum_gateway_configured?: boolean;
 }
 
-/** Live DATUM Gateway reachability + lagging-fee state.
+/** Gateway reachability; historical fees do not establish pool connectivity.
  *  Returned by GET /api/datum/status. */
-export type DatumStatusLabel = 'connected' | 'transitioning' | 'offline' | 'unknown';
+export type DatumStatusLabel = 'reachable' | 'unreachable' | 'unknown';
 
 export interface DatumStatus {
   status: DatumStatusLabel;

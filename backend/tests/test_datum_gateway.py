@@ -3,7 +3,7 @@
 These cover the bug the feature was built for: pool_fees_percentage lags
 real DATUM activation, so a freshly-enabled gateway used to show
 "DATUM OFFLINE" until Ocean's stats caught up.  The probe + state
-machine should now surface a "transitioning" state instead.
+response reports gateway reachability without inferring pool connectivity.
 """
 
 from __future__ import annotations
@@ -189,7 +189,7 @@ async def test_probe_umbrel_api_happy_path(monkeypatch):
     result = await dgc._probe_umbrel_api("http://datum_datum_1:21000")
 
     assert result.reachable is True
-    assert result.status == "connected"
+    assert result.status == "reachable"
     assert result.probe == "umbrel-api"
     assert result.connections == 3
     # 1.25 PH/s == 1250 TH/s
@@ -199,7 +199,7 @@ async def test_probe_umbrel_api_happy_path(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_probe_umbrel_api_reachable_with_zero_workers(monkeypatch):
-    """Gateway up but no miners attached \u2014 still 'connected' (daemon alive)."""
+    """Gateway up but no miners attached \u2014 still 'reachable' (daemon alive)."""
     body = {
         "type": "three-stats",
         "items": [
@@ -370,13 +370,13 @@ async def test_get_datum_status_caches_results(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_endpoint_connected_when_probe_and_fees_agree(client, monkeypatch):
+async def test_endpoint_reachable_when_probe_and_fees_agree(client, monkeypatch):
     """Steady-state happy path \u2014 probe up AND fees in band."""
     monkeypatch.setattr(
         "app.routers.datum.get_datum_status",
         _async_returning(dgc.DatumProbeResult(
             reachable=True,
-            status="connected",
+            status="reachable",
             probe="umbrel-api",
             gateway_url="http://127.0.0.1:21000",
             connections=2,
@@ -389,20 +389,20 @@ async def test_endpoint_connected_when_probe_and_fees_agree(client, monkeypatch)
     resp = await client.get("/api/datum/status")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "connected"
+    assert data["status"] == "reachable"
     assert data["probe_reachable"] is True
     assert data["fees_in_datum_band"] is True
     assert data["connections"] == 2
 
 
 @pytest.mark.asyncio
-async def test_endpoint_transitioning_when_probe_up_but_fees_lag(client, monkeypatch):
+async def test_endpoint_reachable_when_probe_up_but_fees_outside_band(client, monkeypatch):
     """The headline bug: DATUM just enabled, fees haven't caught up."""
     monkeypatch.setattr(
         "app.routers.datum.get_datum_status",
         _async_returning(dgc.DatumProbeResult(
             reachable=True,
-            status="connected",
+            status="reachable",
             probe="umbrel-api",
             gateway_url="http://127.0.0.1:21000",
             connections=1,
@@ -416,7 +416,7 @@ async def test_endpoint_transitioning_when_probe_up_but_fees_lag(client, monkeyp
     resp = await client.get("/api/datum/status")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "transitioning"
+    assert data["status"] == "reachable"
     assert data["probe_reachable"] is True
     assert data["fees_in_datum_band"] is False
     # The user-facing explanation should call out the lagging-fee root cause.
@@ -424,13 +424,13 @@ async def test_endpoint_transitioning_when_probe_up_but_fees_lag(client, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_endpoint_transitioning_when_fees_in_band_but_probe_down(client, monkeypatch):
+async def test_endpoint_unreachable_when_fees_in_band_but_probe_down(client, monkeypatch):
     """Inverse case: fees still look DATUM-shaped but probe is failing."""
     monkeypatch.setattr(
         "app.routers.datum.get_datum_status",
         _async_returning(dgc.DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="umbrel-api",
             gateway_url="http://127.0.0.1:21000",
             reason="http-error: ConnectError",
@@ -441,17 +441,17 @@ async def test_endpoint_transitioning_when_fees_in_band_but_probe_down(client, m
 
     resp = await client.get("/api/datum/status")
     data = resp.json()
-    assert data["status"] == "transitioning"
+    assert data["status"] == "unreachable"
     assert data["probe_reachable"] is False
 
 
 @pytest.mark.asyncio
-async def test_endpoint_offline_when_both_signals_negative(client, monkeypatch):
+async def test_endpoint_unreachable_when_both_signals_negative(client, monkeypatch):
     monkeypatch.setattr(
         "app.routers.datum.get_datum_status",
         _async_returning(dgc.DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="umbrel-api",
             gateway_url="http://127.0.0.1:21000",
             reason="http-error: ConnectError",
@@ -462,7 +462,7 @@ async def test_endpoint_offline_when_both_signals_negative(client, monkeypatch):
 
     resp = await client.get("/api/datum/status")
     data = resp.json()
-    assert data["status"] == "offline"
+    assert data["status"] == "unreachable"
 
 
 @pytest.mark.asyncio
@@ -569,7 +569,7 @@ async def test_config_change_during_probe_does_not_cache_old_gateway(monkeypatch
         if len(calls) == 1:
             started.set()
             await finish.wait()
-        return dgc.DatumProbeResult(True, 'connected', 'umbrel-api', url, checked_at=1e20)
+        return dgc.DatumProbeResult(True, 'reachable', 'umbrel-api', url, checked_at=1e20)
 
     monkeypatch.setattr(dgc, '_do_probe', probe)
     pending = asyncio.create_task(dgc.get_datum_status())

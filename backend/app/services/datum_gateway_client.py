@@ -59,7 +59,7 @@ class DatumProbeResult:
 
     Attributes:
         reachable: ``True`` if any probe succeeded.
-        status: Coarse label: ``connected`` | ``offline`` | ``unknown``.
+        status: Coarse label: ``reachable`` | ``unreachable`` | ``unknown``.
             ``unknown`` means no URL was configured and auto-discovery is
             off, so we cannot make any statement about reachability.
         probe: Which method produced the result
@@ -270,7 +270,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
     except (httpx.RequestError, asyncio.TimeoutError) as e:
         return DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="umbrel-api",
             gateway_url=base_url,
             reason=f"http-error: {type(e).__name__}",
@@ -280,7 +280,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
     if resp.status_code != 200:
         return DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="umbrel-api",
             gateway_url=base_url,
             reason=f"http-{resp.status_code}",
@@ -292,7 +292,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
     except ValueError:
         return DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="umbrel-api",
             gateway_url=base_url,
             reason="invalid-json",
@@ -301,7 +301,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
 
     if not isinstance(body, dict) or body.get("type") not in {"three-stats", "four-stats"}:
         return DatumProbeResult(
-            reachable=False, status="offline", probe="umbrel-api", gateway_url=base_url,
+            reachable=False, status="unreachable", probe="umbrel-api", gateway_url=base_url,
             reason="invalid-payload", checked_at=time.time(),
         )
     items = body.get("items")
@@ -327,7 +327,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
 
     if connections is None and hashrate_ths is None:
         return DatumProbeResult(
-            reachable=False, status="offline", probe="umbrel-api", gateway_url=base_url,
+            reachable=False, status="unreachable", probe="umbrel-api", gateway_url=base_url,
             reason="invalid-payload", checked_at=time.time(),
         )
 
@@ -336,7 +336,7 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
     # We surface the count so the UI can show it.
     return DatumProbeResult(
         reachable=True,
-        status="connected",
+        status="reachable",
         probe="umbrel-api",
         gateway_url=base_url,
         connections=connections,
@@ -365,7 +365,7 @@ async def _probe_stratum_tcp(base_url: str, stratum_port: int = DEFAULT_STRATUM_
     except (asyncio.TimeoutError, OSError) as e:
         return DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="stratum-tcp",
             gateway_url=base_url,
             reason=f"tcp-error: {type(e).__name__}",
@@ -374,7 +374,7 @@ async def _probe_stratum_tcp(base_url: str, stratum_port: int = DEFAULT_STRATUM_
 
     return DatumProbeResult(
         reachable=True,
-        status="connected",
+        status="reachable",
         probe="stratum-tcp",
         gateway_url=base_url,
         checked_at=time.time(),
@@ -424,7 +424,7 @@ async def _do_probe() -> DatumProbeResult:
                 return result
         return DatumProbeResult(
             reachable=False,
-            status="offline",
+            status="unreachable",
             probe="none",
             gateway_url=None,
             reason="autodiscover-failed",

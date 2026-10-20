@@ -11,7 +11,7 @@ const health: HealthStatus = {
   redis_connected: false, uptime_seconds: 10, datum_gateway_configured: true,
 };
 const datum: DatumStatus = {
-  status: 'connected', probe_reachable: true, probe_method: 'umbrel-api',
+  status: 'reachable', probe_reachable: true, probe_method: 'umbrel-api',
   pool_fees_percentage: 1, fees_in_datum_band: true,
   fee_band_low: 0.9, fee_band_high: 1.3, explanation: 'Reachability only.', last_check: 1,
 };

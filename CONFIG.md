@@ -105,7 +105,9 @@ on port 23334 as a fallback, and reports **gateway reachability**.
 
 Reachability does not prove an active connection to the DATUM pool. In DATUM
 v0.4.1 the widget reports miner connections and hashrate, but no live pool
-connection status. Historical pool fees are shown only as supporting evidence;
+connection status. `/api/datum/status` returns `reachable`, `unreachable`, or
+`unknown` independently of historical fees. Historical pool fees are shown only
+as supporting evidence;
 they do not establish whether the gateway is currently connected or offline.
 
 `DATUM_GATEWAY_URL` overrides this setting when it contains a valid URL. Hosts

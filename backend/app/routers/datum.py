@@ -1,13 +1,13 @@
 """Report gateway reachability separately from historical pool-fee evidence.
 
-The status codes are retained for API compatibility. A reachable gateway does
-not prove an active DATUM pool connection: the v0.4.1 widget reports miners and
-hashrate, not upstream readiness. The explanation describes only observed facts.
+A reachable gateway does not prove an active DATUM pool connection: the v0.4.1
+widget reports miners and hashrate, not upstream readiness. The status and
+explanation describe only the reachability observed by the dashboard.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -18,9 +18,9 @@ from app.services.datum_gateway_client import get_datum_status
 
 router = APIRouter()
 
-# These bounds match the legacy frontend isDatumConnected() check.
+# These bounds match the frontend historical fee-evidence band.
 # Keep them in sync if the band ever changes — there is also a copy in
-# frontend/src/pages/Dashboard.tsx.
+# frontend/src/utils/datum.ts.
 DATUM_FEE_BAND_LOW = 0.9
 DATUM_FEE_BAND_HIGH = 1.3
 
@@ -33,7 +33,7 @@ class DatumStatus(BaseModel):
     that transparency is the whole point of this endpoint.
     """
 
-    status: str  # Legacy codes; use probe_reachable and explanation for display
+    status: Literal["reachable", "unreachable", "unknown"]
     probe_reachable: bool
     probe_method: str  # umbrel-api | stratum-tcp | none
     gateway_url: Optional[str] = None
@@ -48,7 +48,7 @@ class DatumStatus(BaseModel):
     probe_error: Optional[str] = None
 
 
-def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str, fees_pct: float) -> tuple[str, str]:
+def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str) -> tuple[str, str]:
     """Combine probe + fee signals into a (status, explanation) pair.
 
     The explanation strings are user-facing — the dashboard renders them
@@ -69,12 +69,12 @@ def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str, fees
         )
     if probe_reachable:
         return (
-            "connected" if fees_in_band else "transitioning",
+            "reachable",
             f"The gateway is reachable. {fee_evidence} "
             "This probe cannot verify its connection to the DATUM pool.",
         )
     return (
-        "transitioning" if fees_in_band else "offline",
+        "unreachable",
         f"The dashboard could not reach the gateway. {fee_evidence} "
         "Check the gateway address and connectivity; the gateway may still be mining.",
     )
@@ -102,7 +102,6 @@ async def datum_status() -> DatumStatus:
         probe_reachable=probe.reachable,
         fees_in_band=fees_in_band,
         probe_method=probe.probe,
-        fees_pct=fees_pct,
     )
 
     return DatumStatus(
