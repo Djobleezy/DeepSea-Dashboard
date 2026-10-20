@@ -61,4 +61,26 @@ describe('snapshot connection state', () => {
     act(() => publishApiStatus({ path: '/metrics', status: 'fresh', updatedAt: 1234, error: null }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
+
+  it('ignores an older stale response after a newer fresh snapshot', () => {
+    publishApiStatus({ path: '/metrics', status: 'fresh', updatedAt: 2000, error: null });
+    publishApiStatus({ path: '/metrics', status: 'stale', updatedAt: 1000, error: 'Old cached response' });
+    expect(getApiStatus()).toBeNull();
+  });
+
+  it('still reports current network errors without a source timestamp', () => {
+    publishApiStatus({ path: '/metrics', status: 'fresh', updatedAt: 2000, error: null });
+    publishApiStatus({ path: '/metrics', status: 'unavailable', updatedAt: null, error: 'Connection failed' });
+    expect(getApiStatus()).toMatchObject({ status: 'unavailable', error: 'Connection failed' });
+    publishApiStatus({ path: '/metrics', status: 'stale', updatedAt: 1000, error: 'Old cached response' });
+    expect(getApiStatus()).toMatchObject({ status: 'unavailable', error: 'Connection failed' });
+  });
+
+  it('starts a new timestamp scope when the wallet changes', () => {
+    setApiWalletScope('wallet-a');
+    publishApiStatus({ path: '/metrics', status: 'fresh', updatedAt: 2000, error: null });
+    setApiWalletScope('wallet-b');
+    publishApiStatus({ path: '/metrics', status: 'stale', updatedAt: 1000, error: 'Wallet B cached response' });
+    expect(getApiStatus()).toMatchObject({ status: 'stale', updatedAt: 1000, error: 'Wallet B cached response' });
+  });
 });

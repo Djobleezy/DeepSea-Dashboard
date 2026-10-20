@@ -9,8 +9,14 @@ export interface ApiStatusUpdate {
 
 export const API_STATUS_EVENT = 'deepsea:api-status';
 const statuses = new Map<string, ApiStatusUpdate>();
+const latestSourceTimestamps = new Map<string, number>();
 
 export function publishApiStatus(update: ApiStatusUpdate): void {
+  if (update.updatedAt !== null && Number.isFinite(update.updatedAt)) {
+    const latest = latestSourceTimestamps.get(update.path);
+    if (latest !== undefined && update.updatedAt < latest) return;
+    latestSourceTimestamps.set(update.path, update.updatedAt);
+  }
   if (update.status === 'fresh') statuses.delete(update.path);
   else statuses.set(update.path, update);
   window.dispatchEvent(new CustomEvent<ApiStatusUpdate>(API_STATUS_EVENT, { detail: update }));
@@ -18,6 +24,7 @@ export function publishApiStatus(update: ApiStatusUpdate): void {
 
 export function resetApiStatus(): void {
   statuses.clear();
+  latestSourceTimestamps.clear();
   window.dispatchEvent(new CustomEvent(API_STATUS_EVENT));
 }
 
