@@ -35,9 +35,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Copy example config as default (entrypoint copies to config.json if missing)
-COPY config.json.example /root/.config/config.json.default
-COPY config.json.example /root/.config/config.json
+# Keep the seed outside /root, which StartOS replaces with its data volume.
+# The entrypoint copies it into that volume only on first start.
+COPY config.json.example /app/config.json.default
 
 # Start9 entrypoint
 ADD start9/docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
