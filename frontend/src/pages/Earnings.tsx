@@ -30,11 +30,14 @@ export const Earnings: React.FC = () => {
 
   const txLink = (txid: string, lightning_txid: string) => {
     if (txid) return `https://mempool.space/tx/${txid}`;
-    if (lightning_txid) return `https://mempool.space/tx/${lightning_txid}`;
+    if (lightning_txid) return `https://ocean.xyz/info/tx/lightning/${lightning_txid}`;
     return null;
   };
 
   const payments = data?.payments ?? [];
+  const maxMonthlySats = data?.monthly_summary.length
+    ? Math.max(...data.monthly_summary.map((m) => m.sats))
+    : 0;
   const totalSats = data?.total_sats ?? 0;
   const totalBtc = data?.total_btc ?? 0;
   const avgPerPayment = payments.length > 0 ? Math.round(totalSats / payments.length) : 0;
@@ -118,8 +121,7 @@ export const Earnings: React.FC = () => {
               </thead>
               <tbody>
                 {data.monthly_summary.map((m, i) => {
-                  const maxSats = Math.max(...data.monthly_summary.map((x) => x.sats));
-                  const barPct = maxSats > 0 ? (m.sats / maxSats) * 100 : 0;
+                  const barPct = maxMonthlySats > 0 ? (m.sats / maxMonthlySats) * 100 : 0;
                   return (
                     <tr key={m.month}>
                       <td style={{ color: 'var(--primary)', fontFamily: 'var(--font-vt323)', fontSize: '16px' }}>
@@ -183,14 +185,19 @@ export const Earnings: React.FC = () => {
                   <th>AMOUNT (SATS)</th>
                   <th>BTC</th>
                   <th style={{ textAlign: 'right' }}>FIAT VALUE</th>
+                  <th>TYPE</th>
                   <th>TRANSACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {payments.map((p, i) => {
                   const link = txLink(p.txid, p.lightning_txid);
+                  const isLightning = Boolean(p.lightning_txid && !p.txid);
                   return (
-                    <tr key={i} style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                    <tr
+                      key={p.txid || p.lightning_txid || `${p.date}-${i}`}
+                      style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}
+                    >
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                         {p.date}
                       </td>
@@ -200,6 +207,9 @@ export const Earnings: React.FC = () => {
                       <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{p.amount_btc.toFixed(8)}</td>
                       <td style={{ textAlign: 'right', color: '#f7931a' }}>
                         {p.fiat_value ? formatFiat(p.fiat_value) : '—'}
+                      </td>
+                      <td style={{ fontSize: '11px', whiteSpace: 'nowrap', color: isLightning ? '#ffd700' : 'var(--text-dim)' }}>
+                        {isLightning ? '⚡ LIGHTNING' : '⛓ ON-CHAIN'}
                       </td>
                       <td>
                         {link ? (
@@ -215,7 +225,6 @@ export const Earnings: React.FC = () => {
                             }}
                           >
                             {(p.txid || p.lightning_txid).slice(0, 8)}…{(p.txid || p.lightning_txid).slice(-6)}
-                            {p.lightning_txid && !p.txid && ' ⚡'}
                           </a>
                         ) : (
                           <span style={{ color: 'var(--text-dim)' }}>—</span>
