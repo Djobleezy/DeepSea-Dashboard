@@ -90,6 +90,40 @@ anything other than `"USD"`. Leave empty if you only need USD display.
 
 ---
 
+### `datum_gateway_url`
+- **Type:** `string` (URL)
+- **Default:** `""` (disabled)
+- **Examples:**
+  - UmbrelOS (DATUM app installed): `"http://datum_datum_1:21000"`
+  - Stock self-build on the same host: `"http://127.0.0.1:7152"`
+  - Bare metal on the LAN: `"http://192.168.1.50:21000"`
+- **Environment override:** `DATUM_GATEWAY_URL`
+
+Optional URL of a local [DATUM Gateway](https://github.com/OCEAN-xyz/datum_gateway).
+The dashboard checks its `/umbrel-api` widget endpoint, with a TCP connection
+on port 23334 as a fallback, and reports **gateway reachability**.
+
+Reachability does not prove an active connection to the DATUM pool. In DATUM
+v0.4.1 the widget reports miner connections and hashrate, but no live pool
+connection status. `/api/datum/status` returns `reachable`, `unreachable`, or
+`unknown` independently of historical fees. Historical pool fees are shown only
+as supporting evidence;
+they do not establish whether the gateway is currently connected or offline.
+
+`DATUM_GATEWAY_URL` overrides this setting when it contains a valid URL. Hosts
+must be loopback, private IP addresses, or supported local Docker service names.
+The probe is cached for 15 seconds and each HTTP/TCP attempt times out after
+2 seconds. A failed check can indicate an incorrect address or network problem
+while the gateway itself remains active.
+
+With no explicit gateway URL, `DATUM_GATEWAY_AUTODISCOVER=1` enables checks of
+the standard Umbrel address and loopback API ports 7152 and 21000. Each candidate
+tries the widget and then Stratum; candidates run concurrently under a 6-second
+total deadline. If none responds, the status is `unreachable`, rather than
+`unknown` (which means no check is configured or no result is available).
+
+---
+
 ### `low_hashrate_threshold_ths`
 - **Type:** `float` (TH/s)
 - **Default:** `3.0`
@@ -121,6 +155,7 @@ match the upper end of your expected operating range.
   "network_fee": 2.0,
   "extended_history": false,
   "exchange_rate_api_key": "",
+  "datum_gateway_url": "",
   "low_hashrate_threshold_ths": 3.0,
   "high_hashrate_threshold_ths": 20.0
 }

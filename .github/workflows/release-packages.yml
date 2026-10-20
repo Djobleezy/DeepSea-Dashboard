@@ -56,7 +56,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
   # ── Umbrel Package ──────────────────────────────────────
   umbrel:
@@ -99,24 +99,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Start9 metadata
+      - name: Build Start9 source bundle
         run: |
           mkdir -p dist/start9
           VERSION="${DEEPSEA_VERSION#v}"
           DIGEST="${{ needs.docker.outputs.digest }}"
 
-          # Update version in manifest.yaml
-          sed "s/^version: .*/version: \"${VERSION}\"/" \
-            start9/manifest.yaml > dist/start9/manifest.yaml
+          # Preserve the source layout required by make -C start9 and its
+          # parent-directory Docker build context. Archive tracked files only.
+          git archive HEAD | tar -x -C dist/start9
 
-          # Copy all Start9 files
-          cp start9/Dockerfile dist/start9/
-          cp start9/docker_entrypoint.sh dist/start9/
-          cp start9/Makefile dist/start9/
-          cp start9/instructions.md dist/start9/
-          cp start9/icon.png dist/start9/
-          cp start9/LICENSE dist/start9/
-          cp -r start9/scripts dist/start9/
+          # Update the staged manifest without changing the checkout.
+          sed "s/^version: .*/version: \"${VERSION}\"/" \
+            dist/start9/start9/manifest.yaml > dist/start9/start9/manifest.yaml.tmp
+          mv dist/start9/start9/manifest.yaml.tmp dist/start9/start9/manifest.yaml
 
           # Create packaging info for Start9 packagers
           cat > dist/start9/IMAGE_INFO.md <<EOF
@@ -125,7 +121,12 @@ jobs:
           Digest: ${DIGEST}
           Platforms: linux/amd64, linux/arm64
 
-          To build the .s9pk, run \`make\` in this directory with start-sdk installed.
+          This source bundle builds the StartOS image from the included
+          start9/Dockerfile; the GHCR image above is a separate image reference.
+
+          From the extracted bundle root, run \`make -C start9\` with Docker
+          Buildx, Deno, yq, and start-sdk installed. The bundle includes the
+          frontend, backend, default configuration, and StartOS wrapper.
           EOF
           sed -i 's/^          //' dist/start9/IMAGE_INFO.md
 
@@ -158,7 +159,7 @@ jobs:
 
           Packages:
           - Umbrel: deepsea-umbrel-${VERSION}.tar.gz (ready to submit to getumbrel/umbrel-apps)
-          - Start9: deepsea-start9-${VERSION}.tar.gz (contains all files for start-sdk pack)
+          - Start9: deepsea-start9-${VERSION}.tar.gz (source bundle; extract and run make -C start9)
           EOF
 
       - name: Upload packaging info

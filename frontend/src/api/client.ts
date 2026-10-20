@@ -4,6 +4,7 @@ import type {
   AppConfig,
   BlocksResponse,
   DashboardMetrics,
+  DatumStatus,
   EarningsResponse,
   HealthStatus,
   Notification,
@@ -190,6 +191,11 @@ export const fetchTimezones = () =>
 // Health
 export const fetchHealth = () => get<HealthStatus>('/health');
 
+// DATUM gateway status — direct probe of the local DATUM gateway, with
+// the lagging pool_fees_percentage signal folded in.  See backend
+// app/routers/datum.py for the state machine.
+export const fetchDatumStatus = () => get<DatumStatus>('/datum/status');
+
 // Exchange rates
 export const fetchExchangeRates = () =>
   get<{ base: string; currencies: string[]; rates: Record<string, number> }>('/exchange-rates');
@@ -245,7 +251,7 @@ async function _flushBatch(): Promise<void> {
         entry.reject(new Error(`Batch sub-request ${paths[i]} failed: ${resp.status}`));
       }
     });
-  } catch (_batchError) {
+  } catch {
     // Batch endpoint failed — fall back to individual requests
     await Promise.allSettled(
       entries.map(async (entry) => {

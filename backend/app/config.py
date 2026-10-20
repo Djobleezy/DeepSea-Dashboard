@@ -36,6 +36,14 @@ _DEFAULTS: dict[str, Any] = {
     "network_fee": 0.5,
     "extended_history": False,
     "exchange_rate_api_key": "",
+    # Optional URL of a local DATUM Gateway (e.g.
+    # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
+    # for a stock self-build). Used for a gateway reachability check,
+    # separate from historical pool-fee evidence. Leave blank to use
+    # fee evidence only unless autodiscovery is enabled.
+    # Environment variable ``DATUM_GATEWAY_URL``
+    # overrides this field at request time.
+    "datum_gateway_url": "",
 }
 
 
@@ -108,3 +116,10 @@ def get_network_fee() -> float:
 
 def get_exchange_rate_api_key() -> str:
     return load_config().get("exchange_rate_api_key", "")
+
+
+def get_datum_gateway_url() -> str:
+    """Return the validated gateway URL used by the live probe."""
+    from app.services.datum_gateway_client import _resolve_gateway_url
+
+    return _resolve_gateway_url() or ""
