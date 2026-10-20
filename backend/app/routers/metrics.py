@@ -27,9 +27,11 @@ async def metrics_history(
 ) -> list[dict]:
     """Return historical metric snapshots for chart hydration on page load.
 
-    Queries the SQLite ``metric_history`` table. Use ``hours`` to control
-    the time window (1–168 hours / up to 7 days). Returns an empty list if
-    no history has been collected yet.
+    Queries wallet-scoped SQLite history over 1–168 hours. Dense windows
+    retain both series' extrema and their first/latest samples within a
+    bounded payload. ``gap_before`` marks a real interruption in the original
+    readings; clients must not infer outages from downsampled point spacing.
+    Returns an empty list if no valid history has been collected yet.
     """
     return await get_metric_history(db, hours=hours, limit=hours * 60)
 

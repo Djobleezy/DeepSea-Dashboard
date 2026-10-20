@@ -10,6 +10,7 @@ import type {
   Notification,
   WorkerSummary,
 } from '../types';
+import type { MetricHistoryPoint } from '../utils/hashrateHistory';
 import { publishApiStatus, resetApiStatus } from './status';
 
 const RAW_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -168,7 +169,7 @@ async function del<T>(path: string): Promise<T> {
 export const fetchMetrics = () => get<DashboardMetrics>('/metrics');
 
 export const fetchMetricHistory = (hours = 1) =>
-  get<{ timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]>('/metrics/history', { hours });
+  get<MetricHistoryPoint[]>('/metrics/history', { hours });
 
 // Workers
 export const fetchWorkers = (

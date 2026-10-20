@@ -1,6 +1,6 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchMetricHistory } from '../api/client';
+import { useHashrateHistory } from '../hooks/useHashrateHistory';
 import { useDatumStatus } from '../hooks/useDatumStatus';
 import { deriveDatumBadge } from '../utils/datum';
 import { useAppStore } from '../stores/store';
@@ -29,40 +29,30 @@ export const Dashboard: React.FC = () => {
   const { formatFiat, formatFiatSigned } = useCurrency();
   const metrics = useAppStore((s) => s.metrics);
   const prevMetrics = useAppStore((s) => s.prevMetrics);
+  const sseConnected = useAppStore((s) => s.sseConnected);
   const metricsLoading = useAppStore((s) => s.metricsLoading);
   const metricsError = useAppStore((s) => s.metricsError);
   const wallet = useAppStore((s) => s.wallet);
-  const walletEpoch = useAppStore((s) => s.walletEpoch);
   const retry = useAppStore((s) => s.requestMetricsRefresh);
   const chartData60s = useAppStore((s) => s.chartData60s);
   const chartData3hr = useAppStore((s) => s.chartData3hr);
-  const addChartPoint = useAppStore((s) => s.addChartPoint);
-  const chartHydrated = useAppStore((s) => s.chartHydrated);
-  const hydrateChart = useAppStore((s) => s.hydrateChart);
-  const { annotations: blockAnnotations } = useBlockAnnotations();
-  const hydrationAttempted = useRef<number | null>(null);
+  const history = useHashrateHistory();
+  const { annotations: blockAnnotations } = useBlockAnnotations(Math.min(history.hours, 72) * 60);
   const { health, datum } = useDatumStatus();
   const [now, setNow] = useState(Date.now());
+  const [online, setOnline] = useState(() => navigator.onLine);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
-    return () => window.clearInterval(timer);
+    const updateOnline = () => setOnline(navigator.onLine);
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('offline', updateOnline);
+    };
   }, []);
-
-  useEffect(() => {
-    if (!wallet || hydrationAttempted.current === walletEpoch || chartHydrated) return;
-    hydrationAttempted.current = walletEpoch;
-    let cancelled = false;
-    fetchMetricHistory(1).then((points) => {
-      if (!cancelled) hydrateChart(Array.isArray(points) ? points : []);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [wallet, walletEpoch, chartHydrated, hydrateChart]);
-
-  useEffect(() => {
-    if (!metrics || metrics.data_status === 'stale' || metrics.data_status === 'unavailable' || metrics.data_status === 'unconfigured') return;
-    addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr, metrics.data_updated_at);
-  }, [metrics, addChartPoint]);
 
   if (wallet === '' || metrics?.data_status === 'unconfigured') {
     return <section className="card dashboard-setup">
@@ -84,6 +74,9 @@ export const Dashboard: React.FC = () => {
     </section>;
   }
 
+  const renderNow = Date.now();
+  const sourceTime = (metrics.data_updated_at ?? 0) * 1000;
+  const chartNow = Math.max(now, renderNow, Number.isFinite(sourceTime) && sourceTime <= renderNow + 5000 ? sourceTime : 0);
   const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
   const isStale = metrics.data_status === 'stale' || Boolean(metricsError);
   const poolIntervalMinutes = estimatePoolIntervalMinutes(
@@ -113,18 +106,27 @@ export const Dashboard: React.FC = () => {
       <MetricCard label="BTC price" value={formatFiat(metrics.btc_price)} current={metrics.btc_price} previous={prevMetrics?.btc_price} metricKey="btc_price" large />
     </div>
     {!isStale && <HashrateNotices metrics={metrics} />}
-    <section aria-labelledby="hashrate-heading">
-      <h2 id="hashrate-heading" className="label dashboard-section-title">Hashrate averages</h2>
-      <div className="grid-4">{hashrates.map((reading) => {
+    <section className="card hashrate-card" aria-labelledby="history-heading">
+      <div className="hashrate-header">
+        <div><p className="eyebrow">Mining performance</p><h2 id="history-heading">Hashrate history</h2></div>
+        <div className="hashrate-ranges" role="group" aria-label="Hashrate time range">
+          {([1, 6, 24, 168] as const).map((hours) => <button type="button" key={hours} aria-pressed={history.hours === hours} onClick={() => history.setHours(hours)}>{hours === 168 ? '7D' : `${hours}H`}</button>)}
+        </div>
+      </div>
+      <dl className="hashrate-readings">{hashrates.map((reading) => {
         const rate = autoScaleHashrate(reading.value, reading.unit);
-        return <MetricCard key={reading.key} label={reading.label} value={rate.display} unit={rate.unit} current={reading.value} previous={reading.previous} metricKey={reading.key} large />;
-      })}</div>
-    </section>
-    <section className="card" aria-labelledby="history-heading">
-      <h2 className="label dashboard-section-title" id="history-heading">Hashrate history{metrics.low_hashrate_mode ? ' · 3 hr primary average' : ''}</h2>
-      {chartData60s.length > 1 ? <ErrorBoundary><Suspense fallback={<p className="field-help">Loading chart…</p>}>
-        <HashrateChart data60s={chartData60s} data3hr={chartData3hr} avg24hr={metrics.hashrate_24hr} blockAnnotations={blockAnnotations} lowHashrateMode={metrics.low_hashrate_mode} />
-      </Suspense></ErrorBoundary> : <p className="field-help">Your history will appear as readings arrive. Valid zero readings are included.</p>}
+        const primary = reading.key === (metrics.low_hashrate_mode ? 'hashrate_3hr' : 'hashrate_60sec');
+        return <div key={reading.key} className={primary ? 'hashrate-reading-primary' : ''}><dt>{reading.label}</dt><dd>{rate.display}<span>{rate.unit}</span></dd></div>;
+      })}</dl>
+      <div className="hashrate-context">
+        <span className={isStale || !online || !sseConnected ? 'hashrate-status hashrate-status-stale' : 'hashrate-status'}><i aria-hidden="true" />{!online ? 'Offline · showing saved readings' : isStale ? 'Updates paused · showing saved readings' : !sseConnected ? 'Reconnecting · last received readings' : 'Live history'}</span>
+        <span>Times in {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+      </div>
+      {history.error && <div className="hashrate-history-error" role="alert"><span>{history.error}</span><button type="button" className="btn" onClick={history.retry}>Retry history</button></div>}
+      {history.loading && <p className="hashrate-loading" role="status">Loading saved history…</p>}
+      {chartData60s.some((point) => point.ts >= chartNow - history.hours * 3_600_000 && point.ts <= chartNow + 5000) ? <ErrorBoundary><Suspense fallback={<p className="field-help">Loading chart…</p>}>
+        <HashrateChart data60s={chartData60s} data3hr={chartData3hr} avg24hr={metrics.hashrate_24hr} blockAnnotations={blockAnnotations} lowHashrateMode={metrics.low_hashrate_mode} hours={history.hours} now={chartNow} />
+      </Suspense></ErrorBoundary> : <div className="hashrate-empty"><span aria-hidden="true">↗</span><p>{history.loading ? 'Fetching your saved readings' : 'Your history starts here'}</p><small>{history.loading ? 'Live updates continue while history loads.' : 'New readings appear automatically. Longer ranges fill as your dashboard runs.'}</small></div>}
     </section>
     <div className="grid-2">
       <section className="card">

@@ -135,3 +135,31 @@ async def test_metrics_history_hours_bounds_validation(test_db, test_client):
     payload = max_ok.json()
     assert len(payload) == 1
     assert payload[0]["hashrate_60sec"] == 42.0
+
+
+@pytest.mark.asyncio
+async def test_dense_history_endpoint_keeps_newest_sample_and_full_window(test_db, test_client):
+    start = time.time() - 3550
+    rows = [_insert_metric_row(start + index * 20, 0, 100.0, 200.0) for index in range(175)]
+    rows[4] = _insert_metric_row(start + 80, 0, 5000.0, 200.0)
+    rows[-3] = _insert_metric_row(start + 172 * 20, 0, 0.0, 6000.0)
+    await test_db.executemany(
+        """INSERT INTO metric_history
+           (timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
+            workers_hashing, btc_price, daily_mined_sats, unpaid_earnings)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        rows,
+    )
+    await test_db.commit()
+
+    response = await test_client.get("/api/metrics/history", params={"hours": 1})
+
+    assert response.status_code == 200
+    result = response.json()
+    assert len(result) <= 60
+    assert result[0]["timestamp"] == rows[0][0]
+    assert result[-1]["timestamp"] == rows[-1][0]
+    assert max(point["hashrate_60sec"] for point in result) == 5000
+    assert min(point["hashrate_60sec"] for point in result) == 0
+    assert max(point["hashrate_3hr"] for point in result) == 6000
+    assert all(point["gap_before"] is False for point in result)

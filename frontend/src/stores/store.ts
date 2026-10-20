@@ -1,12 +1,10 @@
 // Zustand global store
 import { create } from 'zustand';
 import type { DashboardMetrics, WorkerSummary, Notification, Theme } from '../types';
+import { appendChartPoint, chartPoint, mergeChartPoints, sourceTimeMs, validHashrate } from '../utils/hashrateHistory';
+import type { ChartPoint, HistoryHours, MetricHistoryPoint } from '../utils/hashrateHistory';
 
-interface ChartPoint {
-  label: string;
-  value: number;
-  ts: number;
-}
+export type { ChartPoint } from '../utils/hashrateHistory';
 
 interface SnapshotRevision {
   snapshot_updated_at?: number;
@@ -31,7 +29,10 @@ interface AppState {
   chartData3hr: ChartPoint[];
   addChartPoint: (hr60s: number, hr3hr: number, sourceTimestamp?: number | null) => void;
   chartHydrated: boolean;
-  hydrateChart: (points: { timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]) => void;
+  chartHours: HistoryHours;
+  chartLoadedHours: number;
+  setChartHours: (hours: HistoryHours) => void;
+  hydrateChart: (points: MetricHistoryPoint[], expectedWalletEpoch?: number, hours?: number) => void;
 
   // Workers
   workers: WorkerSummary | null;
@@ -57,6 +58,16 @@ interface AppState {
   setLastUpdated: (ts: number) => void;
 }
 
+function appendSample(state: AppState, hr60s: number, hr3hr: number, timestamp: unknown) {
+  const ts = sourceTimeMs(timestamp, Date.now());
+  if (ts === null || !validHashrate(hr60s) || !validHashrate(hr3hr)) return {};
+  const first = chartPoint(hr60s, ts);
+  return {
+    chartData60s: appendChartPoint(state.chartData60s, first),
+    chartData3hr: appendChartPoint(state.chartData3hr, chartPoint(hr3hr, ts, first.label)),
+  };
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   wallet: null,
   walletEpoch: 0,
@@ -66,7 +77,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       wallet, walletEpoch: s.walletEpoch + 1,
       metrics: null, prevMetrics: null, workers: null, lastUpdated: null,
-      chartData60s: [], chartData3hr: [], chartHydrated: false,
+      chartData60s: [], chartData3hr: [], chartHydrated: false, chartLoadedHours: 0,
       metricsLoading: true, metricsError: null,
     }));
     // Legacy payout records had no wallet ownership and cannot be migrated safely.
@@ -85,6 +96,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMetrics: (m) => {
     const current = get();
     if (m.wallet !== undefined && m.wallet !== current.wallet) return false;
+    const sourceTimestamp = m.data_updated_at ?? m.server_timestamp;
+    // A future sample must not move either retention or response ordering into
+    // the future, otherwise later real readings could be rejected indefinitely.
+    if (m.data_updated_at !== null && sourceTimestamp !== undefined && sourceTimeMs(sourceTimestamp, Date.now()) === null) return false;
     const sourceTime = m.data_updated_at === null ? null
       : (m.data_updated_at ?? m.server_timestamp) * 1000;
     const revision = (m as DashboardMetrics & SnapshotRevision).snapshot_updated_at;
@@ -114,6 +129,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
       metricsLoading: false,
       metricsError: m.data_error ?? (m.data_status === 'stale' ? 'Showing previously received data.' : null),
+      // Capture in the shared ingestion path, including while Dashboard is not
+      // mounted. A repeated/recalculated snapshot cannot manufacture a sample.
+      ...(current.wallet && (!m.data_status || m.data_status === 'fresh')
+        ? appendSample(current, m.hashrate_60sec, m.hashrate_3hr, m.data_updated_at)
+        : {}),
     });
     return true;
   },
@@ -121,48 +141,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   chartData60s: [],
   chartData3hr: [],
   chartHydrated: false,
+  chartHours: 24,
+  chartLoadedHours: 0,
+  setChartHours: (chartHours) => set({ chartHours }),
   addChartPoint: (hr60s, hr3hr, sourceTimestamp) =>
+    set((s) => appendSample(s, hr60s, hr3hr, sourceTimestamp)),
+  hydrateChart: (points, expectedWalletEpoch, hours = 1) =>
     set((s) => {
-      const ts = sourceTimestamp ? sourceTimestamp * 1000 : Date.now();
-      const label = new Date(ts).toLocaleTimeString();
-      const append = (points: ChartPoint[], value: number) => [
-        ...points.filter((point) => Math.floor(point.ts / 1000) !== Math.floor(ts / 1000)),
-        { label, value, ts },
-      ].sort((a, b) => a.ts - b.ts).slice(-60);
-      return {
-        chartData60s: append(s.chartData60s, hr60s),
-        chartData3hr: append(s.chartData3hr, hr3hr),
-      };
-    }),
-  hydrateChart: (points) =>
-    set((s) => {
-      const data60s = points.map((p) => ({
-        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
-        value: p.hashrate_60sec,
-        ts: p.timestamp * 1000,
-      }));
-      const data3hr = points.map((p) => ({
-        label: new Date(p.timestamp * 1000).toLocaleTimeString(),
-        value: p.hashrate_3hr,
-        ts: p.timestamp * 1000,
-      }));
-
-      const mergeByTimestamp = (historical: ChartPoint[], live: ChartPoint[]) => {
-        const merged = new Map<string, ChartPoint>();
-        [...historical, ...live].forEach((point) => {
-          const key = `ts:${Math.floor(point.ts / 1000)}`;
-          merged.set(key, point);
-        });
-        return Array.from(merged.values())
-          .sort((a, b) => a.ts - b.ts)
-          .slice(-60);
-      };
+      if (expectedWalletEpoch !== undefined && s.walletEpoch !== expectedWalletEpoch) return s;
+      const data60s: ChartPoint[] = [];
+      const data3hr: ChartPoint[] = [];
+      const now = Date.now();
+      for (const point of points) {
+        const ts = sourceTimeMs(point?.timestamp, now);
+        if (ts === null || !validHashrate(point?.hashrate_60sec) || !validHashrate(point?.hashrate_3hr)) continue;
+        const first = { ...chartPoint(point.hashrate_60sec, ts), gapBefore: point.gap_before };
+        data60s.push(first);
+        data3hr.push({ ...chartPoint(point.hashrate_3hr, ts, first.label), gapBefore: point.gap_before });
+      }
 
       return {
         // Merge hydrated history with any already-received live points.
-        chartData60s: mergeByTimestamp(data60s, s.chartData60s),
-        chartData3hr: mergeByTimestamp(data3hr, s.chartData3hr),
+        chartData60s: mergeChartPoints(data60s, s.chartData60s),
+        chartData3hr: mergeChartPoints(data3hr, s.chartData3hr),
         chartHydrated: true,
+        chartLoadedHours: Math.max(s.chartLoadedHours, hours),
       };
     }),
 

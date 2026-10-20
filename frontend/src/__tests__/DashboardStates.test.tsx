@@ -10,6 +10,9 @@ const { state } = vi.hoisted(() => ({ state: {
 } }));
 vi.mock('../stores/store', () => ({ useAppStore: (selector: (value: typeof state) => unknown) => selector(state) }));
 vi.mock('../api/client', () => ({ fetchMetricHistory: vi.fn().mockResolvedValue([]) }));
+vi.mock('../hooks/useHashrateHistory', () => ({
+  useHashrateHistory: () => ({ hours: 24, setHours: vi.fn(), loading: false, error: null, retry: vi.fn() }),
+}));
 vi.mock('../hooks/useDatumStatus', () => ({ useDatumStatus: () => ({ health: null, datum: null }) }));
 vi.mock('../hooks/useBlockAnnotations', () => ({ useBlockAnnotations: () => ({ annotations: [] }) }));
 vi.mock('../hooks/useCurrency', () => ({ useCurrency: () => ({ formatFiat: (value: number) => `$${value}`, formatFiatSigned: (value: number) => `$${value}` }) }));
