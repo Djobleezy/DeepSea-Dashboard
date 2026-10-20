@@ -150,6 +150,43 @@ async def test_unknown_worker_data_uses_configured_power_fallback(state, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_saved_finances_advance_snapshot_revision_but_preserve_source_age(state, monkeypatch):
+    background._current_metrics = DashboardMetrics(
+        wallet="wallet-a", data_status="fresh", data_updated_at=4000, snapshot_updated_at=5000,
+        btc_price=100000, daily_mined_sats=10000,
+    ).model_dump()
+    background._raw_workers = {
+        "data_updated_at": 4000, "data_status": "fresh",
+        "workers": [{"name": "s21-a", "status": "online", "hashrate_3hr": 100}],
+    }
+    # Equal or backward wall-clock readings must not reuse a revision.
+    monkeypatch.setattr(background, "time", SimpleNamespace(time=lambda: 5000))
+    await background.refresh_financials(state)
+    before = background.get_current_metrics()
+    config.save_config({"power_cost": .5})
+    await background.refresh_financials(state)
+    after = background.get_current_metrics()
+    worker_snapshot = background.get_current_workers()
+    assert after["snapshot_updated_at"] > before["snapshot_updated_at"]
+    assert after["power_cost_per_kwh"] == .5
+    assert after["data_updated_at"] == before["data_updated_at"] == 4000
+    assert worker_snapshot["data_updated_at"] == 4000
+    assert worker_snapshot["snapshot_updated_at"] == after["snapshot_updated_at"]
+    assert background.get_current_metrics()["snapshot_updated_at"] == after["snapshot_updated_at"]
+
+
+@pytest.mark.asyncio
+async def test_new_upstream_snapshot_advances_revision_without_worker_data(state, monkeypatch):
+    background._client = ocean_client(get_worker_data=None)
+    monkeypatch.setattr(background, "time", SimpleNamespace(time=lambda: 5000))
+    monkeypatch.setattr(background, "check_and_fire", AsyncMock())
+    await background.refresh_once(state)
+    previous_revision = background.get_current_metrics()["snapshot_updated_at"]
+    await background.refresh_once(state)
+    assert background.get_current_metrics()["snapshot_updated_at"] > previous_revision
+
+
+@pytest.mark.asyncio
 async def test_unknown_worker_response_still_tries_scraper(monkeypatch):
     client = OceanClient(wallet="wallet-a")
     monkeypatch.setattr(client, "_get", AsyncMock(return_value=SimpleNamespace(json=lambda: {"unexpected": []})))

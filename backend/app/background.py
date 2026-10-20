@@ -154,6 +154,7 @@ async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
         if get_wallet().strip() != wallet or _cache_scope != wallet:
             return
         if next_metrics is not None:
+            next_metrics["snapshot_updated_at"] = (_current_metrics or {}).get("snapshot_updated_at", 0)
             _current_metrics = next_metrics
         elif _current_metrics:
             _current_metrics = {**_current_metrics, "data_status": "stale", "data_error": "Mining data is temporarily unavailable"}
@@ -190,11 +191,20 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
     if not wallet or _cache_scope != wallet:
         return
     metrics = _current_metrics or {}
+    overrides = await get_worker_overrides(db) if _raw_workers is not None else {}
+    if get_wallet().strip() != wallet or _cache_scope != wallet:
+        return
+    # Source age measures the upstream reading. A separate revision orders
+    # derived changes (rates, overrides, stale state) sharing that same reading.
+    revision = max(
+        time.time(),
+        float(metrics.get("snapshot_updated_at") or 0) + 0.000001,
+        float((_current_workers or {}).get("snapshot_updated_at") or 0) + 0.000001,
+    )
     if _raw_workers is not None:
-        overrides = await get_worker_overrides(db)
-        if get_wallet().strip() != wallet or _cache_scope != wallet:
-            return
-        _current_workers = build_worker_summary(_raw_workers, metrics, overrides, wallet)
+        _current_workers = build_worker_summary(
+            {**_raw_workers, "snapshot_updated_at": revision}, metrics, overrides, wallet
+        )
         await cache_set(get_cache_key("workers", wallet), _current_workers, ttl=120)
         if get_wallet().strip() != wallet or _cache_scope != wallet:
             return
@@ -209,7 +219,10 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
         metrics.get("daily_mined_sats", 0), metrics.get("monthly_mined_sats", 0),
         metrics.get("btc_price", 0), rate, power,
     )
-    _current_metrics = {**metrics, **financials, "power_usage_watts": power, "power_cost_per_kwh": rate}
+    _current_metrics = {
+        **metrics, **financials, "power_usage_watts": power,
+        "power_cost_per_kwh": rate, "snapshot_updated_at": revision,
+    }
 
 
 async def _publish_metrics_locked() -> None:

@@ -196,6 +196,7 @@ def build_worker_summary(
         timestamp=raw.get("timestamp", ""),
         wallet=wallet,
         data_updated_at=raw.get("data_updated_at"),
+        snapshot_updated_at=raw.get("snapshot_updated_at", 0.0),
         data_status=(raw.get("data_status", "fresh")
                      if raw.get("data_status", "fresh") != "fresh"
                      else metrics.get("data_status", "fresh")),

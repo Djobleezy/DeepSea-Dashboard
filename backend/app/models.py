@@ -74,6 +74,7 @@ class DashboardMetrics(BaseModel):
     wallet: str = ""
     data_status: Literal["fresh", "stale", "unavailable", "unconfigured"] = "unavailable"
     data_updated_at: Optional[float] = None
+    snapshot_updated_at: float = 0.0
     data_error: Optional[str] = None
     power_usage_watts: float = 0.0
     power_cost_per_kwh: float = 0.12
@@ -135,6 +136,7 @@ class WorkerSummary(BaseModel):
     wallet: str = ""
     data_status: Literal["fresh", "stale", "unavailable", "unconfigured"] = "unavailable"
     data_updated_at: Optional[float] = None
+    snapshot_updated_at: float = 0.0
 
 
 # ---------------------------------------------------------------------------
