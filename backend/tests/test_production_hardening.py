@@ -99,6 +99,10 @@ async def test_exchange_rates_parses_frankfurter_response():
         instance = MockClient.return_value.__aenter__.return_value
         instance.get = AsyncMock(return_value=fake_response)
         rates = await get_exchange_rates()
+        instance.get.assert_awaited_once_with(
+            "https://api.frankfurter.dev/v1/latest",
+            params={"base": "USD", "symbols": "EUR,GBP,CAD,AUD,JPY,CHF"},
+        )
 
     assert rates.get("USD") == 1.0
     assert rates.get("EUR") == 0.92
