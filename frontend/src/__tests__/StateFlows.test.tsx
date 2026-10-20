@@ -69,6 +69,23 @@ describe('wallet-scoped snapshots', () => {
     expect(useAppStore.getState().workers).toBe(revised);
   });
 
+  it('keeps saved financial revisions when mining-source timestamps are equal', () => {
+    const store = useAppStore.getState();
+    store.setWallet('wallet-a');
+    const saved = { ...snapshot('wallet-a', 1000), snapshot_updated_at: 2000, power_cost_per_kwh: .50 };
+    const old = { ...snapshot('wallet-a', 1000), snapshot_updated_at: 1500, power_cost_per_kwh: .12 };
+    expect(store.setMetrics(saved)).toBe(true);
+    expect(store.setMetrics(old)).toBe(false);
+    expect(useAppStore.getState().metrics?.power_cost_per_kwh).toBe(.50);
+    expect(useAppStore.getState().lastUpdated).toBe(1000000);
+
+    const savedWorkers = { wallet: 'wallet-a', workers: [], data_updated_at: 1000, snapshot_updated_at: 2000, total_power_watts: 3000 } as unknown as WorkerSummary;
+    const oldWorkers = { ...savedWorkers, snapshot_updated_at: 1500, total_power_watts: 1000 };
+    expect(store.setWorkers(savedWorkers)).toBe(true);
+    expect(store.setWorkers(oldWorkers)).toBe(false);
+    expect(useAppStore.getState().workers?.total_power_watts).toBe(3000);
+  });
+
   it('retains the source timestamp for stale data rather than stamping receipt time', () => {
     useAppStore.getState().setWallet('wallet-a');
     useAppStore.getState().setMetrics({ ...snapshot('wallet-a', 100), data_status: 'stale', data_error: 'Source unavailable' });
