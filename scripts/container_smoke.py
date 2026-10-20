@@ -46,17 +46,23 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="deepsea-seed-") as directory:
         seed = Path(directory) / "config.json"
         seed.write_text(json.dumps({"wallet": "", "power_cost": 0.12}))
-        seed.chmod(0o644)
+        seed.chmod(0o600)
         original_owner = (seed.stat().st_uid, seed.stat().st_gid)
 
         def start() -> str:
+            docker(
+                "run", "--rm", "--user", "0:0",
+                "--entrypoint", "/usr/local/bin/config_init.sh",
+                "--mount", f"type=volume,src={volumes[0]},dst=/config",
+                "--mount", f"type=bind,src={seed},dst=/config/seed.json,readonly",
+                "-e", "CONFIG_SEED_PATH=/config/seed.json",
+                args.image,
+            )
             docker(
                 "run", "-d", "--name", name,
                 "-p", "127.0.0.1::8000",
                 "--mount", f"type=volume,src={volumes[0]},dst=/config",
                 "--mount", f"type=volume,src={volumes[1]},dst=/data",
-                "--mount", f"type=bind,src={seed},dst=/config/seed.json,readonly",
-                "-e", "CONFIG_SEED_PATH=/config/seed.json",
                 "-e", "REDIS_URL=redis://127.0.0.1:6379/0",
                 args.image,
             )
@@ -71,6 +77,7 @@ def main() -> None:
             assert request(base, "/api/config", {"power_cost": 0.19})["power_cost"] == 0.19
             assert json.loads(seed.read_text())["power_cost"] == 0.12
             assert (seed.stat().st_uid, seed.stat().st_gid) == original_owner
+            assert (seed.stat().st_mode & 0o777) == 0o600
             docker(
                 "exec", name, "python", "-c",
                 "import os, pathlib, stat; "
