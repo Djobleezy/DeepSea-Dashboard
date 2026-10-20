@@ -107,6 +107,28 @@ describe('wallet-scoped snapshots', () => {
     expect(useAppStore.getState().workers).toMatchObject({ workers_total: 2, data_status: 'stale', data_updated_at: 2000 });
   });
 
+  it('marks retained readings stale when a restarted backend returns revision zero', () => {
+    const store = useAppStore.getState();
+    store.setWallet('wallet-a');
+    const metrics = { ...snapshot('wallet-a', 2000), snapshot_updated_at: 2001, hashrate_60sec: 250 };
+    store.setMetrics(metrics);
+    const emptyMetrics = { ...snapshot('wallet-a'), data_updated_at: null, snapshot_updated_at: 0, data_status: 'unavailable' as const, hashrate_60sec: 0 };
+    expect(store.setMetrics(emptyMetrics)).toBe(true);
+    expect(useAppStore.getState().metrics).toMatchObject({
+      hashrate_60sec: 250, data_status: 'stale', data_updated_at: 2000, snapshot_updated_at: 2001,
+    });
+    expect(useAppStore.getState().lastUpdated).toBe(2000000);
+    expect(useAppStore.getState().metricsError).toBeTruthy();
+
+    const workers = { wallet: 'wallet-a', workers: [], workers_total: 2, data_updated_at: 2000, snapshot_updated_at: 2001 } as unknown as WorkerSummary;
+    store.setWorkers(workers);
+    const emptyWorkers = { wallet: 'wallet-a', workers: [], workers_total: 0, data_updated_at: null, snapshot_updated_at: 0, data_status: 'unavailable' } as unknown as WorkerSummary;
+    expect(store.setWorkers(emptyWorkers)).toBe(true);
+    expect(useAppStore.getState().workers).toMatchObject({
+      workers_total: 2, data_status: 'stale', data_updated_at: 2000, snapshot_updated_at: 2001,
+    });
+  });
+
   it('records legitimate zero readings once per source timestamp', () => {
     const store = useAppStore.getState();
     store.addChartPoint(100, 100, 1000);

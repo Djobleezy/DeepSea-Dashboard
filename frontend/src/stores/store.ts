@@ -89,16 +89,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       : (m.data_updated_at ?? m.server_timestamp) * 1000;
     const revision = (m as DashboardMetrics & SnapshotRevision).snapshot_updated_at;
     const previousRevision = (current.metrics as (DashboardMetrics & SnapshotRevision) | null)?.snapshot_updated_at;
-    // Financial recalculations can share a mining-source timestamp. Their
-    // separate revision prevents a delayed pre-save response undoing a save.
-    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
-    if (hasRevisions ? revision < previousRevision
-      : sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return false;
     if (sourceTime === null && current.metrics && current.lastUpdated !== null) {
       // A no-data response cannot erase a successful reading from this wallet.
-      // Keep its age and values, while making the lost source explicit.
+      // A restarted backend has revision 0: handle its loss of data before
+      // ordering snapshots, keeping the last reading's age and revision.
       const retained: DashboardMetrics & SnapshotRevision = {
-        ...current.metrics, ...(typeof revision === 'number' ? { snapshot_updated_at: revision } : {}),
+        ...current.metrics,
+        ...(typeof revision === 'number' && (previousRevision === undefined || revision > previousRevision) ? { snapshot_updated_at: revision } : {}),
         data_status: 'stale', data_error: m.data_error ?? 'Current mining data is unavailable.',
       };
       set({
@@ -108,6 +105,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return true;
     }
+    // Financial recalculations can share a mining-source timestamp. Their
+    // separate revision prevents a delayed pre-save response undoing a save.
+    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
+    if (hasRevisions ? revision < previousRevision
+      : sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return false;
     set({
       prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
       metricsLoading: false,
@@ -172,14 +174,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const previousTime = (current.workers as (WorkerSummary & Pick<DashboardMetrics, 'data_updated_at'>) | null)?.data_updated_at;
     const revision = (w as WorkerSummary & SnapshotRevision).snapshot_updated_at;
     const previousRevision = (current.workers as (WorkerSummary & SnapshotRevision) | null)?.snapshot_updated_at;
-    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
-    if (hasRevisions ? revision < previousRevision
-      : typeof sourceTime === 'number' && typeof previousTime === 'number' && sourceTime < previousTime) return false;
     if (sourceTime === null && typeof previousTime === 'number' && current.workers) {
-      const retained = { ...current.workers, ...(typeof revision === 'number' ? { snapshot_updated_at: revision } : {}), data_status: 'stale' };
+      const retained = {
+        ...current.workers,
+        ...(typeof revision === 'number' && (previousRevision === undefined || revision > previousRevision) ? { snapshot_updated_at: revision } : {}),
+        data_status: 'stale',
+      };
       set({ workers: retained as WorkerSummary });
       return true;
     }
+    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
+    if (hasRevisions ? revision < previousRevision
+      : typeof sourceTime === 'number' && typeof previousTime === 'number' && sourceTime < previousTime) return false;
     set({ workers: w });
     return true;
   },
