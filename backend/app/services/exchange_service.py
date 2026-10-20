@@ -1,4 +1,4 @@
-"""Exchange rate service — fetches and caches currency rates from Frankfurter.app.
+"""Exchange rate service — fetches and caches currency rates from Frankfurter.
 
 No API key required. Rates are cached for 1 hour. Gracefully degrades: if the
 upstream API is unavailable, USD returns 1.0 and other currencies return None
@@ -21,7 +21,7 @@ _log = logging.getLogger(__name__)
 # Supported target currencies (always fetched relative to USD base)
 SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]
 
-_FRANKFURTER_URL = "https://api.frankfurter.app/latest"
+_FRANKFURTER_URL = "https://api.frankfurter.dev/v1/latest"
 _CACHE_TTL_SECONDS = 3600  # 1 hour
 
 _cache: dict[str, Any] = {
