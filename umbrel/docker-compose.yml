@@ -7,11 +7,11 @@ services:
       APP_PORT: 8000
 
   redis:
-    image: redis:7-alpine@sha256:eaea8264f74a95ea9a0767c794c4c68b48f10870e8e4e196f21c8f36053a2e94
-    user: "999:999"
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     restart: on-failure
-    command: >
-      sh -c 'redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru'
+    # Let the official entrypoint initialize bind-mount ownership, then drop
+    # privileges to the image's redis user before starting the server.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - ${APP_DATA_DIR}/redis:/data
     healthcheck:
