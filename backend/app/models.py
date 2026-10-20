@@ -187,6 +187,8 @@ class EarningsResponse(BaseModel):
     total_sats: int = 0
     monthly_summary: list[dict] = Field(default_factory=list)
     currency: str = "USD"
+    data_status: Literal["fresh", "partial", "unconfigured"] = "fresh"
+    data_error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +298,7 @@ class HealthStatus(BaseModel):
     """
 
     status: str = "ok"
-    version: str = "2.1.1"
+    version: str = "2.2.0"
     wallet_configured: bool = False
     redis_connected: bool = False
     last_refresh: Optional[float] = None

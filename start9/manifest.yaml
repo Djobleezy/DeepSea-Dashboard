@@ -1,8 +1,8 @@
 id: deepsea-dashboard
 title: "DeepSea Dashboard"
-version: "2.1.1"
+version: "2.2.0"
 release-notes: |
-  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.1.1
+  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.2.0
   - Complete worker fleets from the live Ocean API and paginated fallback
   - Correct compound block ages and estimated pool block intervals
   - Configurable low-hashrate mode with immediate updates on save

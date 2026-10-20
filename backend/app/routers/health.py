@@ -22,7 +22,7 @@ async def health_check() -> HealthStatus:
     """
     return HealthStatus(
         status="ok",
-        version="2.1.1",
+        version="2.2.0",
         wallet_configured=bool(get_wallet()),
         redis_connected=await is_redis_connected(),
         last_refresh=background.get_last_refresh(),

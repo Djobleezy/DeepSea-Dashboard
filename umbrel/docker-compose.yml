@@ -7,7 +7,7 @@ services:
       APP_PORT: 8000
 
   init:
-    image: ghcr.io/djobleezy/deepsea-dashboard:2.1.1
+    image: ghcr.io/djobleezy/deepsea-dashboard:2.2.0
     user: "0:0"
     restart: "no"
     # Docker creates missing bind directories as root. Prepare only this
@@ -34,7 +34,7 @@ services:
       retries: 3
 
   deepsea:
-    image: ghcr.io/djobleezy/deepsea-dashboard:2.1.1
+    image: ghcr.io/djobleezy/deepsea-dashboard:2.2.0
     user: "1000:1000"
     restart: on-failure
     depends_on:

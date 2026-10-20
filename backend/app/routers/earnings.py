@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app import background
 from app.config import get_currency, get_wallet
@@ -28,7 +28,7 @@ async def get_earnings(
     """
     wallet = get_wallet()
     if not wallet:
-        return EarningsResponse()
+        return EarningsResponse(data_status="unconfigured", currency=get_currency())
 
     # Get BTC price from cached metrics
     btc_price = None
@@ -41,6 +41,13 @@ async def get_earnings(
         raw_payments = await client.get_payment_history(days=days, btc_price=btc_price)
     finally:
         await client.close()
+
+    data_status = getattr(raw_payments, "data_status", "fresh")
+    if data_status == "unavailable":
+        raise HTTPException(
+            status_code=503,
+            detail="Payout history is temporarily unavailable. Please try again.",
+        )
 
     payments = [Payment(**p) for p in raw_payments]
     total_sats = sum(p.amount_sats for p in payments)
@@ -66,4 +73,9 @@ async def get_earnings(
         total_sats=total_sats,
         monthly_summary=monthly_list,
         currency=get_currency(),
+        data_status=data_status,
+        data_error=(
+            "Some payouts may be missing because Ocean payout history could not be loaded completely."
+            if data_status == "partial" else None
+        ),
     )

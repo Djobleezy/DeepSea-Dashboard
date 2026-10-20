@@ -9,6 +9,15 @@ vi.mock('../hooks/useCurrency', () => ({
 }));
 
 describe('Earnings', () => {
+  it('labels incomplete payout totals when only part of the history is available', async () => {
+    vi.mocked(fetchEarnings).mockResolvedValue({
+      payments: [], total_sats: 0, total_btc: 0, monthly_summary: [], currency: 'USD',
+      data_status: 'partial', data_error: 'Some payouts may be missing.',
+    });
+    render(<Earnings />);
+    expect(await screen.findByRole('status')).toHaveTextContent('Some payouts may be missing.');
+  });
+
   it('shows payment types and links Lightning and on-chain payouts to their explorers', async () => {
     vi.mocked(fetchEarnings).mockResolvedValue({
       payments: [
