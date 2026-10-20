@@ -142,10 +142,10 @@ export const Dashboard: React.FC = () => {
     <section className="card">
       <h2 className="label dashboard-section-title">Ocean pool block timer</h2>
       {metrics.last_block_height > 0 ? <>
-        <BitcoinProgressBar lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} targetLabel="estimated pool interval" />
+        <BitcoinProgressBar key={metrics.last_block_height} lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} targetLabel="estimated pool interval" />
         <p className="field-help">Pool blocks arrive irregularly. The interval estimate uses Ocean’s share of network hashrate and is not a deadline.</p>
         <div className="dashboard-detail-list" style={{ marginTop: 20 }}>
-          <div><div className="label">Last Ocean block</div><div className="value-sm">#{metrics.last_block_height.toLocaleString()}</div><LiveBlockTimer lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} /> <span className="field-help" style={{ display: 'inline' }}>ago</span></div>
+          <div><div className="label">Last Ocean block</div><div className="value-sm">#{metrics.last_block_height.toLocaleString()}</div><LiveBlockTimer key={metrics.last_block_height} lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} /> <span className="field-help" style={{ display: 'inline' }}>ago</span></div>
           <div><div className="label">Pool blocks found</div><div className="value-sm">{metrics.blocks_found}</div></div>
         </div>
       </> : <p className="field-help">No pool block timing is available yet.</p>}
