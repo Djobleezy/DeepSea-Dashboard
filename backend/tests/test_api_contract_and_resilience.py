@@ -510,3 +510,90 @@ async def test_payment_history_can_reach_500_payouts_at_five_rows_per_page(monke
     assert len(payments) == 500
     assert payments[-1]["lightning_txid"] == "ln-499"
     assert pages == list(range(100))
+
+
+@pytest.mark.asyncio
+async def test_payment_history_returns_scraped_rows_when_api_hangs(monkeypatch):
+    import asyncio
+
+    from app.services import ocean_client as oc
+
+    monkeypatch.setattr(oc, "PAYOUT_API_BUDGET_SECONDS", 0.03)
+    client = OceanClient(wallet="test-wallet")
+    api_cancelled = asyncio.Event()
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            try:
+                await asyncio.sleep(1)
+            finally:
+                api_cancelled.set()
+        return SimpleNamespace(text=_payouts_html() if "page=0" in url else EMPTY_PAYOUTS_HTML)
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    payments = await asyncio.wait_for(client.get_payment_history(days=360), timeout=0.3)
+
+    assert api_cancelled.is_set()
+    assert len(payments) == 2
+    assert payments[0]["lightning_txid"] == "ln-abc123"
+
+
+@pytest.mark.asyncio
+async def test_payment_history_source_budgets_run_concurrently(monkeypatch):
+    """A near-deadline API response must not postpone the scrape deadline."""
+    import asyncio
+    import time
+
+    from app.services import ocean_client as oc
+
+    monkeypatch.setattr(oc, "PAYOUT_API_BUDGET_SECONDS", 0.2)
+    monkeypatch.setattr(oc, "PAYOUT_SCRAPE_BUDGET_SECONDS", 0.2)
+    client = OceanClient(wallet="test-wallet")
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            await asyncio.sleep(0.15)
+            return _earnpay_response(int(time.time()) - 7 * 86400)
+        if "page=0" in url:
+            return SimpleNamespace(text=_payouts_html())
+        await asyncio.sleep(1)
+        raise AssertionError("the scrape deadline should cancel later pages")
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    # Sequential source budgets would take at least 0.35 seconds here.
+    payments = await asyncio.wait_for(client.get_payment_history(days=360), timeout=0.3)
+
+    assert len(payments) == 2
+    assert payments[0]["lightning_txid"] == "ln-abc123"
+    assert payments[1]["txid"] == "deadbeef"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lightning", [False, True])
+async def test_payment_history_prefers_api_record_for_cross_source_transaction(monkeypatch, lightning):
+    import time
+
+    client = OceanClient(wallet="test-wallet")
+    response = _earnpay_response(int(time.time()) - 5 * 86400)
+    payout = response.json()["result"]["payouts"][0]
+    payout["total_satoshis_net_paid"] = 123_456
+    identifier = "deadbeef"
+    if lightning:
+        identifier = "ln-abc123"
+        payout.update(on_chain_txid="", lightning_txid=identifier)
+
+    async def fake_get(url, timeout=None, headers=None):
+        if "earnpay" in url:
+            return response
+        return SimpleNamespace(text=_payouts_html() if "page=0" in url else EMPTY_PAYOUTS_HTML)
+
+    monkeypatch.setattr(client, "_get", fake_get)
+
+    payments = await client.get_payment_history(days=360)
+    matching = [p for p in payments if (p["lightning_txid"] if lightning else p["txid"]) == identifier]
+
+    assert len(payments) == 2
+    assert len(matching) == 1
+    assert matching[0]["amount_sats"] == 123_456

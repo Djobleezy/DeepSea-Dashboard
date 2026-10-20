@@ -51,6 +51,7 @@ OCEAN_PAYOUTS_URL = "https://ocean.xyz/template/workers/payouts/rows"
 SATS_PER_BTC = 100_000_000
 MAX_PAYOUT_HISTORY = 500
 MAX_PAYOUT_PAGES = 100  # Ocean currently returns five payouts per page.
+PAYOUT_API_BUDGET_SECONDS = 6
 PAYOUT_SCRAPE_BUDGET_SECONDS = 6
 
 _log = logging.getLogger(__name__)
@@ -406,8 +407,9 @@ class OceanClient:
         the stats page payout table — which also lists Lightning payouts — is
         scraped as well, and any entries the API did not return are merged in.
         Pagination walks the requested window and stops at the first page with
-        no unseen rows. The scrape runs under a 6 s budget, retaining rows
-        already parsed if a later page times out.
+        no unseen rows. Both sources run concurrently with 6 s budgets, so
+        retries cannot outlast the frontend's 10 s request timeout. The scrape
+        retains rows already parsed if a later page times out.
         Results are capped at ``MAX_PAYOUT_HISTORY`` entries.
 
         Args:
@@ -420,20 +422,31 @@ class OceanClient:
             ``lightning_txid``, ``amount_btc``, ``amount_sats``, ``status``,
             and optionally ``rate`` / ``fiat_value``, sorted newest first.
         """
-        api_payments = await self._get_payment_history_api(days=days, btc_price=btc_price)
-        exclude_txids = {p["txid"] for p in api_payments if p["txid"]}
-        exclude_lightning_txids = {
-            p["lightning_txid"] for p in api_payments if p["lightning_txid"]
-        }
-        exclude_keys = {(p["date"], p["amount_sats"]) for p in api_payments}
-        scraped = await self._get_payment_history_scrape(
-            days=days,
-            btc_price=btc_price,
-            exclude_txids=exclude_txids,
-            exclude_lightning_txids=exclude_lightning_txids,
-            exclude_keys=exclude_keys,
+        async def fetch_api() -> list[dict]:
+            try:
+                async with asyncio.timeout(PAYOUT_API_BUDGET_SECONDS):
+                    return await self._get_payment_history_api(days=days, btc_price=btc_price)
+            except TimeoutError:
+                _log.warning("Payout API timed out; returning available scraped payouts")
+                return []
+
+        api_payments, scraped = await asyncio.gather(
+            fetch_api(),
+            self._get_payment_history_scrape(days=days, btc_price=btc_price),
         )
-        merged = api_payments + scraped
+        # Prefer API records (which include seconds in their timestamps) when
+        # the same transaction also appears in the scraped minute-level data.
+        merged = []
+        seen_ids: set[tuple[str, str]] = set()
+        seen_keys: set[tuple[str, int]] = set()
+        for payment in api_payments + scraped:
+            ids = {(field, payment[field]) for field in ("txid", "lightning_txid") if payment[field]}
+            key = (payment["date"], payment["amount_sats"])
+            if ids.intersection(seen_ids) or (not ids and key in seen_keys):
+                continue
+            seen_ids.update(ids)
+            seen_keys.add(key)
+            merged.append(payment)
         # Local wall-clock strings can go backwards when daylight saving ends.
         def timestamp(payment: dict) -> float:
             try:
@@ -504,9 +517,6 @@ class OceanClient:
         self,
         days: int,
         btc_price: Optional[float] = None,
-        exclude_txids: Optional[set[str]] = None,
-        exclude_lightning_txids: Optional[set[str]] = None,
-        exclude_keys: Optional[set[tuple[str, int]]] = None,
     ) -> list[dict]:
         """Scrape payout history from the stats page payout table.
 
@@ -520,12 +530,6 @@ class OceanClient:
         Args:
             days: Number of historical days to include.
             btc_price: If provided, adds ``rate`` / ``fiat_value`` per payment.
-            exclude_txids: On-chain txids already known (e.g. from the API);
-                matching rows are omitted from the result but still count as
-                pagination progress so older Lightning payouts are reached.
-            exclude_lightning_txids: Lightning ids already known from the API.
-            exclude_keys: ``(date, amount_sats)`` pairs already known, used to
-                skip rows that carry no parseable txid link.
         """
         tzinfo = _safe_zoneinfo(get_timezone())
         cutoff = datetime.now(ZoneInfo("UTC")) - timedelta(days=days)
@@ -566,7 +570,7 @@ class OceanClient:
                 if page == 0:
                     _log.debug("Payout scrape returned no rows for wallet=%s", self.wallet)
                 break
-            page_progress = 0  # unseen rows, including API-known ones
+            page_progress = 0
             out_of_window = False
 
             for row in rows:
@@ -619,16 +623,6 @@ class OceanClient:
                     continue
                 seen.add(key)
                 page_progress += 1
-
-                # Rows the API already returned are merged from there, but
-                # they still count as pagination progress so Lightning eras
-                # buried behind a page of on-chain payouts are reached.
-                if exclude_txids and txid and txid in exclude_txids:
-                    continue
-                if exclude_lightning_txids and lightning_txid in exclude_lightning_txids:
-                    continue
-                if not (txid or lightning_txid) and exclude_keys and (date_str, sats) in exclude_keys:
-                    continue
 
                 payment = {
                     "date": date_str,
