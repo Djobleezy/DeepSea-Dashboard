@@ -4,6 +4,7 @@ import { fetchMetricHistory } from '../api/client';
 import { useHashrateHistory } from '../hooks/useHashrateHistory';
 import { useAppStore } from '../stores/store';
 import type { MetricHistoryPoint } from '../utils/hashrateHistory';
+import { resetServerClock } from '../utils/serverClock';
 
 vi.mock('../api/client', () => ({ fetchMetricHistory: vi.fn() }));
 const initial = useAppStore.getState();
@@ -19,12 +20,14 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  resetServerClock();
   useAppStore.setState(initial, true);
   useAppStore.getState().setWallet('wallet-a');
   vi.mocked(fetchMetricHistory).mockResolvedValue([sample()]);
 });
 afterEach(() => {
   cleanup();
+  resetServerClock();
   vi.useRealTimers();
 });
 

@@ -6,7 +6,7 @@ import { Dashboard } from '../pages/Dashboard';
 const { state } = vi.hoisted(() => ({ state: {
   wallet: '' as string | null, walletEpoch: 0, metrics: null as Record<string, unknown> | null, prevMetrics: null,
   metricsLoading: false, metricsError: null as string | null, requestMetricsRefresh: vi.fn(),
-  chartData60s: [], chartData3hr: [], addChartPoint: vi.fn(), chartHydrated: true, hydrateChart: vi.fn(),
+  chartData60s: [] as { ts: number; value: number }[], chartData3hr: [] as { ts: number; value: number }[], addChartPoint: vi.fn(), chartHydrated: true, hydrateChart: vi.fn(),
 } }));
 vi.mock('../stores/store', () => ({ useAppStore: (selector: (value: typeof state) => unknown) => selector(state) }));
 vi.mock('../api/client', () => ({ fetchMetricHistory: vi.fn().mockResolvedValue([]) }));
@@ -18,6 +18,7 @@ vi.mock('../hooks/useBlockAnnotations', () => ({ useBlockAnnotations: () => ({ a
 vi.mock('../hooks/useCurrency', () => ({ useCurrency: () => ({ formatFiat: (value: number) => `$${value}`, formatFiatSigned: (value: number) => `$${value}` }) }));
 vi.mock('../components/MetricCard', () => ({ MetricCard: ({ label }: { label: string }) => <div>{label}</div> }));
 vi.mock('../components/PayoutSummary', () => ({ PayoutSummary: () => null }));
+vi.mock('../components/HashrateChart', () => ({ HashrateChart: ({ data60s }: { data60s: unknown[] }) => <div data-testid="saved-chart">Saved readings: {data60s.length}</div> }));
 vi.mock('../components/HashrateNotices', () => ({ HashrateNotices: () => null }));
 
 beforeEach(() => {
@@ -26,6 +27,8 @@ beforeEach(() => {
   state.metrics = null;
   state.metricsError = null;
   state.metricsLoading = false;
+  state.chartData60s = [];
+  state.chartData3hr = [];
 });
 
 function show() { return render(<MemoryRouter><Dashboard /></MemoryRouter>); }
@@ -61,6 +64,18 @@ describe('Dashboard source states', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('last available readings, not current mining status');
     expect(screen.getByText('Updated 2m ago')).toBeInTheDocument();
     expect(state.addChartPoint).not.toHaveBeenCalled();
+  });
+
+  it('keeps persisted history visible while the current upstream reading is unavailable', async () => {
+    state.wallet = 'wallet-a';
+    state.metricsError = 'Ocean unavailable';
+    state.chartData60s = [{ ts: Date.now() - 60000, value: 100 }];
+    state.chartData3hr = [{ ts: Date.now() - 60000, value: 98 }];
+    show();
+    expect(screen.getByRole('alert')).toHaveTextContent('Mining data is unavailable');
+    expect(await screen.findByTestId('saved-chart')).toHaveTextContent('Saved readings: 1');
+    expect(screen.getByText('Current readings are unavailable. Your saved history is shown below.')).toBeInTheDocument();
+    expect(screen.queryByText('Workers hashing')).not.toBeInTheDocument();
   });
 
   it('resets elapsed time for a different block with the same rounded age', () => {

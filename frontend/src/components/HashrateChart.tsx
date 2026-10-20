@@ -5,6 +5,7 @@ import {
 } from 'chart.js';
 import Annotation, { type AnnotationOptions } from 'chartjs-plugin-annotation';
 import type { AnnotationEntry } from '../hooks/useBlockAnnotations';
+import { getServerTime } from '../utils/serverClock';
 import { useAppStore } from '../stores/store';
 import { chartSamples, chartSeries, chartUnit, chartValue, fullChartTime, reduceChartSamples, type HashrateChartPoint } from '../utils/hashrateChart';
 
@@ -38,7 +39,7 @@ interface Props {
   now?: number;
 }
 
-export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = [], lowHashrateMode = false, hours = 24, now = Date.now() }: Props) {
+export function HashrateChart({ data60s, data3hr, avg24hr, blockAnnotations = [], lowHashrateMode = false, hours = 24, now = getServerTime() }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart<'line', { x: number; y: number | null }[]> | null>(null);
   const theme = useAppStore((s) => s.theme);

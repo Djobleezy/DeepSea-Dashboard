@@ -11,6 +11,7 @@ import type {
   WorkerSummary,
 } from '../types';
 import type { MetricHistoryPoint } from '../utils/hashrateHistory';
+import { syncServerTime } from '../utils/serverClock';
 import { publishApiStatus, resetApiStatus } from './status';
 
 const RAW_BASE = import.meta.env.VITE_API_BASE ?? '/api';
@@ -83,6 +84,7 @@ async function request<T>(
   const monitored = method === 'GET' && (path === '/metrics' || path === '/workers');
   const scopeVersion = walletScopeVersion;
   const headers = new Headers(init?.headers);
+  const requestStartedAt = Date.now();
   if (method === 'GET' && walletScope !== null) headers.set('X-DeepSea-Wallet', walletScope);
 
   try {
@@ -114,6 +116,15 @@ async function request<T>(
     }
 
     const data = await res.json();
+    // Calibrate before consumers validate source times or request chart windows.
+    // A saved service-worker response describes the past and cannot set the clock.
+    if (res.headers.get('X-DeepSea-Cache') !== 'stale' && data?.data_status !== 'stale' &&
+        data?.data_status !== 'unavailable' && data?.data_status !== 'unconfigured') {
+      const dateHeader = res.headers.get('Date');
+      const serverTimestamp = typeof data?.server_timestamp === 'number'
+        ? data.server_timestamp : dateHeader ? Date.parse(dateHeader) / 1000 : undefined;
+      syncServerTime(serverTimestamp, requestStartedAt, Date.now());
+    }
     if (path === '/config' && typeof data?.wallet === 'string' &&
         (method !== 'GET' || scopeVersion === walletScopeVersion)) setApiWalletScope(data.wallet);
     if (monitored && scopeVersion === walletScopeVersion) {

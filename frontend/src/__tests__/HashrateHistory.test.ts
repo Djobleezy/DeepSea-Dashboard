@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '../stores/store';
 import type { DashboardMetrics } from '../types';
 import { MAX_CHART_POINTS } from '../utils/hashrateHistory';
+import { getServerTime, resetServerClock } from '../utils/serverClock';
 
 const initial = useAppStore.getState();
 const epoch = 1_800_000_000;
@@ -14,10 +15,11 @@ const metrics = (timestamp: number, value = 100): DashboardMetrics => ({
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime((epoch + 31 * 86_400) * 1000);
+  resetServerClock();
   useAppStore.setState(initial, true);
   useAppStore.getState().setWallet('wallet-a');
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => { resetServerClock(); vi.useRealTimers(); });
 
 describe('durable chart history in the shared store', () => {
   it('retains a full seven-day history with absolute timestamps and both series aligned', () => {
@@ -143,7 +145,7 @@ describe('durable chart history in the shared store', () => {
       const initialHistory = useAppStore.getState().chartData60s;
       store.addChartPoint(999, 999, future);
       expect(useAppStore.getState().chartData60s).toBe(initialHistory);
-      expect(store.setMetrics(metrics(future, 999))).toBe(false);
+      expect(store.setMetrics({ ...metrics(future, 999), server_timestamp: now })).toBe(false);
       store.hydrateChart([row(now - 60), row(future, 999)]);
       expect(useAppStore.getState().chartData60s.map((point) => point.value)).toEqual([100]);
     }
@@ -159,5 +161,37 @@ describe('durable chart history in the shared store', () => {
     store.hydrateChart([row(now + 5)]);
     expect(useAppStore.getState().chartData60s).toHaveLength(1);
     expect(useAppStore.getState().chartData60s[0].ts).toBe((now + 5) * 1000);
+  });
+
+  it('replaces an old reduced selection without moving a gap to an unrelated pair of samples', () => {
+    vi.setSystemTime((epoch + 1000) * 1000);
+    const store = useAppStore.getState();
+    store.hydrateChart([
+      { ...row(epoch - 4000), gap_before: false },
+      { ...row(epoch + 90), gap_before: false },
+      { ...row(epoch + 305), gap_before: true },
+      { ...row(epoch + 310, 310), gap_before: false },
+    ]);
+    store.addChartPoint(500, 250, epoch + 500);
+    store.hydrateChart([
+      { ...row(epoch + 95), gap_before: false },
+      { ...row(epoch + 310, 999), gap_before: true },
+      { ...row(epoch + 315), gap_before: false },
+    ]);
+    const points = useAppStore.getState().chartData60s;
+    expect(points.map((point) => point.ts / 1000 - epoch)).toEqual([-4000, 95, 310, 315, 500]);
+    expect(points[2]).toMatchObject({ value: 310, gapBefore: true });
+  });
+
+  it('accepts the first fresh SSE snapshot with a slow client clock before health synchronization', () => {
+    const serverNow = Date.now();
+    vi.setSystemTime(serverNow - 180_000);
+    const store = useAppStore.getState();
+    expect(store.setMetrics({ ...metrics(serverNow / 1000), server_timestamp: serverNow / 1000 })).toBe(true);
+    expect(getServerTime()).toBe(serverNow);
+    store.hydrateChart([row(serverNow / 1000 - 60), row(serverNow / 1000)]);
+    expect(useAppStore.getState().chartData60s).toHaveLength(2);
+    expect(store.setMetrics({ ...metrics(serverNow / 1000 + 10), server_timestamp: serverNow / 1000 })).toBe(false);
+    expect(useAppStore.getState().chartData60s).toHaveLength(2);
   });
 });

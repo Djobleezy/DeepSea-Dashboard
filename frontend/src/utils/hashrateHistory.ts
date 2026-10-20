@@ -74,13 +74,20 @@ export function appendChartPoint(points: ChartPoint[], point: ChartPoint): Chart
   return prune([...points.slice(0, low), point, ...points.slice(low)]);
 }
 
-/** A live value wins a same-source-sample race against older persisted history. */
-export function mergeChartPoints(historical: ChartPoint[], live: ChartPoint[]): ChartPoint[] {
+/** Replace server-selected coverage; retain newer live values and older ranges. */
+export function mergeChartPoints(historical: ChartPoint[], live: ChartPoint[], coverageStart: number): ChartPoint[] {
+  if (!historical.length) return live;
   const merged = new Map<number, ChartPoint>();
-  for (const point of historical) merged.set(sampleKey(point), point);
+  let coverageEnd = -Infinity;
+  for (const point of historical) {
+    merged.set(sampleKey(point), point);
+    coverageEnd = Math.max(coverageEnd, point.ts);
+    coverageStart = Math.min(coverageStart, point.ts);
+  }
   for (const point of live) {
     const key = sampleKey(point);
     const previous = merged.get(key);
+    if (!previous && point.ts >= coverageStart && point.ts <= coverageEnd) continue;
     // New persisted coverage may fill an earlier gap. Its continuity flag is
     // authoritative even when the already-rendered point carries older metadata.
     merged.set(key, previous?.gapBefore !== undefined

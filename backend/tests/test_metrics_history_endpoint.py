@@ -1,6 +1,7 @@
 """Tests for /api/metrics/history endpoint behavior and bounds."""
 
 import time
+from unittest.mock import AsyncMock
 
 import aiosqlite
 import pytest
@@ -8,13 +9,14 @@ import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.db import get_db
+from app.db import get_db, get_metric_history
 from app.routers import metrics
 
 
 @pytest_asyncio.fixture
 async def test_db(monkeypatch):
     monkeypatch.setattr("app.config.get_wallet", lambda: "wallet-a")
+    monkeypatch.setattr(metrics, "get_wallet", lambda: "wallet-a")
     db = await aiosqlite.connect(":memory:")
     db.row_factory = aiosqlite.Row
     await db.execute(
@@ -163,3 +165,55 @@ async def test_dense_history_endpoint_keeps_newest_sample_and_full_window(test_d
     assert min(point["hashrate_60sec"] for point in result) == 0
     assert max(point["hashrate_3hr"] for point in result) == 6000
     assert all(point["gap_before"] is False for point in result)
+
+
+@pytest.mark.asyncio
+async def test_history_rejects_old_wallet_header_before_querying(test_client, monkeypatch):
+    monkeypatch.setattr(metrics, "get_wallet", lambda: "wallet-b")
+    query = AsyncMock()
+    monkeypatch.setattr(metrics, "get_metric_history", query)
+
+    response = await test_client.get("/api/metrics/history", headers={"X-DeepSea-Wallet": "wallet-a"})
+
+    assert response.status_code == 409
+    query.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_history_pins_checked_wallet_when_config_changes_during_query(test_db, test_client, monkeypatch):
+    now = time.time() - 30
+    await test_db.executemany(
+        "INSERT INTO metric_history(wallet, timestamp, hashrate_60sec, hashrate_3hr) VALUES (?, ?, ?, ?)",
+        [("wallet-a", now, 100, 150), ("wallet-b", now, 900, 950)],
+    )
+    await test_db.commit()
+    captured = []
+
+    async def changing_config_query(db, **kwargs):
+        captured.append(kwargs)
+        monkeypatch.setattr(metrics, "get_wallet", lambda: "wallet-b")
+        monkeypatch.setattr("app.config.get_wallet", lambda: "wallet-b")
+        return await get_metric_history(db, **kwargs)
+
+    monkeypatch.setattr(metrics, "get_metric_history", changing_config_query)
+    response = await test_client.get("/api/metrics/history", headers={"X-DeepSea-Wallet": "wallet-a"})
+
+    assert response.status_code == 200
+    assert captured == [{"hours": 1, "limit": 60, "wallet": "wallet-a"}]
+    assert [point["hashrate_60sec"] for point in response.json()] == [100]
+
+
+@pytest.mark.asyncio
+async def test_history_without_wallet_header_keeps_current_wallet_behavior(test_db, test_client, monkeypatch):
+    now = time.time() - 30
+    await test_db.executemany(
+        "INSERT INTO metric_history(wallet, timestamp, hashrate_60sec, hashrate_3hr) VALUES (?, ?, ?, ?)",
+        [("wallet-a", now, 100, 150), ("wallet-b", now, 900, 950)],
+    )
+    await test_db.commit()
+    monkeypatch.setattr(metrics, "get_wallet", lambda: "wallet-b")
+
+    response = await test_client.get("/api/metrics/history")
+
+    assert response.status_code == 200
+    assert [point["hashrate_60sec"] for point in response.json()] == [900]

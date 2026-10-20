@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { DashboardMetrics, WorkerSummary, Notification, Theme } from '../types';
 import { appendChartPoint, chartPoint, mergeChartPoints, sourceTimeMs, validHashrate } from '../utils/hashrateHistory';
 import type { ChartPoint, HistoryHours, MetricHistoryPoint } from '../utils/hashrateHistory';
+import { getServerTime, syncServerTime } from '../utils/serverClock';
 
 export type { ChartPoint } from '../utils/hashrateHistory';
 
@@ -59,7 +60,7 @@ interface AppState {
 }
 
 function appendSample(state: AppState, hr60s: number, hr3hr: number, timestamp: unknown) {
-  const ts = sourceTimeMs(timestamp, Date.now());
+  const ts = sourceTimeMs(timestamp, getServerTime());
   if (ts === null || !validHashrate(hr60s) || !validHashrate(hr3hr)) return {};
   const first = chartPoint(hr60s, ts);
   return {
@@ -97,9 +98,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const current = get();
     if (m.wallet !== undefined && m.wallet !== current.wallet) return false;
     const sourceTimestamp = m.data_updated_at ?? m.server_timestamp;
+    const envelopeTime = sourceTimeMs(m.server_timestamp);
+    const freshEnvelope = !m.data_status || m.data_status === 'fresh';
+    const validationTime = freshEnvelope && envelopeTime !== null ? envelopeTime : getServerTime();
     // A future sample must not move either retention or response ordering into
     // the future, otherwise later real readings could be rejected indefinitely.
-    if (m.data_updated_at !== null && sourceTimestamp !== undefined && sourceTimeMs(sourceTimestamp, Date.now()) === null) return false;
+    if (m.data_updated_at !== null && sourceTimestamp !== undefined && sourceTimeMs(sourceTimestamp, validationTime) === null) return false;
     const sourceTime = m.data_updated_at === null ? null
       : (m.data_updated_at ?? m.server_timestamp) * 1000;
     const revision = (m as DashboardMetrics & SnapshotRevision).snapshot_updated_at;
@@ -125,6 +129,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
     if (hasRevisions ? revision < previousRevision
       : sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return false;
+    // Initial SSE data can arrive before the first health/REST clock sync.
+    if (freshEnvelope && envelopeTime !== null) syncServerTime(m.server_timestamp);
     set({
       prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
       metricsLoading: false,
@@ -151,7 +157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (expectedWalletEpoch !== undefined && s.walletEpoch !== expectedWalletEpoch) return s;
       const data60s: ChartPoint[] = [];
       const data3hr: ChartPoint[] = [];
-      const now = Date.now();
+      const now = getServerTime();
       for (const point of points) {
         const ts = sourceTimeMs(point?.timestamp, now);
         if (ts === null || !validHashrate(point?.hashrate_60sec) || !validHashrate(point?.hashrate_3hr)) continue;
@@ -162,8 +168,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         // Merge hydrated history with any already-received live points.
-        chartData60s: mergeChartPoints(data60s, s.chartData60s),
-        chartData3hr: mergeChartPoints(data3hr, s.chartData3hr),
+        chartData60s: mergeChartPoints(data60s, s.chartData60s, now - hours * 3_600_000),
+        chartData3hr: mergeChartPoints(data3hr, s.chartData3hr, now - hours * 3_600_000),
         chartHydrated: true,
         chartLoadedHours: Math.max(s.chartLoadedHours, hours),
       };

@@ -8,7 +8,7 @@ import time
 from typing import AsyncGenerator
 
 import aiosqlite
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app import background
@@ -24,6 +24,7 @@ router = APIRouter()
 async def metrics_history(
     hours: int = Query(default=1, ge=1, le=168, description="Hours of history (max 7 days)"),
     db: aiosqlite.Connection = Depends(get_db),
+    requested_wallet: str | None = Header(default=None, alias="X-DeepSea-Wallet"),
 ) -> list[dict]:
     """Return historical metric snapshots for chart hydration on page load.
 
@@ -33,7 +34,13 @@ async def metrics_history(
     readings; clients must not infer outages from downsampled point spacing.
     Returns an empty list if no valid history has been collected yet.
     """
-    return await get_metric_history(db, hours=hours, limit=hours * 60)
+    # History uses a bare array response, so it cannot carry a wallet identity
+    # for clients to verify afterwards. Reject an outdated requested scope and
+    # pin the query to the wallet checked here, even if Config changes in flight.
+    wallet = get_wallet().strip()
+    if requested_wallet is not None and requested_wallet.strip() != wallet:
+        raise HTTPException(status_code=409, detail="Configured wallet changed. Refresh the dashboard configuration.")
+    return await get_metric_history(db, hours=hours, limit=hours * 60, wallet=wallet)
 
 
 @router.get("/metrics", response_model=DashboardMetrics, tags=["metrics"])
