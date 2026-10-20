@@ -22,6 +22,7 @@ consider caching the result per request cycle.
 
 import json
 import logging
+import math
 import os
 from pathlib import Path
 from threading import RLock
@@ -105,6 +106,30 @@ def get_wallet() -> str:
 
 def get_power_cost() -> float:
     return float(load_config().get("power_cost", 0.12))
+
+
+def import_legacy_power_cost(rate: float) -> bool:
+    """Import the old Workers rate only while Config still uses its default.
+
+    Before the migration marker exists, an explicitly chosen 0.12 cannot be
+    distinguished from the shipped default. Treat it as the default once;
+    later explicit writes are protected by the database migration marker.
+    Non-default Config values always take precedence.
+    """
+    if not math.isfinite(rate) or not 0 <= rate <= 10:
+        return False
+    with _save_lock:
+        current = load_config().get("power_cost", 0.12)
+        if isinstance(current, bool):
+            return False
+        try:
+            configured_rate = float(current)
+        except (TypeError, ValueError):
+            return False
+        if configured_rate != 0.12 or rate == configured_rate:
+            return False
+        _save_config_unlocked({"power_cost": rate})
+        return True
 
 
 def get_power_usage() -> float:

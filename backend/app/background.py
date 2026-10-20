@@ -10,7 +10,7 @@ from typing import Optional
 import aiosqlite
 
 from app.config import get_power_cost, get_power_usage, get_wallet
-from app.db import DB_PATH, _configure_connection, get_worker_overrides, save_metric_snapshot
+from app.db import DB_PATH, _configure_connection, get_worker_overrides, migrate_legacy_electricity_rate, save_metric_snapshot
 from app.models import DashboardMetrics, WorkerSummary
 from app.services.cache import cache_delete, cache_set
 from app.services.metrics_service import compute_financials, fetch_full_metrics
@@ -187,6 +187,7 @@ async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
 
 async def _apply_financials(db: aiosqlite.Connection) -> None:
     global _current_metrics, _current_workers
+    await migrate_legacy_electricity_rate(db)
     wallet = get_wallet().strip()
     if not wallet or _cache_scope != wallet:
         return

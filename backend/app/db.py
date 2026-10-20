@@ -1,7 +1,9 @@
 """SQLite database management for persistent data."""
 
+import asyncio
 import json
 import logging
+import math
 import os
 import time
 import uuid
@@ -10,9 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 import aiosqlite
+from starlette.concurrency import run_in_threadpool
 
 DB_PATH = Path(os.environ.get("DB_PATH", "/data/deepsea.db"))
 MAX_NOTIFICATIONS = int(os.environ.get("MAX_NOTIFICATIONS", "1000"))
+LEGACY_RATE_MIGRATION_KEY = "electricity_rate_config_migration_v1"
+_rate_migration_lock = asyncio.Lock()
 
 
 async def _configure_connection(db: aiosqlite.Connection) -> None:
@@ -146,6 +151,7 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_metric_history_ts ON metric_history(timestamp)"
         )
         await db.commit()
+        await migrate_legacy_electricity_rate(db)
     logging.info("Database initialized at %s", DB_PATH)
 
 
@@ -440,6 +446,36 @@ async def set_worker_overrides(db: aiosqlite.Connection, overrides: dict) -> Non
 # ---------------------------------------------------------------------------
 # User settings (electricity rate, etc.)
 # ---------------------------------------------------------------------------
+
+
+async def migrate_legacy_electricity_rate(db: aiosqlite.Connection) -> None:
+    """Reconcile the legacy Workers rate with Config exactly once.
+
+    A valid legacy custom rate fills a missing/default Config rate. An
+    existing non-default Config value wins. Preserve the legacy row and mark
+    every completed decision, including invalid/missing legacy values, so a
+    later explicit Config choice of 0.12 is never overwritten on restart.
+    """
+    from app.config import import_legacy_power_cost
+
+    async with _rate_migration_lock:
+        async with db.execute("SELECT value FROM user_settings WHERE key = ?", (LEGACY_RATE_MIGRATION_KEY,)) as cur:
+            if await cur.fetchone() is not None:
+                return
+        async with db.execute("SELECT value FROM user_settings WHERE key = 'electricity_rate'") as cur:
+            row = await cur.fetchone()
+        imported = False
+        if row is not None:
+            try:
+                value = json.loads(row[0])
+                if isinstance(value, bool):
+                    raise ValueError("Boolean rates are not valid")
+                rate = float(value)
+                if math.isfinite(rate) and 0 <= rate <= 10:
+                    imported = await run_in_threadpool(import_legacy_power_cost, rate)
+            except (TypeError, ValueError):
+                pass
+        await set_user_setting(db, LEGACY_RATE_MIGRATION_KEY, {"completed": True, "imported": imported})
 
 
 async def get_user_settings(db: aiosqlite.Connection) -> dict:

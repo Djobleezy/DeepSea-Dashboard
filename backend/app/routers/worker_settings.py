@@ -13,6 +13,7 @@ from app.config import get_power_cost, save_config
 from app.db import (
     get_db,
     get_worker_overrides,
+    migrate_legacy_electricity_rate,
     set_worker_overrides,
 )
 
@@ -53,6 +54,7 @@ class ElectricityRatePayload(BaseModel):
     summary="Get all worker ASIC overrides and electricity rate",
 )
 async def get_settings(db: aiosqlite.Connection = Depends(get_db)):
+    await migrate_legacy_electricity_rate(db)
     overrides = await get_worker_overrides(db)
     return WorkerOverridesResponse(overrides=overrides, electricity_rate=get_power_cost())
 
@@ -80,6 +82,7 @@ async def save_electricity_rate(
     payload: ElectricityRatePayload,
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await migrate_legacy_electricity_rate(db)
     await run_in_threadpool(save_config, {"power_cost": payload.rate})
     await background.refresh_financials(db)
     return {"electricity_rate": payload.rate}

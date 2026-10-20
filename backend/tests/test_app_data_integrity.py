@@ -1,6 +1,7 @@
 """Regression coverage for truthful mining state, finances, and wallet scope."""
 
 import asyncio
+import json
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -21,6 +22,7 @@ from app.services.worker_service import build_worker_summary
 
 @pytest_asyncio.fixture
 async def state(tmp_path, monkeypatch):
+    monkeypatch.setattr(database, "_rate_migration_lock", asyncio.Lock())
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.json")
     config.save_config({"wallet": "wallet-a", "power_cost": 0.25, "power_usage": 3000})
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "test.db")
@@ -397,3 +399,87 @@ def test_old_wallet_snapshots_are_not_returned(state):
     config.save_config({"wallet": "wallet-b"})
     assert background.get_current_metrics() is None
     assert background.get_current_workers() is None
+
+
+async def prepare_legacy_rate(db, value):
+    await database.set_user_setting(db, "electricity_rate", value)
+    await db.execute("DELETE FROM user_settings WHERE key = ?", (database.LEGACY_RATE_MIGRATION_KEY,))
+    await db.commit()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config_kind", ["default", "missing-key", "missing-file"])
+async def test_legacy_rate_upgrade_imports_only_into_missing_or_default_config(state, config_kind):
+    await prepare_legacy_rate(state, .33)
+    if config_kind == "missing-file":
+        config.CONFIG_PATH.unlink()
+    elif config_kind == "missing-key":
+        config.CONFIG_PATH.write_text(json.dumps({"wallet": "wallet-a"}))
+    else:
+        config.save_config({"power_cost": .12})
+    # Normal startup must finish the migration before serving configuration.
+    await database.init_db()
+    assert config.get_power_cost() == .33
+    settings = await database.get_user_settings(state)
+    assert settings["electricity_rate"] == .33  # Historical data is retained.
+    assert settings[database.LEGACY_RATE_MIGRATION_KEY]["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_legacy_rate_upgrade_preserves_nondefault_config_and_is_idempotent(state):
+    await prepare_legacy_rate(state, .33)
+    config.save_config({"power_cost": .27})
+    await database.migrate_legacy_electricity_rate(state)
+    assert config.get_power_cost() == .27
+    # A later explicit default remains authoritative after migration.
+    config.save_config({"power_cost": .12})
+    await database.migrate_legacy_electricity_rate(state)
+    await database.init_db()
+    assert config.get_power_cost() == .12
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [-1, 11, float("nan"), float("inf"), "invalid", True])
+async def test_legacy_rate_upgrade_rejects_invalid_values(state, value):
+    await prepare_legacy_rate(state, value)
+    config.save_config({"power_cost": .12})
+    await database.migrate_legacy_electricity_rate(state)
+    assert config.get_power_cost() == .12
+    settings = await database.get_user_settings(state)
+    assert settings[database.LEGACY_RATE_MIGRATION_KEY] == {"completed": True, "imported": False}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint,payload", [
+    ("/api/config", {"power_cost": .12}),
+    ("/api/workers/settings/electricity-rate", {"rate": .12}),
+])
+async def test_new_explicit_rate_write_wins_even_before_marker_exists(state, monkeypatch, endpoint, payload):
+    await prepare_legacy_rate(state, .33)
+    config.save_config({"power_cost": .12})
+    app = FastAPI()
+    app.include_router(config_routes.router, prefix="/api")
+    app.include_router(worker_settings.router, prefix="/api")
+
+    async def get_test_db():
+        yield state
+
+    app.dependency_overrides[database.get_db] = get_test_db
+    monkeypatch.setattr(config_routes, "_safe_refresh", AsyncMock())
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.request("POST" if endpoint.endswith("config") else "PUT", endpoint, json=payload)
+        assert response.status_code == 200
+        await database.migrate_legacy_electricity_rate(state)
+        assert config.get_power_cost() == .12
+
+
+@pytest.mark.asyncio
+async def test_worker_settings_read_and_finances_use_migrated_rate(state):
+    await prepare_legacy_rate(state, .4)
+    config.save_config({"power_cost": .12})
+    response = await worker_settings.get_settings(state)
+    assert response.electricity_rate == .4
+    background._current_metrics = DashboardMetrics(wallet="wallet-a").model_dump()
+    await background.refresh_financials(state)
+    assert background.get_current_metrics()["power_cost_per_kwh"] == .4
+    assert background.get_current_metrics()["daily_power_cost"] == 28.8
