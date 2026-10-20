@@ -9,6 +9,7 @@ mkdir -p /root/.data
 
 # Copy default config if none exists
 if [ ! -f /root/.config/config.json ]; then
+  umask 077
   cp /app/config.json.default /root/.config/config.json
 fi
 
