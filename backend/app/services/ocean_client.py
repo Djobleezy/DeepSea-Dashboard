@@ -641,7 +641,7 @@ class OceanClient:
                     return payments
 
             # A page with no unseen rows means the end of history (or the
-            # server ignoring ppage); out-of-window rows mean the rest is older.
+            # server ignoring page); out-of-window rows mean the rest is older.
             if out_of_window or page_progress == 0:
                 break
 
