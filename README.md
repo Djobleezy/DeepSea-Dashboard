@@ -103,7 +103,7 @@ cp config.json.example config.json
 # Edit config.json with your wallet address (see Configuration Reference below)
 
 # 3. Start everything
-docker compose up -d
+docker compose up --build -d
 
 # 4. Open the dashboard
 open http://localhost:5050
