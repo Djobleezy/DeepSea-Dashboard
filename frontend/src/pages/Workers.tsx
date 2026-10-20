@@ -173,11 +173,15 @@ const WorkerCard: React.FC<{
 };
 
 export const Workers: React.FC = () => {
+  const metrics = useAppStore(s => s.metrics);
+  const snapshotRate = metrics?.power_cost_per_kwh;
+  const authoritativeRate = typeof snapshotRate === 'number' && Number.isFinite(snapshotRate)
+    && snapshotRate >= 0 && snapshotRate <= 10 ? snapshotRate : null;
   const [status, setStatus] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [overrides, setOverrides] = useState<OverrideMap>({});
-  const [powerCost, setPowerCost] = useState(0.12);
-  const [rateDraft, setRateDraft] = useState('0.12');
+  const [powerCost, setPowerCost] = useState(authoritativeRate ?? 0.12);
+  const [rateDraft, setRateDraft] = useState(String(authoritativeRate ?? 0.12));
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -185,10 +189,12 @@ export const Workers: React.FC = () => {
   const [showPowerSettings, setShowPowerSettings] = useState(false);
   const mounted = useRef(true);
   const savingRef = useRef(false);
-  const metrics = useAppStore(s => s.metrics);
+  const rateDraftDirty = useRef(false);
   const setMetrics = useAppStore(s => s.setMetrics);
   const { formatFiat } = useCurrency();
   const { workers, loading, error, refresh } = useWorkers('all', 'hashrate_3hr', true);
+  const latestSnapshotRate = useRef(authoritativeRate);
+  latestSnapshotRate.current = authoritativeRate;
   const priceAvailable = metrics !== null && Number.isFinite(metrics.btc_price) && metrics.btc_price > 0
     && metrics.data_status !== 'unavailable' && metrics.data_status !== 'unconfigured';
   const btcPrice = priceAvailable ? metrics.btc_price : 0;
@@ -203,8 +209,9 @@ export const Workers: React.FC = () => {
       const data = await fetchWorkerSettings();
       if (!mounted.current) return;
       setOverrides(decodeOverrides(data.overrides));
-      setPowerCost(data.electricity_rate);
-      setRateDraft(String(data.electricity_rate));
+      const rate = latestSnapshotRate.current ?? data.electricity_rate;
+      setPowerCost(rate);
+      if (!rateDraftDirty.current) setRateDraft(String(rate));
       setSettingsLoaded(true);
     } catch {
       if (mounted.current) setSaveError('Could not load saved power settings. Retry before editing.');
@@ -215,6 +222,11 @@ export const Workers: React.FC = () => {
     void loadSettings();
     return () => { mounted.current = false; };
   }, [loadSettings]);
+  useEffect(() => {
+    if (authoritativeRate === null) return;
+    setPowerCost(authoritativeRate);
+    if (!rateDraftDirty.current) setRateDraft(String(authoritativeRate));
+  }, [authoritativeRate, metrics]);
 
   const refreshCalculations = async () => {
     await refresh();
@@ -236,7 +248,7 @@ export const Workers: React.FC = () => {
       if (mounted.current) {
         setOverrides(decodeOverrides(saved.overrides));
         setPowerCost(saved.electricity_rate);
-        setRateDraft(String(saved.electricity_rate));
+        if (!rateDraftDirty.current) setRateDraft(String(saved.electricity_rate));
         setSaveMessage(name === undefined ? 'All worker overrides reset.' : 'Worker settings saved.');
       }
       await refreshCalculations();
@@ -261,6 +273,7 @@ export const Workers: React.FC = () => {
     try {
       const saved = await saveElectricityRate(rate);
       if (mounted.current) {
+        rateDraftDirty.current = false;
         setPowerCost(saved.electricity_rate);
         setRateDraft(String(saved.electricity_rate));
         setSaveMessage('Electricity rate saved for the whole dashboard.');
@@ -291,7 +304,8 @@ export const Workers: React.FC = () => {
     return Object.entries(map).sort((a, b) => b[1].totalHr - a[1].totalHr);
   }, [allWorkers, overrides]);
   const totalPower = workers?.total_power_watts ?? allWorkers.reduce((sum, w) => sum + w.power_consumption, 0);
-  const totalDailyCost = settingsLoaded ? totalPower / 1000 * 24 * powerCost : null;
+  const rateAvailable = settingsLoaded || authoritativeRate !== null;
+  const totalDailyCost = rateAvailable ? totalPower / 1000 * 24 * powerCost : null;
   const dailyBtc = dataUnavailable ? undefined : workers?.total_daily_earnings_btc;
   const dailyRevenue = dailyBtc === undefined || !priceAvailable ? null : dailyBtc * btcPrice;
   const dailyProfit = dailyRevenue === null || totalDailyCost === null ? null : dailyRevenue - totalDailyCost;
@@ -360,7 +374,11 @@ export const Workers: React.FC = () => {
             <form className="worker-rate-form" onSubmit={saveRate} noValidate>
               <label htmlFor="fleet-electricity-rate">Electricity cost (USD/kWh)</label>
               <input id="fleet-electricity-rate" type="number" min="0" max="10" step="any" disabled={!settingsLoaded || saving} value={rateDraft}
-                onChange={e => {setRateDraft(e.target.value);setSaveError(null);setSaveMessage('');}} aria-describedby="fleet-rate-help" />
+                onChange={e => {
+                  const value = e.target.value;
+                  rateDraftDirty.current = value.trim() === '' || Number(value) !== powerCost;
+                  setRateDraft(value);setSaveError(null);setSaveMessage('');
+                }} aria-describedby="fleet-rate-help" />
               <button className="btn btn-primary" type="submit" disabled={!settingsLoaded || saving}>Save rate</button>
             </form>
             <div><div className="label">Daily cost</div><div className="worker-summary-value">{totalDailyCost === null ? '—' : formatFiat(totalDailyCost)}</div></div>
@@ -382,7 +400,7 @@ export const Workers: React.FC = () => {
       {loading ? <p role="status" className="worker-help">Loading workers…</p> : (error && !workers) ? <p role="alert" className="worker-save-error">Could not load workers. Try again when the connection is available.</p> : filtered.length === 0 ?
         <p className="card worker-help">{allWorkers.length ? 'No workers match this filter.' : 'No workers yet. Confirm your wallet in Configuration and check that your miners are submitting shares.'}</p> :
         <StaggerChildren stagger={40} duration={350} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,300px),1fr))',gap:16}}>
-          {filtered.map(w => <WorkerCard key={w.name} worker={w} maxHashrate={maxHashrate} btcPrice={btcPrice} powerCost={settingsLoaded && !dataUnavailable ? powerCost : null} override={overrides[w.name]}
+          {filtered.map(w => <WorkerCard key={w.name} worker={w} maxHashrate={maxHashrate} btcPrice={btcPrice} powerCost={rateAvailable && !dataUnavailable ? powerCost : null} override={overrides[w.name]}
             disabled={!settingsLoaded || saving} onSave={handleOverride} />)}
         </StaggerChildren>}
     </div>

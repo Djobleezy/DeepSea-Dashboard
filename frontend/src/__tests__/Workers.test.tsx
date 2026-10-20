@@ -92,6 +92,32 @@ describe('Workers', () => {
     expect(screen.getAllByText('+$1.36').length).toBe(2);
   });
 
+  it('updates fleet and worker costs from a streamed rate without discarding an unsaved edit', async () => {
+    await showSettings();
+    const input = screen.getByLabelText('Electricity cost (USD/kWh)');
+    fireEvent.change(input, { target: { value: '0.75' } });
+    act(() => useAppStore.getState().setMetrics({ ...metrics, power_cost_per_kwh: 0.5 }));
+    expect(input).toHaveValue(0.75);
+    expect(screen.getAllByText('-$26.00').length).toBe(2);
+    expect(screen.getAllByText('$36.00').length).toBe(2);
+    expect(screen.getByText(/\$36.00\/day at \$0.50\/kWh/)).toBeInTheDocument();
+    expect(saveElectricityRate).not.toHaveBeenCalled();
+  });
+
+  it('keeps a clean draft synchronized with the current authoritative rate', async () => {
+    await showSettings();
+    act(() => useAppStore.getState().setMetrics({ ...metrics, power_cost_per_kwh: 0.5 }));
+    expect(screen.getByLabelText('Electricity cost (USD/kWh)')).toHaveValue(0.5);
+    expect(screen.getAllByText('-$26.00').length).toBe(2);
+  });
+
+  it('does not let a stale settings response replace a newer snapshot rate', async () => {
+    useAppStore.setState({ metrics: { ...metrics, power_cost_per_kwh: 0.5 } });
+    await showSettings();
+    expect(screen.getByLabelText('Electricity cost (USD/kWh)')).toHaveValue(0.5);
+    expect(screen.getAllByText('-$26.00').length).toBe(2);
+  });
+
   it('rejects an invalid electricity rate without changing active calculations', async () => {
     await showSettings();
     fireEvent.change(screen.getByLabelText('Electricity cost (USD/kWh)'), { target: { value: '11' } });
