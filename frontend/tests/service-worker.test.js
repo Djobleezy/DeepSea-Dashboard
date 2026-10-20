@@ -58,6 +58,12 @@ function scopedRequest(wallet = 'wallet-a') {
   return new Request('https://app.test/api/metrics', { headers: { 'X-DeepSea-Wallet': wallet } });
 }
 
+const settingsWrites = [
+  ['/api/config', 'POST'],
+  ['/api/workers/settings', 'PUT'],
+  ['/api/workers/settings/electricity-rate', 'PUT'],
+];
+
 describe('service worker snapshot caching', () => {
   it('marks fallback as stale while retaining the original snapshot timestamp', async () => {
     const sw = worker();
@@ -91,10 +97,34 @@ describe('service worker snapshot caching', () => {
     for (const path of ['/api/config', '/api/workers/settings', '/api/health', '/api/earnings', '/api/metrics']) {
       expect(sw.dispatch(new Request('https://app.test' + path))).toBeUndefined();
     }
-    expect(sw.dispatch(new Request('https://app.test/api/workers/settings', { method: 'PUT', body: '{}' }))).toBeUndefined();
+    expect(sw.dispatch(new Request('https://app.test/api/notifications/read-all', { method: 'POST', body: '{}' }))).toBeUndefined();
   });
 
-  it('invalidates saved snapshots on configuration changes, including in-flight responses', async () => {
+  it.each(settingsWrites)('invalidates cached snapshots after a successful %s write', async (path, method) => {
+    const sw = worker();
+    sw.fetch.mockResolvedValueOnce(Response.json({ wallet: 'wallet-a', data_status: 'fresh', data_updated_at: 1234 }));
+    await sw.dispatch(scopedRequest());
+    sw.fetch.mockResolvedValueOnce(Response.json({ ok: true }));
+    const saved = await sw.dispatch(new Request('https://app.test' + path, { method, body: '{}' }));
+    expect(saved.status).toBe(200);
+    sw.fetch.mockRejectedValue(new Error('network unavailable'));
+    expect((await sw.dispatch(scopedRequest())).status).toBe(503);
+  });
+
+  it.each(settingsWrites)('preserves cached snapshots when a %s write fails', async (path, method) => {
+    const sw = worker();
+    sw.fetch.mockResolvedValueOnce(Response.json({ wallet: 'wallet-a', data_status: 'fresh', data_updated_at: 1234 }));
+    await sw.dispatch(scopedRequest());
+    sw.fetch.mockResolvedValueOnce(Response.json({ detail: 'Invalid settings' }, { status: 422 }));
+    const rejected = await sw.dispatch(new Request('https://app.test' + path, { method, body: '{}' }));
+    expect(rejected.status).toBe(422);
+    sw.fetch.mockRejectedValue(new Error('network unavailable'));
+    const fallback = await sw.dispatch(scopedRequest());
+    expect(fallback.status).toBe(200);
+    expect(await fallback.json()).toMatchObject({ data_status: 'stale', data_updated_at: 1234 });
+  });
+
+  it.each(settingsWrites)('does not recache an in-flight snapshot after a %s write', async (path, method) => {
     const sw = worker();
     let resolveOld;
     sw.fetch.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }));
@@ -102,7 +132,7 @@ describe('service worker snapshot caching', () => {
     // Wait until the old read has passed its asynchronous cache lookup.
     await vi.waitFor(() => expect(sw.fetch).toHaveBeenCalledOnce());
     sw.fetch.mockResolvedValueOnce(Response.json({ wallet: 'wallet-b' }));
-    await sw.dispatch(new Request('https://app.test/api/config', { method: 'POST', body: '{}' }));
+    await sw.dispatch(new Request('https://app.test' + path, { method, body: '{}' }));
     resolveOld(Response.json({ wallet: 'wallet-a', data_status: 'fresh', data_updated_at: 1234 }));
     await pendingOld;
     sw.fetch.mockRejectedValue(new Error('network unavailable'));

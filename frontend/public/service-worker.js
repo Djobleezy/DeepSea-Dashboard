@@ -152,11 +152,14 @@ self.addEventListener('fetch', (event) => {
     return; // let browser handle natively
   }
 
-  // Writes and editable settings must reach the server. A successful config
-  // update invalidates snapshots, including writes started before that update.
+  // Writes and editable settings must reach the server. Successful wallet or
+  // power-setting updates invalidate the derived metrics/worker snapshots.
   if (request.method !== 'GET') {
-    if (url.pathname === '/api/config' && request.method === 'POST') {
-      event.respondWith(updateConfigAndClearSnapshots(request));
+    const configWrite = url.pathname === '/api/config' && request.method === 'POST';
+    const workerSettingsWrite = request.method === 'PUT' &&
+      (url.pathname === '/api/workers/settings' || url.pathname === '/api/workers/settings/electricity-rate');
+    if (configWrite || workerSettingsWrite) {
+      event.respondWith(updateSettingsAndClearSnapshots(request));
     }
     return;
   }
@@ -260,7 +263,7 @@ async function networkFirstWithTimeout(request, cacheName, timeoutMs, maxEntries
   }
 }
 
-async function updateConfigAndClearSnapshots(request) {
+async function updateSettingsAndClearSnapshots(request) {
   const response = await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
   if (response.ok) {
     apiCacheGeneration++;
