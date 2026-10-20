@@ -25,8 +25,8 @@ Real-time Bitcoin mining dashboard for [Ocean.xyz](https://ocean.xyz) pool miner
 
 ## Features
 
-- **Live Hashrate Monitoring** — 60s, 10min, 3hr, 24hr with auto-scaling (TH/s → PH/s → EH/s)
-- **Interactive Charts** — Chart.js hashrate history with theme-reactive colors, block annotations, Zustand persistence
+- **Live Hashrate Monitoring** — 60s, 10min, 3hr, 24hr with auto-scaling (MH/s → GH/s → TH/s → PH/s → EH/s)
+- **Interactive Charts** — 1h, 6h, 24h and 7-day views, timestamp-accurate gaps, accessible series controls, recent pool-block markers, and persistent wallet-scoped history
 - **Worker Management** — Per-worker cards with ASIC model detection, efficiency/power controls, proportional earnings distribution
 - **Block Explorer** — Real Bitcoin network blocks from mempool.space with pool donut chart and color-coded pool badges
 - **Earnings & Payouts** — Payment history, daily/monthly summaries, estimated time to payout with progress bar
@@ -173,6 +173,14 @@ Estimated daily profit uses estimated daily revenue less electricity cost.
 The unpaid balance is shown separately. Config and Workers share one saved
 electricity rate, and worker power overrides feed the dashboard's cost estimate.
 Payout and chart histories are isolated by wallet.
+
+The hashrate chart starts collecting when DeepSea runs; selecting a longer range
+does not create earlier readings. SQLite retains up to 30 days and 43,200 samples
+per wallet, while each chart response and the browser retain at most 10,080
+readings. Dense views preserve both series' peaks, zeros, and missing-data gaps.
+History continues collecting while you visit another page, survives restarts,
+and is reconciled after reconnecting. Hover to inspect a reading's full date,
+time, and unit; use the legend buttons to show or hide individual series.
 
 ---
 

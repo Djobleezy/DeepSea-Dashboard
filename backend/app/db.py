@@ -104,9 +104,17 @@ async def init_db() -> None:
             columns = {row[1] for row in await cur.fetchall()}
         if "wallet" not in columns:
             await db.execute("ALTER TABLE metric_history ADD COLUMN wallet TEXT NOT NULL DEFAULT ''")
+        # A retry or settings refresh can carry the same source reading. Keep
+        # one row per wallet/sample, including databases created by old builds.
+        await db.execute("""
+            DELETE FROM metric_history WHERE id NOT IN (
+                SELECT MAX(id) FROM metric_history GROUP BY wallet, timestamp
+            )
+        """)
         await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_metric_history_wallet_ts ON metric_history(wallet, timestamp)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_metric_history_sample ON metric_history(wallet, timestamp)"
         )
+        await db.execute("DROP INDEX IF EXISTS idx_metric_history_wallet_ts")
         # Persists notification engine state across restarts, preventing alert
         # storms and duplicate notifications after a process restart.
         await db.execute("""
@@ -307,7 +315,105 @@ def _row_to_notification(row) -> dict:
 # Metric history
 # ---------------------------------------------------------------------------
 
-MAX_METRIC_HISTORY_ROWS = 7 * 24 * 60  # 10,080 rows (7 days @ 60s cadence)
+MAX_METRIC_HISTORY_ROWS = 7 * 24 * 60  # Maximum chart payload (7 days at 60s cadence).
+MAX_STORED_METRIC_HISTORY_ROWS = 30 * 24 * 60  # Per wallet; also enforce 30-day age retention.
+METRIC_HISTORY_RETENTION_SECONDS = 30 * 86400
+METRIC_HISTORY_CLOCK_SKEW_SECONDS = 5
+METRIC_HISTORY_GAP_SECONDS = 150
+
+
+def _chart_sample(timestamp, hashrate_60sec, hashrate_3hr, now: float) -> dict | None:
+    """Validate shared chart coordinates without converting missing data to zero."""
+    values = (timestamp, hashrate_60sec, hashrate_3hr)
+    if any(isinstance(value, bool) or not isinstance(value, (int, float))
+           or not math.isfinite(value) for value in values):
+        return None
+    if timestamp <= 0 or timestamp > now + METRIC_HISTORY_CLOCK_SKEW_SECONDS:
+        return None
+    if hashrate_60sec < 0 or hashrate_3hr < 0:
+        return None
+    return {
+        "timestamp": timestamp,
+        "hashrate_60sec": hashrate_60sec,
+        "hashrate_3hr": hashrate_3hr,
+    }
+
+
+class _ChartHistorySampler:
+    """Reduce a chronological stream without retaining an unbounded DB result.
+
+    Min/max buckets retain both series' extrema. A cumulative gap counter
+    keeps actual interruptions visible even when intervening points are
+    reduced, without treating downsampled spacing as an outage.
+    """
+
+    def __init__(self, limit: int, start: float, end: float):
+        self.limit = limit
+        self.start = start
+        self.duration = max(1.0, end - start)
+        self.bucket_count = max(1, (limit - 2) // 4)
+        self.count = 0
+        self.gap_count = 0
+        self.first: dict | None = None
+        self.last: dict | None = None
+        self.points: list[dict] = []
+        self.buckets: dict[int, list[dict]] = {}
+        self.gap_edges: list[dict] = []
+
+    def add(self, point: dict) -> None:
+        is_gap = self.last is not None and point["timestamp"] - self.last["timestamp"] > METRIC_HISTORY_GAP_SECONDS
+        self.gap_count += int(is_gap)
+        point = {**point, "_gap_count": self.gap_count}
+        if self.first is None:
+            self.first = point
+        if is_gap and len(self.gap_edges) + 2 <= self.limit:
+            self.gap_edges.extend((self.last, point))
+        self.last = point
+        self.count += 1
+        if self.count <= self.limit:
+            self.points.append(point)
+        elif self.points:
+            self.points.clear()
+        bucket = min(self.bucket_count - 1, int(
+            (point["timestamp"] - self.start) / self.duration * self.bucket_count
+        ))
+        extrema = self.buckets.setdefault(bucket, [point] * 4)
+        for index, field in enumerate(("hashrate_60sec", "hashrate_3hr")):
+            if point[field] < extrema[index * 2][field]:
+                extrema[index * 2] = point
+            if point[field] >= extrema[index * 2 + 1][field]:
+                extrema[index * 2 + 1] = point
+
+    def finish(self) -> list[dict]:
+        if self.first is None:
+            return []
+        if self.count <= self.limit:
+            selected = self.points
+        elif self.limit == 1:
+            selected = [self.last]
+        else:
+            candidates = {self.first["timestamp"]: self.first, self.last["timestamp"]: self.last}
+            for extrema in self.buckets.values():
+                for point in extrema:
+                    if len(candidates) < self.limit or point["timestamp"] in candidates:
+                        candidates[point["timestamp"]] = point
+            # Spare capacity preserves exact gap edges where possible; the
+            # counter still preserves discontinuity if the budget is exhausted.
+            for point in self.gap_edges:
+                if len(candidates) < self.limit or point["timestamp"] in candidates:
+                    candidates[point["timestamp"]] = point
+            selected = sorted(candidates.values(), key=lambda point: point["timestamp"])
+        result = []
+        previous_gaps = selected[0]["_gap_count"]
+        for point in selected:
+            result.append({
+                "timestamp": point["timestamp"],
+                "hashrate_60sec": point["hashrate_60sec"],
+                "hashrate_3hr": point["hashrate_3hr"],
+                "gap_before": point["_gap_count"] > previous_gaps,
+            })
+            previous_gaps = point["_gap_count"]
+        return result
 
 
 async def get_metric_history(
@@ -316,11 +422,10 @@ async def get_metric_history(
     limit: int = 360,
     wallet: Optional[str] = None,
 ) -> list[dict]:
-    """Return recent metric snapshots for chart hydration.
+    """Return ordered, wallet-scoped chart samples from the requested window.
 
-    Args:
-        hours: How far back to look (default 1 hour).
-        limit: Maximum rows (default 360 = 6 hours at 60s intervals).
+    Invalid legacy rows are omitted. The source timestamp is retained so a
+    stopped process or an upstream outage appears as a gap, never a zero rate.
     """
     bounded_limit = max(1, min(int(limit), MAX_METRIC_HISTORY_ROWS))
     if wallet is None:
@@ -329,41 +434,66 @@ async def get_metric_history(
         wallet = get_wallet().strip()
     if not wallet:
         return []
-    cutoff = time.time() - hours * 3600
+    now = time.time()
+    cutoff = now - max(1, min(int(hours), 168)) * 3600
+    sampler = _ChartHistorySampler(bounded_limit, cutoff, now + METRIC_HISTORY_CLOCK_SKEW_SECONDS)
     async with db.execute(
         """SELECT timestamp, hashrate_60sec, hashrate_3hr
            FROM metric_history
-           WHERE timestamp > ? AND wallet = ?
-           ORDER BY timestamp ASC
-           LIMIT ?""",
-        (cutoff, wallet, bounded_limit),
+           WHERE timestamp >= ? AND timestamp <= ? AND wallet = ?
+           ORDER BY timestamp ASC, id ASC""",
+        (cutoff, now + METRIC_HISTORY_CLOCK_SKEW_SECONDS, wallet),
     ) as cur:
-        rows = await cur.fetchall()
-    return [
-        {
-            "timestamp": row["timestamp"],
-            "hashrate_60sec": row["hashrate_60sec"],
-            "hashrate_3hr": row["hashrate_3hr"],
-        }
-        for row in rows
-    ]
+        # Streaming also bounds memory while an oversized legacy database is
+        # awaiting its first retention pass. Last valid duplicate wins.
+        pending = None
+        async for row in cur:
+            sample = _chart_sample(row["timestamp"], row["hashrate_60sec"], row["hashrate_3hr"], now)
+            if sample is None:
+                continue
+            if pending is not None and pending["timestamp"] != sample["timestamp"]:
+                sampler.add(pending)
+            pending = sample
+        if pending is not None:
+            sampler.add(pending)
+    return sampler.finish()
 
 
 async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
-    wallet = metrics.get("wallet", "").strip()
-    if not wallet:
+    wallet = metrics.get("wallet", "")
+    if not isinstance(wallet, str) or not wallet.strip():
+        return
+    wallet = wallet.strip()
+    # Only successful source readings belong in history. Derived settings and
+    # failed upstream requests must not make old data look newly sampled.
+    if metrics.get("data_status", "fresh") != "fresh":
+        return
+    now = time.time()
+    sample = _chart_sample(
+        metrics.get("data_updated_at", now), metrics.get("hashrate_60sec"), metrics.get("hashrate_3hr"), now
+    )
+    if sample is None:
         return
     await db.execute(
         """INSERT INTO metric_history
            (wallet, timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
             workers_hashing, btc_price, daily_mined_sats, unpaid_earnings)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(wallet, timestamp) DO UPDATE SET
+               hashrate_60sec=excluded.hashrate_60sec,
+               hashrate_10min=excluded.hashrate_10min,
+               hashrate_3hr=excluded.hashrate_3hr,
+               hashrate_24hr=excluded.hashrate_24hr,
+               workers_hashing=excluded.workers_hashing,
+               btc_price=excluded.btc_price,
+               daily_mined_sats=excluded.daily_mined_sats,
+               unpaid_earnings=excluded.unpaid_earnings""",
         (
             wallet,
-            metrics.get("data_updated_at") or time.time(),
-            metrics.get("hashrate_60sec"),
+            sample["timestamp"],
+            sample["hashrate_60sec"],
             metrics.get("hashrate_10min"),
-            metrics.get("hashrate_3hr"),
+            sample["hashrate_3hr"],
             metrics.get("hashrate_24hr"),
             metrics.get("workers_hashing"),
             metrics.get("btc_price"),
@@ -371,10 +501,17 @@ async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
             metrics.get("unpaid_earnings"),
         ),
     )
-    await db.commit()
-    # Prune old entries (keep 30 days)
-    cutoff = time.time() - 30 * 86400
-    await db.execute("DELETE FROM metric_history WHERE timestamp < ?", (cutoff,))
+    # Bound storage for installations that refresh more frequently than the
+    # default cadence. A different wallet's recent history is never evicted to
+    # make room for the active wallet.
+    await db.execute("DELETE FROM metric_history WHERE timestamp < ?", (now - METRIC_HISTORY_RETENTION_SECONDS,))
+    await db.execute(
+        """DELETE FROM metric_history WHERE wallet = ? AND id IN (
+               SELECT id FROM metric_history WHERE wallet = ?
+               ORDER BY timestamp DESC LIMIT -1 OFFSET ?
+           )""",
+        (wallet, wallet, MAX_STORED_METRIC_HISTORY_ROWS),
+    )
     await db.commit()
 
 

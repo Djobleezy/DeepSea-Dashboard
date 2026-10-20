@@ -32,23 +32,20 @@ export function useSSE() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const watchdogTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageAtRef = useRef(0);
-  const mountedRef = useRef(true);
 
   useEffect(() => {
-    mountedRef.current = true;
     if (wallet === null) return;
+    let active = true;
     const scopeEpoch = useAppStore.getState().walletEpoch;
-    const isCurrent = () => mountedRef.current && scopeEpoch === useAppStore.getState().walletEpoch;
+    const isCurrent = () => active && scopeEpoch === useAppStore.getState().walletEpoch;
+    backoffRef.current = INITIAL_BACKOFF;
 
-    async function resyncSnapshot() {
-      try {
-        const [metrics, workers] = await Promise.all([fetchMetrics(), fetchWorkers()]);
-        if (!isCurrent()) return;
-        setMetrics(metrics);
-        setWorkers(workers);
-      } catch {
-        // Ignore — polling hooks remain a secondary recovery path.
-      }
+    async function resyncSnapshot(connectionIsCurrent: () => boolean) {
+      const [metrics, workers] = await Promise.allSettled([fetchMetrics(), fetchWorkers()]);
+      if (!connectionIsCurrent()) return;
+      // One failed endpoint must not discard a successful current snapshot.
+      if (metrics.status === 'fulfilled') setMetrics(metrics.value);
+      if (workers.status === 'fulfilled') setWorkers(workers.value);
     }
 
     function markActivity() {
@@ -65,8 +62,8 @@ export function useSSE() {
       }, delay);
     }
 
-    function closeConnection(markDisconnected = true) {
-      if (markDisconnected) setSseConnected(false);
+    function closeConnection() {
+      setSseConnected(false);
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;
@@ -76,21 +73,22 @@ export function useSSE() {
     function connect() {
       if (!isCurrent()) return;
 
-      closeConnection(false);
+      closeConnection();
       const es = new EventSource(SSE_URL);
       esRef.current = es;
+      const connectionIsCurrent = () => isCurrent() && esRef.current === es;
       markActivity();
 
       es.addEventListener('open', () => {
-        if (!isCurrent()) return;
+        if (!connectionIsCurrent()) return;
         markActivity();
         setSseConnected(true);
         backoffRef.current = INITIAL_BACKOFF;
-        void resyncSnapshot();
+        void resyncSnapshot(connectionIsCurrent);
       });
 
       es.addEventListener('metrics', (e: MessageEvent) => {
-        if (!isCurrent()) return;
+        if (!connectionIsCurrent()) return;
         markActivity();
         try {
           const data = JSON.parse(e.data) as DashboardMetrics;
@@ -104,7 +102,7 @@ export function useSSE() {
       });
 
       es.addEventListener('workers', (e: MessageEvent) => {
-        if (!isCurrent()) return;
+        if (!connectionIsCurrent()) return;
         markActivity();
         try {
           const data = JSON.parse(e.data) as WorkerSummary;
@@ -118,17 +116,28 @@ export function useSSE() {
       });
 
       es.addEventListener('heartbeat', () => {
+        if (!connectionIsCurrent()) return;
         markActivity();
       });
 
       es.addEventListener('error', () => {
-        if (!isCurrent()) return;
+        if (!connectionIsCurrent()) return;
         closeConnection();
         scheduleReconnect();
       });
     }
 
+    const reconnectNow = () => {
+      if (!isCurrent()) return;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      backoffRef.current = INITIAL_BACKOFF;
+      connect();
+    };
     connect();
+    window.addEventListener('online', reconnectNow);
     watchdogTimerRef.current = setInterval(() => {
       if (!isCurrent() || !esRef.current) return;
       if (Date.now() - lastMessageAtRef.current <= STALE_AFTER_MS) return;
@@ -137,7 +146,8 @@ export function useSSE() {
     }, WATCHDOG_INTERVAL_MS);
 
     return () => {
-      mountedRef.current = false;
+      active = false;
+      window.removeEventListener('online', reconnectNow);
       if (watchdogTimerRef.current) {
         clearInterval(watchdogTimerRef.current);
         watchdogTimerRef.current = null;

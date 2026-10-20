@@ -1,21 +1,18 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchMetricHistory } from '../api/client';
+import { HashrateHistoryPanel } from '../components/HashrateHistoryPanel';
+import { getServerTime } from '../utils/serverClock';
 import { useDatumStatus } from '../hooks/useDatumStatus';
 import { deriveDatumBadge } from '../utils/datum';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
 import { BitcoinProgressBar } from '../components/BitcoinProgressBar';
-import { ErrorBoundary } from '../components/ErrorBoundary';
-import { useBlockAnnotations } from '../hooks/useBlockAnnotations';
 import { useCurrency } from '../hooks/useCurrency';
-import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
+import { fmtHashrate, fmtSats } from '../utils/format';
 import { LiveBlockTimer } from '../components/LiveBlockTimer';
 import { HashrateNotices } from '../components/HashrateNotices';
 import { estimatePoolIntervalMinutes } from '../utils/pool';
-
-const HashrateChart = lazy(() => import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })));
 
 function freshnessLabel(updatedAt: number | null | undefined, now: number) {
   if (!updatedAt) return 'Waiting for the first successful update';
@@ -32,37 +29,14 @@ export const Dashboard: React.FC = () => {
   const metricsLoading = useAppStore((s) => s.metricsLoading);
   const metricsError = useAppStore((s) => s.metricsError);
   const wallet = useAppStore((s) => s.wallet);
-  const walletEpoch = useAppStore((s) => s.walletEpoch);
   const retry = useAppStore((s) => s.requestMetricsRefresh);
-  const chartData60s = useAppStore((s) => s.chartData60s);
-  const chartData3hr = useAppStore((s) => s.chartData3hr);
-  const addChartPoint = useAppStore((s) => s.addChartPoint);
-  const chartHydrated = useAppStore((s) => s.chartHydrated);
-  const hydrateChart = useAppStore((s) => s.hydrateChart);
-  const { annotations: blockAnnotations } = useBlockAnnotations();
-  const hydrationAttempted = useRef<number | null>(null);
   const { health, datum } = useDatumStatus();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(getServerTime);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    const timer = window.setInterval(() => setNow(getServerTime()), 30000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (!wallet || hydrationAttempted.current === walletEpoch || chartHydrated) return;
-    hydrationAttempted.current = walletEpoch;
-    let cancelled = false;
-    fetchMetricHistory(1).then((points) => {
-      if (!cancelled) hydrateChart(Array.isArray(points) ? points : []);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [wallet, walletEpoch, chartHydrated, hydrateChart]);
-
-  useEffect(() => {
-    if (!metrics || metrics.data_status === 'stale' || metrics.data_status === 'unavailable' || metrics.data_status === 'unconfigured') return;
-    addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr, metrics.data_updated_at);
-  }, [metrics, addChartPoint]);
 
   if (wallet === '' || metrics?.data_status === 'unconfigured') {
     return <section className="card dashboard-setup">
@@ -74,14 +48,14 @@ export const Dashboard: React.FC = () => {
   }
 
   if (!metrics || metrics.data_status === 'unavailable') {
-    return <section className="status-panel" role={metricsError || metrics?.data_error ? 'alert' : 'status'}>
+    return <><section className="status-panel" role={metricsError || metrics?.data_error ? 'alert' : 'status'}>
       <div>
         <h1>{metricsError || metrics?.data_error ? 'Mining data is unavailable' : 'Loading your mining data'}</h1>
         <p>{metricsError || metrics?.data_error ? 'We could not get a current snapshot. Check the connection and try again.' : 'Connecting to your configured wallet. Your first update will appear here.'}</p>
       </div>
       {(metricsError || metrics?.data_error || !metricsLoading) && <button className="btn" onClick={retry}>Retry</button>}
       <Link to="/config">Check configuration</Link>
-    </section>;
+    </section>{wallet && <HashrateHistoryPanel />}</>;
   }
 
   const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
@@ -90,12 +64,7 @@ export const Dashboard: React.FC = () => {
     metrics.network_hashrate, metrics.network_hashrate_unit,
     metrics.pool_total_hashrate, metrics.pool_total_hashrate_unit,
   );
-  const hashrates = [
-    { label: metrics.low_hashrate_mode ? '60 sec · variable' : '60 sec', value: metrics.hashrate_60sec, unit: metrics.hashrate_60sec_unit, previous: prevMetrics?.hashrate_60sec, key: 'hashrate_60sec' },
-    { label: '10 min', value: metrics.hashrate_10min, unit: metrics.hashrate_10min_unit, previous: prevMetrics?.hashrate_10min, key: 'hashrate_10min' },
-    { label: metrics.low_hashrate_mode ? '3 hr · primary average' : '3 hr average', value: metrics.hashrate_3hr, unit: metrics.hashrate_3hr_unit, previous: prevMetrics?.hashrate_3hr, key: 'hashrate_3hr' },
-    { label: '24 hr average', value: metrics.hashrate_24hr, unit: metrics.hashrate_24hr_unit, previous: prevMetrics?.hashrate_24hr, key: 'hashrate_24hr' },
-  ];
+
 
   return <div className="dashboard-stack">
     <div className="page-heading">
@@ -113,19 +82,7 @@ export const Dashboard: React.FC = () => {
       <MetricCard label="BTC price" value={formatFiat(metrics.btc_price)} current={metrics.btc_price} previous={prevMetrics?.btc_price} metricKey="btc_price" large />
     </div>
     {!isStale && <HashrateNotices metrics={metrics} />}
-    <section aria-labelledby="hashrate-heading">
-      <h2 id="hashrate-heading" className="label dashboard-section-title">Hashrate averages</h2>
-      <div className="grid-4">{hashrates.map((reading) => {
-        const rate = autoScaleHashrate(reading.value, reading.unit);
-        return <MetricCard key={reading.key} label={reading.label} value={rate.display} unit={rate.unit} current={reading.value} previous={reading.previous} metricKey={reading.key} large />;
-      })}</div>
-    </section>
-    <section className="card" aria-labelledby="history-heading">
-      <h2 className="label dashboard-section-title" id="history-heading">Hashrate history{metrics.low_hashrate_mode ? ' · 3 hr primary average' : ''}</h2>
-      {chartData60s.length > 1 ? <ErrorBoundary><Suspense fallback={<p className="field-help">Loading chart…</p>}>
-        <HashrateChart data60s={chartData60s} data3hr={chartData3hr} avg24hr={metrics.hashrate_24hr} blockAnnotations={blockAnnotations} lowHashrateMode={metrics.low_hashrate_mode} />
-      </Suspense></ErrorBoundary> : <p className="field-help">Your history will appear as readings arrive. Valid zero readings are included.</p>}
-    </section>
+    <HashrateHistoryPanel />
     <div className="grid-2">
       <section className="card">
         <h2 className="label dashboard-section-title">Estimated cash flow</h2>
