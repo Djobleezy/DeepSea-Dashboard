@@ -327,7 +327,7 @@ The Umbrel package uses the pre-built multi-platform image from `ghcr.io/djoblee
 The `start9/` directory contains a full StartOS service wrapper:
 
 1. **From the Start9 Marketplace** — Search for "DeepSea Dashboard" (once accepted)
-2. **Build from source** — Requires [start-sdk](https://github.com/Start9Labs/start-os) and Deno:
+2. **Build from source** — Requires [start-sdk](https://github.com/Start9Labs/start-os), Deno, yq, and Docker Buildx:
    ```bash
    cd start9/
    make          # Builds the .s9pk package
@@ -340,7 +340,7 @@ The Start9 package includes Tor and LAN access, automatic SSL, health checks, an
 
 Each [GitHub Release](https://github.com/Djobleezy/DeepSea-Dashboard/releases) includes:
 - `deepsea-umbrel-<version>.tar.gz` — Complete Umbrel package with pinned image digest
-- `deepsea-start9-<version>.tar.gz` — Complete Start9 wrapper files for `start-sdk pack`
+- `deepsea-start9-<version>.tar.gz` — Source bundle containing the frontend, backend, default configuration, and Start9 wrapper. Extract it and run `make -C start9` from the bundle root to build the `.s9pk` with the prerequisites above. This builds the StartOS image from source rather than repackaging the GHCR image.
 - `packaging-info.txt` — Image digest and platform info for packagers
 
 ---
