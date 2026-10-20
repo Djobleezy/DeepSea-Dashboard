@@ -669,3 +669,6 @@ nav.nav-desktop { flex: 1; gap: 3px; overflow-x: auto; min-width: 0; }
   .grid-4 { grid-template-columns: 1fr; }
   .dashboard-detail-list, .payout-summary-grid { grid-template-columns: 1fr; }
 }
+
+/* Links inherit the selected high-contrast accent, including recovery actions. */
+a { color: var(--primary); }
