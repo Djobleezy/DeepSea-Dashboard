@@ -8,7 +8,7 @@ It uses a **dual-source strategy**:
    and require only a Bitcoin wallet address — no authentication.
 
 2. **HTML scraper** (``https://ocean.xyz/stats/<wallet>``): a fallback used when the
-   API endpoint for worker data is unavailable or returns an empty result.  The
+   API endpoint for worker data is unavailable or has an unknown format.  The
    scraper parses the worker table with BeautifulSoup.
 
 **Retry logic:** every ``_get()`` call retries up to 3 times with exponential backoff
@@ -33,10 +33,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import re
 import time
 from datetime import datetime, timedelta
 from typing import Any, Optional
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -53,8 +54,46 @@ MAX_PAYOUT_HISTORY = 500
 MAX_PAYOUT_PAGES = 100  # Ocean currently returns five payouts per page.
 PAYOUT_API_BUDGET_SECONDS = 6
 PAYOUT_SCRAPE_BUDGET_SECONDS = 6
+MAX_WORKER_PAGES = 100
+WORKER_SCRAPE_BUDGET_SECONDS = 12
 
 _log = logging.getLogger(__name__)
+
+
+def _first_present(data: dict, *keys: str) -> Any:
+    """Select a reported interval without replacing an explicit zero."""
+    return next((data[key] for key in keys if data.get(key) is not None), None)
+
+
+def _worker_summary(workers: list[dict]) -> dict:
+    return {
+        "workers": workers,
+        "total_hashrate": sum(worker["hashrate_3hr"] for worker in workers),
+        "hashrate_unit": "TH/s",
+        "workers_total": len(workers),
+        "workers_online": sum(worker["status"] == "online" for worker in workers),
+        "workers_offline": sum(worker["status"] == "offline" for worker in workers),
+        "total_earnings": 0.0,
+        "timestamp": datetime.now(ZoneInfo("UTC")).isoformat(),
+    }
+
+
+def _worker_record(name: str, hr60: float, hr3: float, status: str, last_share: str = "N/A") -> dict:
+    return {
+        "name": name,
+        "status": status,
+        "type": "ASIC",
+        "model": "Unknown",
+        "hashrate_60sec": hr60,
+        "hashrate_60sec_unit": "TH/s",
+        "hashrate_3hr": hr3,
+        "hashrate_3hr_unit": "TH/s",
+        "efficiency": 0.0,
+        "last_share": last_share,
+        "earnings": 0.0,
+        "power_consumption": 0.0,
+        "acceptance_rate": 100.0,
+    }
 
 
 def _safe_zoneinfo(name: str) -> ZoneInfo:
@@ -220,7 +259,7 @@ class OceanClient:
 
             raw_60 = data.get("hashrate_60s")
             raw_10m = data.get("hashrate_600s")
-            raw_3h = data.get("hashrate_10800s") or data.get("hashrate_7200s") or data.get("hashrate_3600s")
+            raw_3h = _first_present(data, "hashrate_10800s", "hashrate_7200s", "hashrate_3600s")
             raw_24h = data.get("hashrate_86400s")
 
             for key, raw in [
@@ -667,205 +706,178 @@ class OceanClient:
         return await self._get_worker_data_scrape()
 
     async def _get_worker_data_api(self) -> Optional[dict]:
-        """Fetch worker data from ``/v1/user_hashrate_full/<wallet>``.
+        """Parse the complete worker snapshot, including Ocean's one-item arrays.
 
-        Handles both dict-of-workers and list-of-workers response shapes.
-        Filters out sentinel keys (``online``, ``offline``, ``total``, etc.)
-        that Ocean sometimes includes alongside real worker entries.
-
-        Returns:
-            Normalised worker summary dict (including a valid empty fleet),
-            or ``None`` if unavailable or malformed.
+        Unknown or malformed named entries invalidate the snapshot rather than
+        silently reducing the fleet used for power and financial estimates.
         """
         resp = await self._get(f"{API_BASE}/user_hashrate_full/{self.wallet}", timeout=15)
         if resp is None:
             return None
         try:
             data = resp.json()
+            if not isinstance(data, dict):
+                return None
             workers_obj = None
             for container in (data, data.get("result"), data.get("user_hashrate")):
                 if isinstance(container, dict) and "workers" in container:
                     workers_obj = container["workers"]
                     break
-            if workers_obj is None:
-                return None
-
             if isinstance(workers_obj, dict):
-                workers_iter = list(workers_obj.items())
+                entries = list(workers_obj.items())
             elif isinstance(workers_obj, list):
-                workers_iter = []
-                for w in workers_obj:
-                    if not isinstance(w, dict):
-                        continue
-                    workers_iter.append((w.get("workername") or w.get("name"), w))
+                if any(not isinstance(record, dict) for record in workers_obj):
+                    return None
+                entries = [(record.get("workername") or record.get("name"), record) for record in workers_obj]
             else:
                 return None
 
             workers = []
-            total_hashrate = 0.0
-            workers_online = 0
-            workers_offline = 0
+            seen = set()
             invalid = {"online", "offline", "status", "worker", "total"}
-
-            for name, info in workers_iter:
-                if not name or str(name).lower() in invalid or not isinstance(info, dict):
+            rate_keys = (
+                "hashrate_10800s", "hashrate_10800", "hashrate_7200s", "hashrate_7200",
+                "hashrate_3600s", "hashrate_3600", "hashrate_300s",
+            )
+            for name, info in entries:
+                if name and str(name).lower() in invalid:
                     continue
-                try:
-                    hr3_raw = (
-                        info.get("hashrate_10800")
-                        or info.get("hashrate_7200")
-                        or info.get("hashrate_3600")
-                        or info.get("hashrate_300s")
-                    )
-                    hr60_raw = info.get("hashrate_60s") or 0
-                    hr3 = convert_to_ths(float(hr3_raw or 0), "H/s")
-                    hr60 = convert_to_ths(float(hr60_raw or 0), "H/s")
-                except (TypeError, ValueError):
-                    _log.debug("Skipping worker with unparseable hashrates: %r", name)
-                    continue
+                if not name or str(name) in seen:
+                    return None
+                # Current Ocean responses wrap each worker's current record in
+                # a one-item list. Multiple records are ambiguous, so use the
+                # complete HTML fallback instead of discarding or double-counting.
+                if isinstance(info, list):
+                    if len(info) != 1:
+                        return None
+                    info = info[0]
+                if not isinstance(info, dict):
+                    return None
+                hr3_raw = _first_present(info, *rate_keys)
+                hr60_raw = info.get("hashrate_60s")
+                if hr3_raw is None and hr60_raw is None:
+                    return None
+                if isinstance(hr3_raw, bool) or isinstance(hr60_raw, bool):
+                    return None
+                hr3 = convert_to_ths(float(hr3_raw if hr3_raw is not None else 0), "H/s")
+                hr60 = convert_to_ths(float(hr60_raw if hr60_raw is not None else 0), "H/s")
+                if not all(math.isfinite(rate) and rate >= 0 for rate in (hr3, hr60)):
+                    return None
+                status = "online" if hr60 or hr3 else "offline"
+                workers.append(_worker_record(str(name), hr60, hr3, status))
+                seen.add(str(name))
 
-                status = "online" if (hr60 or hr3) else "offline"
-                if status == "online":
-                    workers_online += 1
-                else:
-                    workers_offline += 1
-                total_hashrate += hr3
-                workers.append({
-                    "name": str(name),
-                    "status": status,
-                    "type": "ASIC",
-                    "model": "Unknown",
-                    "hashrate_60sec": hr60,
-                    "hashrate_60sec_unit": "TH/s",
-                    "hashrate_3hr": hr3,
-                    "hashrate_3hr_unit": "TH/s",
-                    "efficiency": 0.0,
-                    "last_share": "N/A",
-                    "earnings": 0.0,
-                    "power_consumption": 0.0,
-                    "acceptance_rate": 100.0,
-                })
-
-            if not workers and workers_iter:
+            if not workers and entries:
                 return None
-
-            return {
-                "workers": workers,
-                "total_hashrate": total_hashrate,
-                "hashrate_unit": "TH/s",
-                "workers_total": len(workers),
-                "workers_online": workers_online,
-                "workers_offline": workers_offline,
-                "total_earnings": 0.0,
-                "timestamp": datetime.now(ZoneInfo("UTC")).isoformat(),
-            }
-        except Exception as e:
-            _log.error("API worker parse error: %s", e)
+            return _worker_summary(workers)
+        except (TypeError, ValueError, AttributeError) as error:
+            _log.warning("API worker snapshot could not be parsed: %s", error)
             return None
 
     async def _get_worker_data_scrape(self) -> Optional[dict]:
-        """Scrape worker data from ocean.xyz/stats/<wallet>."""
-        url = OCEAN_STATS_URL.format(wallet=self.wallet)
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; DeepSea/2.0)",
-            "Accept": "text/html",
-        }
-
-        resp = await self._get(url, timeout=15, headers=headers)
-        if resp is None:
-            _log.warning("Scrape fetch failed for wallet=%s", self.wallet)
+        """Read every worker page, including inactive workers, or fail as a whole."""
+        try:
+            async with asyncio.timeout(WORKER_SCRAPE_BUDGET_SECONDS):
+                return await self._get_all_worker_pages()
+        except TimeoutError:
+            _log.warning("Worker pagination timed out; discarding incomplete fleet")
             return None
 
-        soup = BeautifulSoup(resp.text, "html.parser")
+    async def _get_all_worker_pages(self) -> Optional[dict]:
+        base_url = OCEAN_STATS_URL.format(wallet=self.wallet)
+        expected_url = urlsplit(base_url)
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; DeepSea/2.0)", "Accept": "text/html"}
         workers = []
-        total_hashrate = 0.0
-        workers_online = 0
-        workers_offline = 0
+        seen_names = set()
         invalid = {"online", "offline", "status", "worker", "total"}
+        row_count = 0
+        expected_rows = None
 
-        table = soup.find("tbody", id="workers-tablerows")
-        if table is None:
-            # Fallback selectors for minor Ocean DOM changes
-            table = soup.select_one("table#workers tbody")
-        known_worker_table = table is not None
-        if table is None:
-            table = soup.select_one("tbody")
-        if table is None:
-            _log.warning("Worker scrape table not found for wallet=%s", self.wallet)
-            return None
+        for page in range(MAX_WORKER_PAGES):
+            # Build the URL from our fixed endpoint, never from an upstream href.
+            # Ocean otherwise hides inactive workers by default.
+            url = f"{base_url}?{urlencode({'wactive': 'off', 'wpage': page})}"
+            resp = await self._get(url, timeout=15, headers=headers)
+            if resp is None:
+                return None
+            soup = BeautifulSoup(resp.text, "html.parser")
+            table = soup.find("tbody", id="workers-tablerows") or soup.select_one("table#workers tbody")
+            known_worker_table = table is not None
+            if table is None:
+                table = soup.select_one("tbody")
+            if table is None:
+                return None
+            rows = table.find_all("tr", class_="table-row") or table.find_all("tr")
+            counts = soup.select_one("#workers-page-counts")
+            if counts is not None:
+                match = re.search(r"of\s+([\d,]+)\s+results", counts.get_text(" ", strip=True), re.I)
+                if match:
+                    reported = int(match.group(1).replace(",", ""))
+                    if expected_rows is not None and expected_rows != reported:
+                        return None  # Fleet changed during pagination: retry a whole snapshot later.
+                    expected_rows = reported
+            new_names = set()
+            for row in rows:
+                cells = row.find_all("td")
+                if not cells:
+                    continue
+                name = cells[0].get_text(strip=True)
+                row_count += 1
+                if name.lower() in invalid:
+                    continue
+                if not name or len(cells) < 5 or name in seen_names:
+                    return None
+                try:
+                    rates = []
+                    for cell in (cells[3], cells[4]):
+                        parts = cell.get_text(strip=True).split()
+                        if not parts:
+                            return None
+                        rate = convert_to_ths(float(parts[0].replace(",", "")), parts[1] if len(parts) > 1 else "TH/s")
+                        if not math.isfinite(rate) or rate < 0:
+                            return None
+                        rates.append(rate)
+                except (ValueError, TypeError):
+                    return None
+                status_text = cells[1].get_text(strip=True).lower()
+                if "offline" in status_text:
+                    status = "offline"
+                elif "online" in status_text:
+                    status = "online"
+                else:
+                    return None
+                workers.append(_worker_record(name, rates[0], rates[1], status, cells[2].get_text(strip=True)))
+                new_names.add(name)
+                seen_names.add(name)
 
-        rows = table.find_all("tr", class_="table-row") or table.find_all("tr")
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) < 3:
-                continue
-            name = cells[0].get_text(strip=True)
-            if not name or name.lower() in invalid:
-                continue
-            status_text = cells[1].get_text(strip=True).lower() if len(cells) > 1 else ""
-            status = "online" if "online" in status_text else "offline"
-            if status == "online":
-                workers_online += 1
-            else:
-                workers_offline += 1
+            if not workers and (rows or not known_worker_table):
+                return None
+            if page > 0 and not new_names:
+                return None
 
-            hr60 = 0.0
-            hr60_unit = "TH/s"
-            hr3 = 0.0
-            hr3_unit = "TH/s"
+            scope = soup.select_one("#workers-footer") or soup.select_one("#workers-fulltable") or soup
+            later_pages = set()
+            for link in scope.find_all("a", href=True):
+                try:
+                    target = urlsplit(urljoin(base_url, link["href"]))
+                except ValueError:
+                    continue
+                if (target.scheme, target.netloc, target.path) != (
+                    expected_url.scheme, expected_url.netloc, expected_url.path
+                ):
+                    continue
+                values = parse_qs(target.query).get("wpage", [])
+                if len(values) == 1 and values[0].isdigit() and int(values[0]) > page:
+                    later_pages.add(int(values[0]))
+            if not later_pages:
+                if expected_rows is not None and row_count != expected_rows:
+                    return None
+                return _worker_summary(workers)
+            if page + 1 not in later_pages:
+                return None
 
-            if len(cells) > 3:
-                parts = cells[3].get_text(strip=True).split()
-                if parts:
-                    try:
-                        hr60 = float(parts[0].replace(",", ""))
-                        hr60_unit = parts[1] if len(parts) > 1 else "TH/s"
-                        hr60 = convert_to_ths(hr60, hr60_unit)
-                        hr60_unit = "TH/s"
-                    except ValueError:
-                        pass
-
-            if len(cells) > 4:
-                parts = cells[4].get_text(strip=True).split()
-                if parts:
-                    try:
-                        hr3 = float(parts[0].replace(",", ""))
-                        hr3_unit = parts[1] if len(parts) > 1 else "TH/s"
-                        hr3 = convert_to_ths(hr3, hr3_unit)
-                        hr3_unit = "TH/s"
-                    except ValueError:
-                        pass
-
-            total_hashrate += hr3
-            workers.append({
-                "name": name,
-                "status": status,
-                "type": "ASIC",
-                "model": "Unknown",
-                "hashrate_60sec": hr60,
-                "hashrate_60sec_unit": "TH/s",
-                "hashrate_3hr": hr3,
-                "hashrate_3hr_unit": "TH/s",
-                "efficiency": 0.0,
-                "last_share": cells[2].get_text(strip=True) if len(cells) > 2 else "N/A",
-                "earnings": 0.0,
-                "power_consumption": 0.0,
-                "acceptance_rate": 100.0,
-            })
-
-        if not workers and (rows or not known_worker_table):
-            return None
-
-        return {
-            "workers": workers,
-            "total_hashrate": total_hashrate,
-            "hashrate_unit": "TH/s",
-            "workers_total": len(workers),
-            "workers_online": workers_online,
-            "workers_offline": workers_offline,
-            "total_earnings": 0.0,
-            "timestamp": datetime.now(ZoneInfo("UTC")).isoformat(),
-        }
+        _log.warning("Worker page limit reached; discarding incomplete fleet")
+        return None
 
     # ------------------------------------------------------------------
     # Bitcoin Network Stats
