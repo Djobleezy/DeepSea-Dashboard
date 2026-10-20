@@ -180,3 +180,36 @@ async def test_pagination_does_not_follow_off_origin_or_other_wallet_links(monke
     result = await client._get_worker_data_scrape()
     assert result["workers_total"] == 1
     get.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["total", "online", "offline", "status", "worker"])
+@pytest.mark.parametrize("wrapped", [False, True])
+async def test_reserved_labels_with_worker_fields_are_real_api_workers(monkeypatch, name, wrapped):
+    record = {"hashrate_10800s": 2e12, "hashrate_60s": 1e12}
+    client = OceanClient("test-wallet")
+    payload = {"workers": {name: [record] if wrapped else record, "miner-a": {"hashrate_10800s": 1e12}}}
+    monkeypatch.setattr(client, "_get", AsyncMock(return_value=json_response(payload)))
+
+    result = await client._get_worker_data_api()
+
+    assert result["workers_total"] == 2
+    assert result["total_hashrate"] == 3
+    assert {worker["name"] for worker in result["workers"]} == {name, "miner-a"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["total", "online", "offline", "status", "worker"])
+async def test_worker_link_preserves_reserved_html_name_but_skips_total_summary(monkeypatch, name):
+    summary = worker_row('<a href="/stats/test-wallet">Total</a>', 2)
+    actual = worker_row(f'<a href="/stats/test-wallet.{name}">{name}</a>', 2)
+    client = OceanClient("test-wallet")
+    monkeypatch.setattr(client, "_get", AsyncMock(return_value=SimpleNamespace(
+        text=worker_page(summary + actual, total=2)
+    )))
+
+    result = await client._get_worker_data_scrape()
+
+    assert result["workers_total"] == 1
+    assert result["total_hashrate"] == 2
+    assert result["workers"][0]["name"] == name

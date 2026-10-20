@@ -741,7 +741,15 @@ class OceanClient:
             )
             for name, info in entries:
                 if name and str(name).lower() in invalid:
-                    continue
+                    records = info if isinstance(info, list) else [info]
+                    # These labels can also be legitimate worker names. Ignore
+                    # metadata values only when they contain no worker fields.
+                    if not any(
+                        isinstance(record, dict)
+                        and any(key in record for key in (*rate_keys, "hashrate_60s"))
+                        for record in records
+                    ):
+                        continue
                 if not name or str(name) in seen:
                     return None
                 # Current Ocean responses wrap each worker's current record in
@@ -824,7 +832,23 @@ class OceanClient:
                 name = cells[0].get_text(strip=True)
                 row_count += 1
                 if name.lower() in invalid:
-                    continue
+                    # The aggregate links to /stats/<wallet>; actual workers
+                    # link to /stats/<wallet>.<worker>, even when named Total.
+                    link = cells[0].find("a", href=True)
+                    target = None
+                    if link is not None:
+                        try:
+                            target = urlsplit(urljoin(base_url, link["href"]))
+                        except ValueError:
+                            return None
+                    worker_link = (
+                        target is not None
+                        and (target.scheme, target.netloc) == (expected_url.scheme, expected_url.netloc)
+                        and target.path.startswith(expected_url.path + ".")
+                        and len(target.path) > len(expected_url.path) + 1
+                    )
+                    if not worker_link:
+                        continue
                 if not name or len(cells) < 5 or name in seen_names:
                     return None
                 try:
