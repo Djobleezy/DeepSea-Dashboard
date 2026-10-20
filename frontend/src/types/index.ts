@@ -66,6 +66,8 @@ export interface Worker {
 
 export interface WorkerSummary {
   wallet?: string;
+  data_status?: 'fresh' | 'stale' | 'unavailable' | 'unconfigured';
+  data_updated_at?: number | null;
   workers: Worker[];
   total_hashrate: number;
   hashrate_unit: string;
