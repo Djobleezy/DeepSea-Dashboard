@@ -98,7 +98,7 @@ Real-time Bitcoin mining dashboard for [Ocean.xyz](https://ocean.xyz) pool miner
 git clone https://github.com/Djobleezy/DeepSea-Dashboard.git
 cd DeepSea-Dashboard
 
-# 2. Create your config
+# 2. Create the initial config (imported on first start)
 cp config.json.example config.json
 # Edit config.json with your wallet address (see Configuration Reference below)
 
@@ -113,6 +113,17 @@ The Docker setup starts:
 - `app` — FastAPI backend serving the frontend static files on port 5050
 - `redis` — Redis 7 for caching and pub/sub
 
+On first start, the app imports `config.json` into the persistent
+`deepsea-config` volume. Use the dashboard Config page for later changes;
+editing the original file does not replace saved settings. Configuration and
+mining history survive `docker compose down` and subsequent starts.
+
+To export the active settings:
+
+```bash
+docker compose cp app:/config/config.json ./config.backup.json
+```
+
 ### Stop / Restart
 
 ```bash
@@ -125,7 +136,10 @@ docker compose logs -f app   # tail logs
 
 ## Configuration Reference
 
-All configuration lives in `config.json` at the repo root. Changes are applied via the dashboard Config page or by editing the file directly (backend auto-reloads).
+The default Docker setup stores active settings at `/config/config.json` in the
+`deepsea-config` volume. The repository's `config.json` supplies the initial
+settings only. Apply later changes through the dashboard Config page. If you
+manage a custom config mount, the backend reloads edits to its active file.
 
 ```json
 {
@@ -349,7 +363,7 @@ Each [GitHub Release](https://github.com/Djobleezy/DeepSea-Dashboard/releases) i
 
 ### Dashboard shows all zeros / "N/A"
 
-- **Wallet not configured** — edit `config.json` and set `wallet` to your Ocean.xyz payout address
+- **Wallet not configured** — set your Ocean.xyz payout address on the dashboard Config page. For a fresh Docker install, you can also set `wallet` in `config.json` before the first start.
 - **Ocean.xyz API unreachable** — check your network; the backend logs will show HTTP errors
 - Check `docker compose logs app` for error details
 

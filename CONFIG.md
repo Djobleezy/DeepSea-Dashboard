@@ -1,7 +1,10 @@
 # Configuration Reference
 
-DeepSea Dashboard is configured via `config.json` (mounted at `/config/config.json` in Docker).
-Copy `config.json.example` to `config.json` and edit as needed.
+DeepSea Dashboard reads its active configuration from `/config/config.json` in Docker.
+Copy `config.json.example` to `config.json` and edit it before the first start.
+The default Compose setup imports that file into a persistent named volume once;
+later changes belong on the dashboard Config page. Editing the original seed file
+does not overwrite saved settings.
 
 All fields are optional except `wallet`. Missing fields fall back to the defaults listed below.
 
@@ -147,7 +150,7 @@ match the upper end of your expected operating range.
 
 ```json
 {
-  "wallet": "bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "wallet": "",
   "power_cost": 0.12,
   "power_usage": 3000,
   "currency": "USD",
@@ -164,9 +167,25 @@ match the upper end of your expected operating range.
 ## Docker Usage
 
 ```yaml
+services:
+  app:
+    environment:
+      - CONFIG_PATH=/config/config.json
+      - CONFIG_SEED_PATH=/config/seed.json
+    volumes:
+      - deepsea-config:/config
+      - ./config.json:/config/seed.json:ro
 volumes:
-  - ./config.json:/config/config.json
+  deepsea-config:
 ```
+
+The app initializes the active file with owner-only permissions and preserves it
+on restart. This keeps dashboard updates writable without changing ownership of
+your host's seed file. Export active settings with
+`docker compose cp app:/config/config.json ./config.backup.json`.
+
+For custom bind mounts of the active file, make sure the container user owns and
+can write the file and its parent directory; otherwise dashboard saves will fail.
 
 The config path can be overridden with the `CONFIG_PATH` environment variable:
 
