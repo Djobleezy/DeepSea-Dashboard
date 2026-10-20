@@ -270,7 +270,7 @@ export function useBlockAnnotations(windowMinutes = DEFAULT_WINDOW_MIN) {
       blockAudio.addEventListener('ended', restoreVolume);
       blockAudio.addEventListener('error', restoreVolume);
       blockAudio.play().catch(restoreVolume);
-    } catch (_err) {
+    } catch {
       // ignore missing/blocked audio
     }
 
