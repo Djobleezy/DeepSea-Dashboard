@@ -1,258 +1,19 @@
-/**
- * AudioPlayer — theme-aware ambient audio player
- *
- * Audio files live at /static/audio/ (served by FastAPI backend).
- * The component gracefully handles missing files (no crash, silent fail).
- *
- * Playlists:
- *   bitcoin  → bitcoin.mp3, bitcoin1.mp3, bitcoin2.mp3
- *   deepsea  → ocean.mp3
- *   matrix   → matrix.mp3, matrix1.mp3, matrix2.mp3
- *
- * State persisted to localStorage:
- *   audioVolume, audioTrackIndex, audioMuted, audioPaused
- */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+/** Theme-aware controls for the single shared ambient-audio session. */
+import React from 'react';
 import { useAppStore } from '../stores/store';
-import type { Theme } from '../types';
-
-const PLAYLISTS: Record<Theme, string[]> = {
-  bitcoin: [
-    '/audio/bitcoin.mp3',
-    '/audio/bitcoin1.mp3',
-    '/audio/bitcoin2.mp3',
-  ],
-  deepsea: ['/audio/ocean.mp3'],
-  matrix: [
-    '/audio/matrix.mp3',
-    '/audio/matrix1.mp3',
-    '/audio/matrix2.mp3',
-  ],
-};
-
-const CROSSFADE_DURATION = 2; // seconds
-
-function persist(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // ignore storage failures (private mode/quota)
-  }
-}
-
-function load(key: string, fallback: string): string {
-  try {
-    return localStorage.getItem(key) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
+import { useAudio } from '../hooks/useAudio';
 
 export const AudioPlayer: React.FC = () => {
   const theme = useAppStore((s) => s.theme);
-  const playlist = PLAYLISTS[theme];
-
-  const audioRef = useRef<HTMLAudioElement>(new Audio());
-  const nextRef = useRef<HTMLAudioElement>(new Audio());
-  const crossfadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isCrossfadingRef = useRef(false);
-  const trackIndexRef = useRef(0);
-  const playingRef = useRef(false);
-  const prevThemeRef = useRef(theme);
-
-  const volumeRef = useRef(0.5);
-  const mutedRef = useRef(false);
-
-  const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(() => {
-    const m = load('audioMuted', 'false') === 'true';
-    mutedRef.current = m;
-    return m;
-  });
-  const [volume, setVolume] = useState<number>(() => {
-    const v = parseFloat(load('audioVolume', '0.5'));
-    const resolved = isNaN(v) ? 0.5 : v;
-    volumeRef.current = resolved;
-    return resolved;
-  });
-  const [trackIndex, setTrackIndex] = useState<number>(() => {
-    const idx = parseInt(load('audioTrackIndex', '0'), 10);
-    return isNaN(idx) ? 0 : idx;
-  });
-
-  // Clamp track index whenever playlist changes (theme switch)
-  const safeIndex = trackIndex % playlist.length;
-
-  useEffect(() => {
-    trackIndexRef.current = safeIndex;
-  }, [safeIndex]);
-
-  // ── helpers ──────────────────────────────────────────────────────────────
-  const loadTrack = useCallback(
-    (el: HTMLAudioElement, idx: number) => {
-      el.src = playlist[idx % playlist.length];
-      el.load();
-    },
-    [playlist]
-  );
-
-  const startCrossfade = useCallback((nextIdx: number) => {
-    if (isCrossfadingRef.current) return;
-    isCrossfadingRef.current = true;
-
-    const cur = audioRef.current;
-    const nxt = nextRef.current;
-
-    nxt.volume = 0;
-    nxt.play().catch(() => {});
-
-    const steps = 20;
-    const stepMs = (CROSSFADE_DURATION * 1000) / steps;
-    let step = 0;
-
-    if (crossfadeIntervalRef.current) {
-      clearInterval(crossfadeIntervalRef.current);
-    }
-
-    crossfadeIntervalRef.current = setInterval(() => {
-      step++;
-      const pct = step / steps;
-      const vol = mutedRef.current ? 0 : volumeRef.current;
-      cur.volume = Math.max(0, vol * (1 - pct));
-      nxt.volume = Math.min(vol, vol * pct);
-      if (step >= steps) {
-        if (crossfadeIntervalRef.current) {
-          clearInterval(crossfadeIntervalRef.current);
-          crossfadeIntervalRef.current = null;
-        }
-        cur.pause();
-        cur.src = nxt.src;
-        cur.volume = vol;
-        isCrossfadingRef.current = false;
-        // prepare following track
-        const followingIdx = (nextIdx + 1) % playlist.length;
-        loadTrack(nxt, followingIdx);
-      }
-    }, stepMs);
-  }, [playlist, loadTrack]);
-
-  // ── initial load (mount only) ────────────────────────────────────────────
-  useEffect(() => {
-    const cur = audioRef.current;
-    const nxt = nextRef.current;
-    const effectiveVol = mutedRef.current ? 0 : volumeRef.current;
-    cur.volume = effectiveVol;
-    nxt.volume = effectiveVol;
-    loadTrack(cur, safeIndex);
-    loadTrack(nxt, (safeIndex + 1) % playlist.length);
-    cur.loop = playlist.length === 1;
-
-    // Auto-resume if was playing before
-    const wasPaused = load('audioPaused', 'true') === 'true';
-    if (!wasPaused) {
-      cur.play().then(() => {
-        setPlaying(true);
-        playingRef.current = true;
-      }).catch(() => {});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── end-of-track handler ────────────────────────────────────────────────
-  useEffect(() => {
-    const cur = audioRef.current;
-    const onEnded = () => {
-      if (playlist.length === 1) return; // looping, won't fire
-      const currentIdx = trackIndexRef.current;
-      const nextIdx = (currentIdx + 1) % playlist.length;
-      setTrackIndex(nextIdx);
-      trackIndexRef.current = nextIdx;
-      persist('audioTrackIndex', String(nextIdx));
-      startCrossfade(nextIdx);
-    };
-    cur.addEventListener('ended', onEnded);
-
-    return () => {
-      cur.removeEventListener('ended', onEnded);
-      if (crossfadeIntervalRef.current) {
-        clearInterval(crossfadeIntervalRef.current);
-        crossfadeIntervalRef.current = null;
-      }
-    };
-  }, [playlist, startCrossfade]);
-
-  // Keep refs in sync with state
-  useEffect(() => {
-    playingRef.current = playing;
-  }, [playing]);
-
-  // ── theme change → switch playlist (skip initial mount) ────────────────
-  useEffect(() => {
-    if (prevThemeRef.current === theme) return;
-    prevThemeRef.current = theme;
-
-    const cur = audioRef.current;
-    const wasPlaying = playingRef.current;
-    cur.pause();
-    const newIdx = 0;
-    setTrackIndex(newIdx);
-    trackIndexRef.current = newIdx;
-    loadTrack(cur, newIdx);
-    loadTrack(nextRef.current, 1 % playlist.length);
-    cur.loop = playlist.length === 1;
-    if (wasPlaying) {
-      cur.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-    }
-  }, [loadTrack, playlist, theme]);
-
-  // ── volume sync ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    volumeRef.current = volume;
-    mutedRef.current = muted;
-    audioRef.current.volume = muted ? 0 : volume;
-    nextRef.current.volume = muted ? 0 : volume;
-    persist('audioVolume', String(volume));
-    persist('audioMuted', String(muted));
-  }, [volume, muted]);
-
-  // ── controls ──────────────────────────────────────────────────────────────
-  const togglePlay = useCallback(() => {
-    const cur = audioRef.current;
-    if (playing) {
-      cur.pause();
-      setPlaying(false);
-      persist('audioPaused', 'true');
-    } else {
-      cur.play().then(() => {
-        setPlaying(true);
-        persist('audioPaused', 'false');
-      }).catch(() => {});
-    }
-  }, [playing]);
-
-  const prevTrack = useCallback(() => {
-    const newIdx = (safeIndex - 1 + playlist.length) % playlist.length;
-    setTrackIndex(newIdx);
-    trackIndexRef.current = newIdx;
-    persist('audioTrackIndex', String(newIdx));
-    const cur = audioRef.current;
-    loadTrack(cur, newIdx);
-    loadTrack(nextRef.current, (newIdx + 1) % playlist.length);
-    if (playing) cur.play().catch(() => {});
-  }, [safeIndex, playlist, playing, loadTrack]);
-
-  const nextTrack = useCallback(() => {
-    const newIdx = (safeIndex + 1) % playlist.length;
-    setTrackIndex(newIdx);
-    trackIndexRef.current = newIdx;
-    persist('audioTrackIndex', String(newIdx));
-    const cur = audioRef.current;
-    loadTrack(cur, newIdx);
-    loadTrack(nextRef.current, (newIdx + 1) % playlist.length);
-    if (playing) cur.play().catch(() => {});
-  }, [safeIndex, playlist, playing, loadTrack]);
-
-  const toggleMute = () => setMuted((m) => !m);
+  const { playing, muted, volume, trackIndex: safeIndex, trackCount, error, engine } = useAudio(theme);
+  const setVolume = (next: number | ((current: number) => number)) =>
+    engine.setVolume(typeof next === 'function' ? next(engine.getSnapshot().volume) : next);
+  const setMuted = (next: boolean | ((current: boolean) => boolean)) =>
+    engine.setMuted(typeof next === 'function' ? next(engine.getSnapshot().muted) : next);
+  const togglePlay = engine.togglePlay;
+  const prevTrack = engine.previousTrack;
+  const nextTrack = engine.nextTrack;
+  const toggleMute = () => setMuted((value) => !value);
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -260,15 +21,17 @@ export const AudioPlayer: React.FC = () => {
       style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: '6px',
         fontSize: '11px',
         fontFamily: 'var(--font-mono)',
         color: 'var(--text-dim)',
       }}
-      title={`Theme audio — ${theme} playlist (track ${safeIndex + 1}/${playlist.length})`}
+      title={error ?? `Theme audio — ${theme} playlist (track ${safeIndex + 1}/${trackCount})`}
     >
+      {error && <span role="status" style={{ flexBasis: '100%', fontSize: '11px', color: 'var(--color-warning)', maxWidth: '170px' }}>{error}</span>}
       {/* Prev */}
-      {playlist.length > 1 && (
+      {trackCount > 1 && (
         <button
           onClick={prevTrack}
           style={btnStyle}
@@ -290,7 +53,7 @@ export const AudioPlayer: React.FC = () => {
       </button>
 
       {/* Next */}
-      {playlist.length > 1 && (
+      {trackCount > 1 && (
         <button
           onClick={nextTrack}
           style={btnStyle}
@@ -420,7 +183,9 @@ const btnStyle: React.CSSProperties = {
   cursor: 'pointer',
   color: 'inherit',
   fontSize: '13px',
-  padding: '2px 3px',
+  padding: '6px',
+  minWidth: '28px',
+  minHeight: '32px',
   lineHeight: 1,
   opacity: 0.8,
 };
