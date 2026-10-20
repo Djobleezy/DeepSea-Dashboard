@@ -98,9 +98,5 @@ jobs:
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
-      - name: Verify container starts
-        run: |
-          docker run -d --name test-app -p 8000:8000 deepsea-dashboard:test
-          sleep 10
-          curl -f http://localhost:8000/api/health || (docker logs test-app && exit 1)
-          docker stop test-app
+      - name: Verify fresh configuration and restart persistence
+        run: python3 scripts/container_smoke.py --image deepsea-dashboard:test

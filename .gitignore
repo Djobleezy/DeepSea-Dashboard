@@ -31,3 +31,4 @@ logs/
 # OS
 .DS_Store
 config.json
+config.backup.json

@@ -1,3 +1,9 @@
+x-app-image: &app-image
+  image: deepsea-dashboard:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+
 services:
   redis:
     image: redis:7-alpine
@@ -11,10 +17,22 @@ services:
       timeout: 5s
       retries: 3
 
+  config-init:
+    <<: *app-image
+    user: "0:0"
+    restart: "no"
+    entrypoint: ["/usr/local/bin/config_init.sh"]
+    environment:
+      - CONFIG_PATH=/config/config.json
+      - CONFIG_SEED_PATH=/config/seed.json
+    volumes:
+      - deepsea-config:/config
+      - ./config.json:/config/seed.json:ro
+    security_opt:
+      - no-new-privileges:true
+
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *app-image
     restart: unless-stopped
     ports:
       - "5050:8000"
@@ -24,9 +42,11 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-change-me-in-production}@redis:6379/0
       - DB_PATH=/data/deepsea.db
     volumes:
-      - ./config.json:/config/config.json
+      - deepsea-config:/config
       - deepsea-data:/data
     depends_on:
+      config-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     security_opt:
@@ -39,5 +59,7 @@ services:
       start_period: 15s
 
 volumes:
+  deepsea-config:
+    driver: local
   deepsea-data:
     driver: local

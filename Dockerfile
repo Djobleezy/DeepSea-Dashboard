@@ -33,12 +33,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Copy example config as fallback (overridden by bind mount at runtime)
-COPY config.json.example /config/config.json
+# Keep the seed separate from the writable config volume.
+COPY --chmod=644 config.json.example /app/config.json.default
+COPY --chmod=755 docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
+COPY --chmod=755 config_init.sh /usr/local/bin/config_init.sh
 
 # Create non-root runtime user and writable app directories
 RUN addgroup --system app && adduser --system --ingroup app app \
     && mkdir -p /data /config \
+    && chmod -R a+rX /app/backend /app/frontend \
     && chown -R app:app /app /data /config
 
 USER app
@@ -48,4 +51,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD python /app/backend/healthcheck.py
 
+ENTRYPOINT ["docker_entrypoint.sh"]
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
