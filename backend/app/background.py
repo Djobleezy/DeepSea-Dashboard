@@ -162,6 +162,8 @@ async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
             _raw_workers = {**_raw_workers, "data_status": "stale"}
 
     await _recalculate_financials_locked(db)
+    if get_wallet().strip() != wallet or _cache_scope != wallet:
+        return
     if metrics_ok:
         _last_refresh = _current_metrics["data_updated_at"]
         await save_metric_snapshot(db, _current_metrics)
