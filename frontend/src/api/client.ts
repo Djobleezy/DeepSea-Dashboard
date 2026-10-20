@@ -10,12 +10,25 @@ import type {
   Notification,
   WorkerSummary,
 } from '../types';
+import { publishApiStatus, resetApiStatus } from './status';
 
 const RAW_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 const BASE = String(RAW_BASE).replace(/\/+$/, '');
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 10000);
 
 const MAX_RATE_LIMIT_RETRIES = 3;
+let walletScope: string | null = null;
+let walletScopeVersion = 0;
+
+/** Set only from a successful live configuration read or write. */
+export function setApiWalletScope(wallet: string): void {
+  const next = wallet.trim();
+  if (walletScope !== next) {
+    walletScopeVersion++;
+    resetApiStatus();
+  }
+  walletScope = next;
+}
 
 // Simple toast helper — avoids importing a full toast library here
 function _showRateLimitToast(message: string): void {
@@ -65,10 +78,16 @@ async function request<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const method = init?.method ?? 'GET';
+  const monitored = method === 'GET' && (path === '/metrics' || path === '/workers');
+  const scopeVersion = walletScopeVersion;
+  const headers = new Headers(init?.headers);
+  if (method === 'GET' && walletScope !== null) headers.set('X-DeepSea-Wallet', walletScope);
 
   try {
     const res = await fetch(buildUrl(path, params), {
       ...init,
+      headers,
       signal: controller.signal,
     });
 
@@ -93,8 +112,25 @@ async function request<T>(
       throw new Error(`API ${init?.method ?? 'GET'} ${path} failed: ${res.status}${detail ? ` - ${detail}` : ''}`);
     }
 
-    return (await res.json()) as T;
+    const data = await res.json();
+    if (path === '/config' && typeof data?.wallet === 'string' &&
+        (method !== 'GET' || scopeVersion === walletScopeVersion)) setApiWalletScope(data.wallet);
+    if (monitored && scopeVersion === walletScopeVersion) {
+      const cached = res.headers.get('X-DeepSea-Cache') === 'stale';
+      if (cached && data && typeof data === 'object') {
+        data.data_status = 'stale';
+        data.data_error ||= 'Server unavailable. Showing the last saved snapshot.';
+      }
+      publishApiStatus({
+        path,
+        status: cached || data?.data_status === 'stale' ? 'stale' : data?.data_status === 'unavailable' ? 'unavailable' : 'fresh',
+        updatedAt: typeof data?.data_updated_at === 'number' ? data.data_updated_at : null,
+        error: data?.data_error ?? null,
+      });
+    }
+    return data as T;
   } catch (err) {
+    if (monitored && scopeVersion === walletScopeVersion) publishApiStatus({ path, status: 'unavailable', updatedAt: null, error: 'Dashboard data is unavailable. Retrying the connection.' });
     if (err instanceof DOMException && err.name === 'AbortError') {
       throw new Error(`API ${init?.method ?? 'GET'} ${path} timed out after ${API_TIMEOUT_MS}ms`);
     }
