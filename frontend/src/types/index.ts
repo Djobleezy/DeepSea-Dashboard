@@ -5,6 +5,8 @@ export interface DashboardMetrics {
   wallet?: string;
   data_status?: 'fresh' | 'stale' | 'unavailable' | 'unconfigured';
   data_updated_at?: number | null;
+  /** Orders recalculated snapshots without changing the mining-data age. */
+  snapshot_updated_at?: number;
   data_error?: string | null;
   power_usage_watts?: number;
   power_cost_per_kwh?: number;
@@ -68,6 +70,7 @@ export interface WorkerSummary {
   wallet?: string;
   data_status?: 'fresh' | 'stale' | 'unavailable' | 'unconfigured';
   data_updated_at?: number | null;
+  snapshot_updated_at?: number;
   workers: Worker[];
   total_hashrate: number;
   hashrate_unit: string;
