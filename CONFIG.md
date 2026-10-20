@@ -32,6 +32,10 @@ Your electricity rate in US dollars per kilowatt-hour. The Config and Workers
 pages share this saved rate. Both pages use it for daily power-cost and profit
 estimates; changing it in either place updates the same setting.
 
+On upgrade, an existing custom Workers rate is imported once if the Config rate
+is still the default. An already customized Config rate takes precedence. Later
+changes always use the shared setting and do not re-import the old value.
+
 ---
 
 ### `power_usage`
