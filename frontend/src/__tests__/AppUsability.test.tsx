@@ -42,6 +42,7 @@ describe('Configuration accessibility and save behavior', () => {
     expect(screen.getByRole('spinbutton', { name: 'Electricity rate ($/kWh)' })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Fallback power draw (W)' })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Pool fee estimate (%)' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Low-hashrate threshold (TH/s)' })).toHaveValue(3);
     expect(screen.getByRole('combobox', { name: 'Display currency' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Timezone' })).toBeInTheDocument();
     fireEvent.change(wallet, { target: { value: 'wallet-b' } });
@@ -49,6 +50,16 @@ describe('Configuration accessibility and save behavior', () => {
     await waitFor(() => expect(store.setWallet).toHaveBeenCalledWith('wallet-b'));
     expect(store.requestMetricsRefresh).toHaveBeenCalledOnce();
     expect(screen.getByRole('status')).toHaveTextContent('Settings saved');
+  });
+
+  it('loads and saves a custom low-hashrate threshold', async () => {
+    vi.mocked(fetchConfig).mockResolvedValue({ ...config, low_hashrate_threshold_ths: 10 });
+    render(<MemoryRouter><Boot /></MemoryRouter>);
+    const threshold = await screen.findByRole('spinbutton', { name: 'Low-hashrate threshold (TH/s)' });
+    expect(threshold).toHaveValue(10);
+    fireEvent.change(threshold, { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledWith(expect.objectContaining({ low_hashrate_threshold_ths: 0 })));
   });
 
   it('does not offer editable defaults after configuration loading fails', async () => {

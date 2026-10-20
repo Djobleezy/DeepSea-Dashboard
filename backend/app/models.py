@@ -245,6 +245,7 @@ class AppConfig(BaseModel):
     timezone: str = "America/Los_Angeles"
     network_fee: float = Field(default=0.5, ge=0, le=100)
     extended_history: bool = False
+    low_hashrate_threshold_ths: float = Field(default=3.0, ge=0, le=1_000_000, allow_inf_nan=False, strict=True)
     # Optional base URL of a local DATUM Gateway (e.g.
     # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
     # for a stock self-build). Empty disables the explicit reachability probe;
@@ -272,6 +273,7 @@ class ConfigUpdate(BaseModel):
     timezone: Optional[str] = None
     network_fee: Optional[float] = Field(default=None, ge=0, le=100)
     extended_history: Optional[bool] = None
+    low_hashrate_threshold_ths: Optional[float] = Field(default=None, ge=0, le=1_000_000, allow_inf_nan=False, strict=True)
     datum_gateway_url: Optional[str] = Field(default=None, max_length=500)
 
     @field_validator("currency", mode="before")

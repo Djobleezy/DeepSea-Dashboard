@@ -9,7 +9,7 @@ from typing import Optional
 
 import aiosqlite
 
-from app.config import get_power_cost, get_power_usage, get_wallet
+from app.config import get_low_hashrate_threshold_ths, get_power_cost, get_power_usage, get_wallet
 from app.db import DB_PATH, _configure_connection, get_worker_overrides, migrate_legacy_electricity_rate, save_metric_snapshot
 from app.models import DashboardMetrics, WorkerSummary
 from app.services.cache import cache_delete, cache_set
@@ -223,6 +223,7 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
     _current_metrics = {
         **metrics, **financials, "power_usage_watts": power,
         "power_cost_per_kwh": rate, "snapshot_updated_at": revision,
+        "low_hashrate_mode": float(metrics.get("hashrate_3hr") or 0) < get_low_hashrate_threshold_ths(),
     }
 
 
@@ -237,7 +238,7 @@ async def _publish_metrics_locked() -> None:
 
 
 async def refresh_financials(db: aiosqlite.Connection) -> None:
-    """Apply a saved cost/override change without waiting on upstream requests."""
+    """Apply saved settings to the current snapshot without waiting on upstream."""
     async with _financial_lock:
         await _apply_financials(db)
         await _publish_metrics_locked()
