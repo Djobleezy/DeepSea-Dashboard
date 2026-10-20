@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from typing import Any, Optional
 
@@ -35,6 +36,10 @@ from app.services.ocean_client import OceanClient
 
 SATS_PER_BTC = 100_000_000
 _log = logging.getLogger(__name__)
+
+
+class MetricsUnavailableError(RuntimeError):
+    """The upstream did not supply a valid miner snapshot."""
 
 
 def _normalize_hashrate_fields(data: dict) -> dict:
@@ -180,6 +185,22 @@ async def fetch_full_metrics(
         return_exceptions=False,
     )
 
+    # Empty/error responses are not zero mining. A successful all-zero
+    # snapshot still contains the numeric hashrate fields and is valid.
+    hash_fields = ("hashrate_60sec", "hashrate_10min", "hashrate_3hr", "hashrate_24hr")
+    if not any(
+        isinstance(hr_data.get(key), (int, float)) and math.isfinite(hr_data[key])
+        for key in hash_fields
+    ):
+        raise MetricsUnavailableError("Mining data is temporarily unavailable")
+    if not isinstance(snap_data.get("unpaid_earnings"), (int, float)):
+        raise MetricsUnavailableError("Unpaid earnings are temporarily unavailable")
+    if not all(
+        isinstance(btc_data.get(key), (int, float)) and math.isfinite(btc_data[key]) and btc_data[key] > 0
+        for key in ("btc_price", "network_hashrate")
+    ):
+        raise MetricsUnavailableError("Bitcoin price or network data is temporarily unavailable")
+
     merged: dict[str, Any] = {}
     merged.update(hr_data)
     merged.update(snap_data)
@@ -239,6 +260,11 @@ async def fetch_full_metrics(
     merged["low_hashrate_mode"] = hr_3hr < 3.0  # < 3 TH/s on 3hr avg
 
     merged["server_timestamp"] = time.time()
+    merged["data_updated_at"] = merged["server_timestamp"]
+    merged["data_status"] = "fresh"
+    merged["wallet"] = client.wallet
+    merged["power_usage_watts"] = power_usage
+    merged["power_cost_per_kwh"] = power_cost
 
     # Build typed model
     safe: dict[str, Any] = {}

@@ -4,11 +4,13 @@ import asyncio
 import logging
 
 import pytz
-from fastapi import APIRouter
+import aiosqlite
+from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
 from app import background
 from app.config import load_config, save_config
+from app.db import get_db
 from app.models import AppConfig, ConfigUpdate
 
 _log = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ async def get_config() -> AppConfig:
 
 
 @router.post("/config", response_model=AppConfig, tags=["config"])
-async def update_config(payload: ConfigUpdate) -> AppConfig:
+async def update_config(payload: ConfigUpdate, db: aiosqlite.Connection = Depends(get_db)) -> AppConfig:
     """Update dashboard configuration and trigger a background metrics refresh.
 
     Only provided (non-null) fields are updated — omitted fields retain their
@@ -46,6 +48,7 @@ async def update_config(payload: ConfigUpdate) -> AppConfig:
     """
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
     await run_in_threadpool(save_config, update)
+    await background.refresh_financials(db)
 
     # If the DATUM gateway URL changed, drop the probe cache so the
     # next /api/datum/status call hits the new endpoint immediately

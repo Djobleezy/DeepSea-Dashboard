@@ -21,6 +21,14 @@ from app.models import Notification, NotificationCreate
 router = APIRouter()
 
 
+@router.get("/notifications/unread-count", response_model=dict, tags=["notifications"])
+async def unread_count(db: aiosqlite.Connection = Depends(get_db)) -> dict[str, int]:
+    """Count all unread alerts independently of the current list/filter."""
+    async with db.execute("SELECT COUNT(*) FROM notifications WHERE read = 0") as cursor:
+        row = await cursor.fetchone()
+    return {"unread_count": row[0]}
+
+
 @router.get("/notifications", response_model=list[Notification], tags=["notifications"])
 async def get_notifications(
     category: str = Query(default="all", description="Filter by category: all, block, hashrate, worker, payout, daily"),

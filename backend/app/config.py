@@ -24,7 +24,10 @@ import json
 import logging
 import os
 from pathlib import Path
+from threading import RLock
 from typing import Any
+
+_save_lock = RLock()
 
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/config/config.json"))
 _DEFAULTS: dict[str, Any] = {
@@ -60,6 +63,12 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(data: dict[str, Any]) -> None:
+    # Both the Config and Workers rate endpoints write this shared file.
+    with _save_lock:
+        _save_config_unlocked(data)
+
+
+def _save_config_unlocked(data: dict[str, Any]) -> None:
     """Persist config to file safely.
 
     Tries atomic rename first; falls back to in-place write for

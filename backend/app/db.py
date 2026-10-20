@@ -81,6 +81,7 @@ async def init_db() -> None:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS metric_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wallet TEXT NOT NULL DEFAULT '',
                 timestamp REAL NOT NULL,
                 hashrate_60sec REAL,
                 hashrate_10min REAL,
@@ -92,6 +93,15 @@ async def init_db() -> None:
                 unpaid_earnings REAL
             )
         """)
+        # Older snapshots cannot be assigned to a wallet safely. Preserve them
+        # with an empty scope rather than showing them for the current wallet.
+        async with db.execute("PRAGMA table_info(metric_history)") as cur:
+            columns = {row[1] for row in await cur.fetchall()}
+        if "wallet" not in columns:
+            await db.execute("ALTER TABLE metric_history ADD COLUMN wallet TEXT NOT NULL DEFAULT ''")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metric_history_wallet_ts ON metric_history(wallet, timestamp)"
+        )
         # Persists notification engine state across restarts, preventing alert
         # storms and duplicate notifications after a process restart.
         await db.execute("""
@@ -298,6 +308,7 @@ async def get_metric_history(
     db: aiosqlite.Connection,
     hours: int = 1,
     limit: int = 360,
+    wallet: Optional[str] = None,
 ) -> list[dict]:
     """Return recent metric snapshots for chart hydration.
 
@@ -306,15 +317,20 @@ async def get_metric_history(
         limit: Maximum rows (default 360 = 6 hours at 60s intervals).
     """
     bounded_limit = max(1, min(int(limit), MAX_METRIC_HISTORY_ROWS))
+    if wallet is None:
+        from app.config import get_wallet
+
+        wallet = get_wallet().strip()
+    if not wallet:
+        return []
     cutoff = time.time() - hours * 3600
     async with db.execute(
         """SELECT timestamp, hashrate_60sec, hashrate_3hr
            FROM metric_history
-           WHERE timestamp > ?
-             AND (COALESCE(hashrate_60sec, 0) > 0 OR COALESCE(hashrate_3hr, 0) > 0)
+           WHERE timestamp > ? AND wallet = ?
            ORDER BY timestamp ASC
            LIMIT ?""",
-        (cutoff, bounded_limit),
+        (cutoff, wallet, bounded_limit),
     ) as cur:
         rows = await cur.fetchall()
     return [
@@ -328,13 +344,17 @@ async def get_metric_history(
 
 
 async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
+    wallet = metrics.get("wallet", "").strip()
+    if not wallet:
+        return
     await db.execute(
         """INSERT INTO metric_history
-           (timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
+           (wallet, timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
             workers_hashing, btc_price, daily_mined_sats, unpaid_earnings)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            time.time(),
+            wallet,
+            metrics.get("data_updated_at") or time.time(),
             metrics.get("hashrate_60sec"),
             metrics.get("hashrate_10min"),
             metrics.get("hashrate_3hr"),

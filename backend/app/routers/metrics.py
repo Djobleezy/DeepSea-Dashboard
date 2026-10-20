@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app import background
+from app.config import get_wallet
 from app.db import get_db, get_metric_history
 from app.models import DashboardMetrics
 from app.services.cache import cache_get
@@ -37,18 +38,23 @@ async def metrics_history(
 async def get_metrics() -> DashboardMetrics:
     """Return the latest cached mining metrics snapshot.
 
-    Data is sourced from the Ocean.xyz API and refreshed every 30 seconds by
+    Data is sourced from the Ocean.xyz API and refreshed every 60 seconds by
     the background loop. Returns safe zero-value defaults if no data has been
     collected yet (e.g., on first startup or unconfigured wallet).
     """
-    cached = await cache_get(background.get_cache_key("metrics"))
-    if cached:
-        return DashboardMetrics(**cached)
-    # Return defaults if not yet populated
+    wallet = get_wallet().strip()
     live = background.get_current_metrics()
-    if live:
+    if live is not None:
         return DashboardMetrics(**live)
-    return DashboardMetrics(server_timestamp=time.time())
+    cached = await cache_get(background.get_cache_key("metrics")) if wallet else None
+    if cached and cached.get("wallet", wallet) == wallet:
+        snapshot = dict(cached)
+        updated_at = snapshot.get("data_updated_at") or snapshot.get("server_timestamp")
+        snapshot.update(wallet=wallet, data_updated_at=updated_at, server_timestamp=time.time())
+        if not updated_at or time.time() - updated_at > 120:
+            snapshot.update(data_status="stale", data_error="Mining data has not refreshed recently")
+        return DashboardMetrics(**snapshot)
+    return DashboardMetrics(wallet=wallet, data_status="unavailable" if wallet else "unconfigured")
 
 
 @router.get("/stream", tags=["metrics"])
