@@ -15,6 +15,7 @@ from app import background, config, db as database
 from app.models import DashboardMetrics
 from app.routers import config_routes, metrics, notifications, worker_settings, workers
 from app.services.metrics_service import MetricsUnavailableError, fetch_full_metrics
+from app.services.ocean_client import OceanClient
 from app.services.worker_service import build_worker_summary
 
 
@@ -110,6 +111,58 @@ async def test_failure_keeps_source_age_and_still_refreshes_workers(state, monke
     assert await database.get_metric_history(state) == []
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [
+    {"workers": []}, {"workers": {}}, {"result": {"workers": []}},
+    {"user_hashrate": {"workers": {}}},
+])
+async def test_known_empty_worker_response_is_not_a_failed_fetch(monkeypatch, payload):
+    client = OceanClient(wallet="wallet-a")
+    monkeypatch.setattr(client, "_get", AsyncMock(return_value=SimpleNamespace(json=lambda: payload)))
+    fallback = AsyncMock(return_value=None)
+    monkeypatch.setattr(client, "_get_worker_data_scrape", fallback)
+    result = await client.get_worker_data()
+    assert result["workers"] == []
+    assert result["workers_total"] == 0
+    fallback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_successful_empty_fleet_replaces_previous_workers(state, monkeypatch):
+    background._client = ocean_client(get_worker_data={"workers": []})
+    background._raw_workers = {"workers": [{"name": "old-worker", "status": "online", "hashrate_3hr": 100}]}
+    monkeypatch.setattr(background, "check_and_fire", AsyncMock())
+    await background.refresh_once(state)
+    assert background.get_current_workers()["workers"] == []
+    assert background.get_current_workers()["data_status"] == "fresh"
+
+
+@pytest.mark.asyncio
+async def test_unknown_worker_response_still_tries_scraper(monkeypatch):
+    client = OceanClient(wallet="wallet-a")
+    monkeypatch.setattr(client, "_get", AsyncMock(return_value=SimpleNamespace(json=lambda: {"unexpected": []})))
+    fallback = AsyncMock(return_value={"workers": []})
+    monkeypatch.setattr(client, "_get_worker_data_scrape", fallback)
+    assert await client.get_worker_data() == {"workers": []}
+    fallback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("markup, expected_empty", [
+    ('<table><tbody id="workers-tablerows"></tbody></table>', True),
+    ('<table id="workers"><tbody></tbody></table>', True),
+    ('<table><tbody></tbody></table>', False),
+])
+async def test_empty_scraper_table_requires_known_worker_container(monkeypatch, markup, expected_empty):
+    client = OceanClient(wallet="wallet-a")
+    monkeypatch.setattr(client, "_get", AsyncMock(return_value=SimpleNamespace(text=markup)))
+    result = await client._get_worker_data_scrape()
+    if expected_empty:
+        assert result["workers"] == []
+    else:
+        assert result is None
+
+
 def test_worker_day_estimate_is_distinct_from_unpaid_balance():
     raw = {"workers": [
         {"name": "s21-a", "status": "online", "hashrate_3hr": 100},
@@ -168,6 +221,90 @@ async def test_cost_endpoints_share_config_and_update_snapshot_without_network_w
         rejected = await client.put("/api/workers/settings/electricity-rate", json={"rate": 11})
         assert rejected.status_code == 422
         assert config.get_power_cost() == .2
+
+
+@pytest.mark.asyncio
+async def test_cost_save_cannot_overwrite_a_concurrent_new_mining_snapshot(state, monkeypatch):
+    """Suspend a save DB read while the next upstream fetch completes."""
+    background._current_metrics = DashboardMetrics(
+        wallet="wallet-a", hashrate_3hr=100, data_updated_at=100, data_status="fresh"
+    ).model_dump()
+    background._raw_workers = {"workers": [{"name": "s21-a", "status": "online", "hashrate_3hr": 100}]}
+    background._client = ocean_client()
+    reading_settings = asyncio.Event()
+    release_settings = asyncio.Event()
+    fetched_metrics = asyncio.Event()
+    release_workers = asyncio.Event()
+    first_read = True
+
+    async def read_overrides(_db):
+        nonlocal first_read
+        if first_read:
+            first_read = False
+            reading_settings.set()
+            await release_settings.wait()
+        return {}
+
+    async def fetch_workers():
+        fetched_metrics.set()
+        await release_workers.wait()
+        return {"workers": [{"name": "s21-a", "status": "online", "hashrate_3hr": 250}]}
+
+    monkeypatch.setattr(background, "get_worker_overrides", read_overrides)
+    monkeypatch.setattr(background, "fetch_full_metrics", AsyncMock(return_value=DashboardMetrics(
+        wallet="wallet-a", hashrate_3hr=250, data_status="fresh"
+    )))
+    monkeypatch.setattr(background._client, "get_worker_data", fetch_workers)
+    monkeypatch.setattr(background, "check_and_fire", AsyncMock())
+    save = asyncio.create_task(background.refresh_financials(state))
+    await asyncio.wait_for(reading_settings.wait(), 1)
+    refresh = asyncio.create_task(background.refresh_once(state))
+    await asyncio.wait_for(fetched_metrics.wait(), 1)
+    release_settings.set()
+    await asyncio.wait_for(save, 1)
+    release_workers.set()
+    await asyncio.wait_for(refresh, 1)
+
+    assert background.get_current_metrics()["hashrate_3hr"] == 250
+    assert background.get_current_workers()["workers"][0]["hashrate_3hr"] == 250
+    assert [row["hashrate_3hr"] for row in await database.get_metric_history(state)] == [250]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("suspend_at", ["overrides", "cache"])
+async def test_wallet_change_during_cost_save_does_not_publish_old_wallet(state, monkeypatch, suspend_at):
+    background._current_metrics = DashboardMetrics(wallet="wallet-a", hashrate_3hr=100).model_dump()
+    background._raw_workers = {"workers": [{"name": "s21-a", "status": "online", "hashrate_3hr": 100}]}
+    started = asyncio.Event()
+    release = asyncio.Event()
+    events = []
+
+    async def suspend():
+        started.set()
+        await release.wait()
+
+    async def read_overrides(_db):
+        if suspend_at == "overrides":
+            await suspend()
+        return {}
+
+    async def write_cache(key, value, **_kwargs):
+        assert value["wallet"] == "wallet-a"
+        assert "wallet-a" in key
+        if suspend_at == "cache":
+            await suspend()
+
+    monkeypatch.setattr(background, "get_worker_overrides", read_overrides)
+    monkeypatch.setattr(background, "cache_set", write_cache)
+    monkeypatch.setattr(background, "_broadcast", events.append)
+    save = asyncio.create_task(background.refresh_financials(state))
+    await asyncio.wait_for(started.wait(), 1)
+    config.save_config({"wallet": "wallet-b"})
+    release.set()
+    await asyncio.wait_for(save, 1)
+    assert events == []
+    assert background.get_current_metrics() is None
+    assert background.get_current_workers() is None
 
 
 @pytest.mark.asyncio

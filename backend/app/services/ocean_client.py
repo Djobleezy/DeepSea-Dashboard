@@ -651,7 +651,7 @@ class OceanClient:
         """Return enriched worker data, trying the API then the HTML scraper.
 
         Calls ``_get_worker_data_api()`` first; if that returns ``None`` (e.g.
-        the API endpoint is unavailable or returns no workers), falls back to
+        the API endpoint is unavailable or has an unknown response), falls back to
         ``_get_worker_data_scrape()`` which parses the Ocean stats page HTML.
 
         Returns:
@@ -661,7 +661,7 @@ class OceanClient:
             ``None`` if both sources fail.
         """
         result = await self._get_worker_data_api()
-        if result:
+        if result is not None:
             return result
         _log.info("API worker fetch failed, trying scraper")
         return await self._get_worker_data_scrape()
@@ -674,19 +674,20 @@ class OceanClient:
         that Ocean sometimes includes alongside real worker entries.
 
         Returns:
-            Normalised worker summary dict, or ``None`` if unavailable/empty.
+            Normalised worker summary dict (including a valid empty fleet),
+            or ``None`` if unavailable or malformed.
         """
         resp = await self._get(f"{API_BASE}/user_hashrate_full/{self.wallet}", timeout=15)
         if resp is None:
             return None
         try:
             data = resp.json()
-            workers_obj = (
-                data.get("workers")
-                or data.get("result", {}).get("workers")
-                or data.get("user_hashrate", {}).get("workers")
-            )
-            if not workers_obj:
+            workers_obj = None
+            for container in (data, data.get("result"), data.get("user_hashrate")):
+                if isinstance(container, dict) and "workers" in container:
+                    workers_obj = container["workers"]
+                    break
+            if workers_obj is None:
                 return None
 
             if isinstance(workers_obj, dict):
@@ -745,7 +746,7 @@ class OceanClient:
                     "acceptance_rate": 100.0,
                 })
 
-            if not workers:
+            if not workers and workers_iter:
                 return None
 
             return {
@@ -785,7 +786,10 @@ class OceanClient:
         table = soup.find("tbody", id="workers-tablerows")
         if table is None:
             # Fallback selectors for minor Ocean DOM changes
-            table = soup.select_one("table#workers tbody") or soup.select_one("tbody")
+            table = soup.select_one("table#workers tbody")
+        known_worker_table = table is not None
+        if table is None:
+            table = soup.select_one("tbody")
         if table is None:
             _log.warning("Worker scrape table not found for wallet=%s", self.wallet)
             return None
@@ -849,7 +853,7 @@ class OceanClient:
                 "acceptance_rate": 100.0,
             })
 
-        if not workers:
+        if not workers and (rows or not known_worker_table):
             return None
 
         return {

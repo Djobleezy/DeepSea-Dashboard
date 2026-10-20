@@ -92,19 +92,19 @@ def get_cache_key(name: str, wallet: str | None = None) -> str:
 async def _clear_runtime_state(previous_wallet: str | None = None) -> None:
     global _current_metrics, _current_workers, _raw_workers, _cache_scope, _last_refresh
 
-    if previous_wallet:
-        await cache_delete(get_cache_key("metrics", previous_wallet))
-        await cache_delete(get_cache_key("workers", previous_wallet))
-
-    _current_metrics = None
-    _current_workers = None
-    _raw_workers = None
-    _last_refresh = None
-    _cache_scope = None
-    wallet = get_wallet().strip()
-    status = "unavailable" if wallet else "unconfigured"
-    _broadcast({"type": "metrics", "data": DashboardMetrics(wallet=wallet, data_status=status).model_dump()})
-    _broadcast({"type": "workers", "data": WorkerSummary(wallet=wallet, data_status=status).model_dump()})
+    async with _financial_lock:
+        if previous_wallet:
+            await cache_delete(get_cache_key("metrics", previous_wallet))
+            await cache_delete(get_cache_key("workers", previous_wallet))
+        _current_metrics = None
+        _current_workers = None
+        _raw_workers = None
+        _last_refresh = None
+        _cache_scope = None
+        wallet = get_wallet().strip()
+        status = "unavailable" if wallet else "unconfigured"
+        _broadcast({"type": "metrics", "data": DashboardMetrics(wallet=wallet, data_status=status).model_dump()})
+        _broadcast({"type": "workers", "data": WorkerSummary(wallet=wallet, data_status=status).model_dump()})
 
 
 async def refresh_once(db: aiosqlite.Connection) -> None:
@@ -129,55 +129,59 @@ async def _refresh_once_locked(db: aiosqlite.Connection) -> None:
         _client = OceanClient(wallet=wallet)
     _cache_scope = wallet
 
-    metrics_ok = False
+    next_metrics = None
     try:
         metrics = await fetch_full_metrics(_client)
-        if get_wallet().strip() != wallet:
-            return  # A request for the previous wallet completed after a config change.
-        _current_metrics = metrics.model_dump()
-        _current_metrics.update(wallet=wallet, data_status="fresh", data_updated_at=time.time(), data_error=None)
-        metrics_ok = True
+        next_metrics = metrics.model_dump()
+        next_metrics.update(wallet=wallet, data_status="fresh", data_updated_at=time.time(), data_error=None)
     except Exception as e:
         _log.warning("Metrics refresh failed: %s", e)
-        if get_wallet().strip() != wallet:
+
+    # Fetch outside the state lock: saving a local setting never waits for an
+    # upstream request. Worker refresh remains independent of metrics failure.
+    next_workers = None
+    try:
+        workers = await _client.get_worker_data()
+        if workers is None:
+            raise ValueError("Worker data is temporarily unavailable")
+        next_workers = {**workers, "data_status": "fresh", "data_updated_at": time.time()}
+    except Exception as e:
+        _log.warning("Worker refresh failed: %s", e)
+
+    # Commit raw inputs and derive finances as one state transition. Otherwise
+    # a save suspended in a DB read could overwrite a newer mining snapshot.
+    async with _financial_lock:
+        if get_wallet().strip() != wallet or _cache_scope != wallet:
             return
-        if _current_metrics:
+        if next_metrics is not None:
+            _current_metrics = next_metrics
+        elif _current_metrics:
             _current_metrics = {**_current_metrics, "data_status": "stale", "data_error": "Mining data is temporarily unavailable"}
         else:
             _current_metrics = DashboardMetrics(
                 wallet=wallet, data_status="unavailable", data_error="Mining data is temporarily unavailable"
             ).model_dump()
-
-    # Worker refresh is independent: a failed metric request must never suppress it.
-    try:
-        workers = await _client.get_worker_data()
-        if get_wallet().strip() != wallet:
-            return
-        if workers is None:
-            raise ValueError("Worker data is temporarily unavailable")
-        _raw_workers = {**workers, "data_status": "fresh", "data_updated_at": time.time()}
-    except Exception as e:
-        _log.warning("Worker refresh failed: %s", e)
-        if _raw_workers:
+        if next_workers is not None:
+            _raw_workers = next_workers
+        elif _raw_workers:
             _raw_workers = {**_raw_workers, "data_status": "stale"}
 
-    await _recalculate_financials_locked(db)
-    if get_wallet().strip() != wallet or _cache_scope != wallet:
-        return
-    if metrics_ok:
-        _last_refresh = _current_metrics["data_updated_at"]
-        await save_metric_snapshot(db, _current_metrics)
+        await _apply_financials(db)
+        if get_wallet().strip() != wallet or _cache_scope != wallet:
+            return
+        snapshot = dict(_current_metrics)
+        if next_metrics is not None:
+            _last_refresh = snapshot["data_updated_at"]
+        await _publish_metrics_locked()
+
+    # This immutable snapshot belongs to this successful upstream refresh;
+    # concurrent local setting changes cannot change its wallet or hashrate.
+    if next_metrics is not None and get_wallet().strip() == wallet:
+        await save_metric_snapshot(db, snapshot)
         try:
-            await check_and_fire(db, _current_metrics)
+            await check_and_fire(db, snapshot)
         except Exception as e:
             _log.warning("Notification check error: %s", e)
-    await cache_set(get_cache_key("metrics", wallet), _current_metrics, ttl=120)
-    _broadcast({"type": "metrics", "data": get_current_metrics()})
-
-
-async def _recalculate_financials_locked(db: aiosqlite.Connection) -> None:
-    async with _financial_lock:
-        await _apply_financials(db)
 
 
 async def _apply_financials(db: aiosqlite.Connection) -> None:
@@ -192,6 +196,8 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
             return
         _current_workers = build_worker_summary(_raw_workers, metrics, overrides, wallet)
         await cache_set(get_cache_key("workers", wallet), _current_workers, ttl=120)
+        if get_wallet().strip() != wallet or _cache_scope != wallet:
+            return
         _broadcast({"type": "workers", "data": _current_workers})
     if _current_metrics is None:
         return
@@ -206,13 +212,21 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
     _current_metrics = {**metrics, **financials, "power_usage_watts": power, "power_cost_per_kwh": rate}
 
 
+async def _publish_metrics_locked() -> None:
+    current = get_current_metrics()
+    if current is None:
+        return
+    wallet = current["wallet"]
+    await cache_set(get_cache_key("metrics", wallet), current, ttl=120)
+    if get_wallet().strip() == wallet and _cache_scope == wallet:
+        _broadcast({"type": "metrics", "data": current})
+
+
 async def refresh_financials(db: aiosqlite.Connection) -> None:
     """Apply a saved cost/override change without waiting on upstream requests."""
-    await _recalculate_financials_locked(db)
-    current = get_current_metrics()
-    if current is not None:
-        await cache_set(get_cache_key("metrics"), current, ttl=120)
-        _broadcast({"type": "metrics", "data": current})
+    async with _financial_lock:
+        await _apply_financials(db)
+        await _publish_metrics_locked()
 
 
 async def trigger_refresh() -> None:
