@@ -13,6 +13,7 @@ import { useCurrency } from '../hooks/useCurrency';
 import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import { LiveBlockTimer } from '../components/LiveBlockTimer';
 import { HashrateNotices } from '../components/HashrateNotices';
+import { estimatePoolIntervalMinutes } from '../utils/pool';
 
 const HashrateChart = lazy(() => import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })));
 
@@ -85,6 +86,10 @@ export const Dashboard: React.FC = () => {
 
   const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
   const isStale = metrics.data_status === 'stale' || Boolean(metricsError);
+  const poolIntervalMinutes = estimatePoolIntervalMinutes(
+    metrics.network_hashrate, metrics.network_hashrate_unit,
+    metrics.pool_total_hashrate, metrics.pool_total_hashrate_unit,
+  );
   const hashrates = [
     { label: metrics.low_hashrate_mode ? '60 sec · variable' : '60 sec', value: metrics.hashrate_60sec, unit: metrics.hashrate_60sec_unit, previous: prevMetrics?.hashrate_60sec, key: 'hashrate_60sec' },
     { label: '10 min', value: metrics.hashrate_10min, unit: metrics.hashrate_10min_unit, previous: prevMetrics?.hashrate_10min, key: 'hashrate_10min' },
@@ -103,7 +108,7 @@ export const Dashboard: React.FC = () => {
     {isStale && <div className="status-panel status-warning" role="alert"><p>Updates are interrupted. These are the last available readings, not current mining status.</p><button className="btn" onClick={retry}>Retry update</button></div>}
     <div className="grid-4">
       <MetricCard label="Workers hashing" value={metrics.workers_hashing} current={metrics.workers_hashing} previous={prevMetrics?.workers_hashing} metricKey="workers_hashing" large />
-      <MetricCard label="Est. daily profit" value={formatFiatSigned(metrics.daily_profit_usd)} current={metrics.daily_profit_usd} previous={prevMetrics?.daily_profit_usd} metricKey="daily_profit_usd" large subtext="Revenue estimate less electricity" />
+      <MetricCard label="Est. daily profit" value={formatFiatSigned(metrics.daily_profit_usd)} current={metrics.daily_profit_usd} previous={prevMetrics?.daily_profit_usd} metricKey="daily_profit_usd" valueColor={metrics.daily_profit_usd < 0 ? 'var(--color-error)' : 'var(--color-success)'} large subtext="Revenue estimate less electricity" />
       <MetricCard label="Unpaid balance" value={fmtSats(metrics.unpaid_earnings * 1e8)} unit="SATS" large subtext={`≈ ${formatFiat(metrics.unpaid_earnings * metrics.btc_price)}`} />
       <MetricCard label="BTC price" value={formatFiat(metrics.btc_price)} current={metrics.btc_price} previous={prevMetrics?.btc_price} metricKey="btc_price" large />
     </div>
@@ -137,9 +142,10 @@ export const Dashboard: React.FC = () => {
     <section className="card">
       <h2 className="label dashboard-section-title">Ocean pool block timer</h2>
       {metrics.last_block_height > 0 ? <>
-        <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
+        <BitcoinProgressBar lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} targetLabel="estimated pool interval" />
+        <p className="field-help">Pool blocks arrive irregularly. The interval estimate uses Ocean’s share of network hashrate and is not a deadline.</p>
         <div className="dashboard-detail-list" style={{ marginTop: 20 }}>
-          <div><div className="label">Last Ocean block</div><div className="value-sm">#{metrics.last_block_height.toLocaleString()}</div><LiveBlockTimer lastBlockTime={metrics.last_block_time} /> <span className="field-help" style={{ display: 'inline' }}>ago</span></div>
+          <div><div className="label">Last Ocean block</div><div className="value-sm">#{metrics.last_block_height.toLocaleString()}</div><LiveBlockTimer lastBlockTime={metrics.last_block_time} targetMinutes={poolIntervalMinutes} /> <span className="field-help" style={{ display: 'inline' }}>ago</span></div>
           <div><div className="label">Pool blocks found</div><div className="value-sm">{metrics.blocks_found}</div></div>
         </div>
       </> : <p className="field-help">No pool block timing is available yet.</p>}
