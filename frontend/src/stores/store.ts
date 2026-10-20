@@ -76,7 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   metricsLoading: true,
   metricsError: null,
   setMetricsLoading: (metricsLoading) => set({ metricsLoading }),
-  setMetricsError: (metricsError) => set({ metricsError, metricsLoading: false }),
+  setMetricsError: (metricsError) => set((s) => ({ metricsError, metricsLoading: metricsError ? false : s.metricsLoading })),
   requestMetricsRefresh: () => window.dispatchEvent(new Event('deepsea:refresh-metrics')),
   setMetrics: (m) => {
     const current = get();

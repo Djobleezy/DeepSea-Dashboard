@@ -17,6 +17,10 @@ export function useMetrics(pollMs = 60000) {
   const load = useCallback(async () => {
     const scope = useAppStore.getState();
     if (scope.wallet === null) return;
+    if (!scope.metrics) {
+      setLoading(true);
+      setError(null);
+    }
     const requestId = ++requestIdRef.current;
 
     try {
@@ -25,7 +29,10 @@ export function useMetrics(pollMs = 60000) {
       setMetrics(m);
     } catch (e) {
       if (!mountedRef.current || requestId !== requestIdRef.current || scope.walletEpoch !== useAppStore.getState().walletEpoch) return;
-      setError(e instanceof Error ? e.message : 'Failed to load metrics');
+      const latest = useAppStore.getState();
+      if (latest.lastUpdated === scope.lastUpdated || latest.metrics?.data_status !== 'fresh') {
+        setError(e instanceof Error ? e.message : 'Failed to load metrics');
+      }
     } finally {
       if (mountedRef.current && requestId === requestIdRef.current && scope.walletEpoch === useAppStore.getState().walletEpoch) {
         setLoading(false);

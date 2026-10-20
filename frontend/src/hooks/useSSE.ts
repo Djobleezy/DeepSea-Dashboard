@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { fetchMetrics, fetchWorkers } from '../api/client';
 import { useAppStore } from '../stores/store';
+import { publishApiStatus } from '../api/status';
 import type { DashboardMetrics, WorkerSummary } from '../types';
 
 const API_BASE = String(import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
@@ -10,6 +11,16 @@ const INITIAL_BACKOFF = 1000;
 const MAX_BACKOFF = 30000;
 const STALE_AFTER_MS = 70000;
 const WATCHDOG_INTERVAL_MS = 10000;
+
+function publishSnapshotStatus(path: string, snapshot: object) {
+  const data = snapshot as Pick<DashboardMetrics, 'data_status' | 'data_updated_at' | 'data_error'>;
+  publishApiStatus({
+    path,
+    status: data.data_status === 'stale' ? 'stale' : data.data_status === 'unavailable' ? 'unavailable' : 'fresh',
+    updatedAt: data.data_updated_at ?? null,
+    error: data.data_error ?? null,
+  });
+}
 
 export function useSSE() {
   const wallet = useAppStore((s) => s.wallet);
@@ -83,7 +94,9 @@ export function useSSE() {
         markActivity();
         try {
           const data = JSON.parse(e.data) as DashboardMetrics;
+          if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
           setMetrics(data);
+          publishSnapshotStatus('/metrics', data);
         } catch {
           // ignore malformed event
         }
@@ -94,7 +107,9 @@ export function useSSE() {
         markActivity();
         try {
           const data = JSON.parse(e.data) as WorkerSummary;
+          if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
           setWorkers(data);
+          publishSnapshotStatus('/workers', data);
         } catch {
           // ignore malformed event
         }

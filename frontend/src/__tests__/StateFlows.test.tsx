@@ -1,18 +1,20 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchBlocks, fetchEarnings, fetchMetrics, fetchNotifications, fetchUnreadCount } from '../api/client';
+import { getApiStatus, publishApiStatus, resetApiStatus } from '../api/status';
 import { useAppStore } from '../stores/store';
 import { useMetrics } from '../hooks/useMetrics';
 import { usePayoutTracking, payoutHistoryKey } from '../hooks/usePayoutTracking';
 import { useNotifications } from '../hooks/useNotifications';
 import { useUnreadCount } from '../hooks/useUnreadCount';
+import { useSSE } from '../hooks/useSSE';
 import { Earnings } from '../pages/Earnings';
 import { Blocks } from '../pages/Blocks';
 import type { DashboardMetrics, EarningsResponse, Notification, WorkerSummary } from '../types';
 
 vi.mock('../api/client', () => ({
   fetchBlocks: vi.fn(), fetchEarnings: vi.fn(), fetchMetrics: vi.fn(),
-  fetchNotifications: vi.fn(), fetchUnreadCount: vi.fn(),
+  fetchNotifications: vi.fn(), fetchUnreadCount: vi.fn(), fetchWorkers: vi.fn(),
 }));
 vi.mock('../hooks/useCurrency', () => ({
   useCurrency: () => ({ formatFiat: (amount: number) => `$${amount.toFixed(2)}` }),
@@ -33,6 +35,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
   useAppStore.setState(initial, true);
+  resetApiStatus();
   vi.mocked(fetchEarnings).mockResolvedValue(emptyEarnings);
   vi.mocked(fetchUnreadCount).mockResolvedValue({ unread_count: 2 });
   vi.mocked(fetchNotifications).mockResolvedValue([]);
@@ -55,6 +58,15 @@ describe('wallet-scoped snapshots', () => {
     useAppStore.getState().setMetrics({ ...snapshot('wallet-a', 100), data_status: 'stale', data_error: 'Source unavailable' });
     expect(useAppStore.getState().lastUpdated).toBe(100000);
     expect(useAppStore.getState().metricsError).toBe('Source unavailable');
+  });
+
+  it('records legitimate zero readings once per source timestamp', () => {
+    const store = useAppStore.getState();
+    store.addChartPoint(100, 100, 1000);
+    store.addChartPoint(0, 0, 1060);
+    store.addChartPoint(0, 0, 1060);
+    expect(useAppStore.getState().chartData60s.map((point) => point.value)).toEqual([100, 0]);
+    expect(useAppStore.getState().chartData60s[1].ts).toBe(1060000);
   });
 
   it('exposes a metrics error instead of remaining in a loading state', async () => {
@@ -87,6 +99,37 @@ describe('wallet-scoped snapshots', () => {
     await act(async () => a.resolve({ ...emptyEarnings, payments: [{ date: new Date().toISOString(), txid: 'wallet-a-tx', lightning_txid: '', amount_btc: .01, amount_sats: 1000000, status: 'confirmed' }] }));
     expect(result.current.payoutHistory).toEqual([]);
     expect(localStorage.getItem(payoutHistoryKey('wallet-b'))).not.toContain('wallet-a-tx');
+  });
+});
+
+describe('stream recovery', () => {
+  it('clears a REST connection failure on a fresh event and ignores old-wallet events', () => {
+    const sources: FakeSource[] = [];
+    class FakeSource {
+      listeners = new Map<string, ((event: MessageEvent) => void)[]>();
+      constructor() { sources.push(this); }
+      addEventListener(type: string, callback: (event: MessageEvent) => void) {
+        this.listeners.set(type, [...(this.listeners.get(type) ?? []), callback]);
+      }
+      close() { /* Capture old callbacks to verify scope guards. */ }
+      emit(type: string, data: object) {
+        for (const callback of this.listeners.get(type) ?? []) callback({ data: JSON.stringify(data) } as MessageEvent);
+      }
+    }
+    const original = globalThis.EventSource;
+    vi.stubGlobal('EventSource', FakeSource);
+    useAppStore.getState().setWallet('wallet-a');
+    const hook = renderHook(() => useSSE());
+    publishApiStatus({ path: '/metrics', status: 'unavailable', updatedAt: null, error: 'Offline' });
+    act(() => sources[0].emit('metrics', snapshot('wallet-a')));
+    expect(getApiStatus()).toBeNull();
+    act(() => useAppStore.getState().setWallet('wallet-b'));
+    act(() => sources[0].emit('metrics', snapshot('wallet-a', 2000)));
+    expect(useAppStore.getState().metrics).toBeNull();
+    act(() => sources[1].emit('metrics', snapshot('wallet-b', 3000)));
+    expect(useAppStore.getState().metrics?.wallet).toBe('wallet-b');
+    hook.unmount();
+    vi.stubGlobal('EventSource', original);
   });
 });
 

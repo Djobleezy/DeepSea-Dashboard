@@ -32,24 +32,36 @@ function notifyListeners() {
   _listeners.forEach((fn) => fn());
 }
 
-async function refreshCurrencyCache(): Promise<void> {
+let pendingRefresh: Promise<void> | null = null;
+let refreshGeneration = 0;
+
+async function refreshCurrencyCache(force = false): Promise<void> {
+  if (pendingRefresh && !force) return pendingRefresh;
+  const generation = ++refreshGeneration;
+  const refresh = (async () => {
+    try {
+      const [config, ratesResp] = await Promise.all([
+        fetchConfig(),
+        fetchExchangeRates().catch(() => null),
+      ]);
+      if (generation !== refreshGeneration) return;
+      const currency = (config.currency ?? 'USD').toUpperCase();
+      const rates: Record<string, number> = ratesResp?.rates ?? {};
+      const rate = currency === 'USD' ? 1.0 : (rates[currency] ?? 1.0);
+      _cached = { currency, rate, loaded: true };
+      _cacheExpiry = Date.now() + REFRESH_INTERVAL_MS;
+      notifyListeners();
+    } catch {
+      if (generation !== refreshGeneration) return;
+      _cached = { ..._cached, loaded: true };
+      notifyListeners();
+    }
+  })();
+  pendingRefresh = refresh;
   try {
-    const [config, ratesResp] = await Promise.all([
-      fetchConfig(),
-      fetchExchangeRates().catch(() => null),
-    ]);
-
-    const currency = (config.currency ?? 'USD').toUpperCase();
-    const rates: Record<string, number> = ratesResp?.rates ?? {};
-    const rate = currency === 'USD' ? 1.0 : (rates[currency] ?? 1.0);
-
-    _cached = { currency, rate, loaded: true };
-    _cacheExpiry = Date.now() + REFRESH_INTERVAL_MS;
-    notifyListeners();
-  } catch {
-    // Degrade gracefully — keep whatever we had
-    _cached = { ..._cached, loaded: true };
-    notifyListeners();
+    await refresh;
+  } finally {
+    if (generation === refreshGeneration) pendingRefresh = null;
   }
 }
 
@@ -111,5 +123,5 @@ export function useCurrency() {
  */
 export function invalidateCurrencyCache(): void {
   _cacheExpiry = 0;
-  refreshCurrencyCache();
+  void refreshCurrencyCache(true);
 }
