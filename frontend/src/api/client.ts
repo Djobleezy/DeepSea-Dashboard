@@ -251,7 +251,7 @@ async function _flushBatch(): Promise<void> {
         entry.reject(new Error(`Batch sub-request ${paths[i]} failed: ${resp.status}`));
       }
     });
-  } catch (_batchError) {
+  } catch {
     // Batch endpoint failed — fall back to individual requests
     await Promise.allSettled(
       entries.map(async (entry) => {
