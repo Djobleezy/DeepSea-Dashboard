@@ -108,8 +108,8 @@ export const Earnings: React.FC = () => {
       {data && data.monthly_summary.length > 0 && (
         <div className="card" style={{ animation: 'stagger-in 0.4s ease-out 0.15s both' }}>
           <div className="label" style={{ marginBottom: '12px' }}>MONTHLY BREAKDOWN</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table>
+          <div className="table-scroll" role="region" aria-label="Monthly earnings" tabIndex={0}>
+            <table style={{ minWidth: '560px', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr>
                   <th>MONTH</th>
@@ -177,8 +177,8 @@ export const Earnings: React.FC = () => {
             </span>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table>
+          <div className="table-scroll" role="region" aria-label="Payment history" tabIndex={0}>
+            <table style={{ minWidth: '800px', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr>
                   <th>DATE</th>
