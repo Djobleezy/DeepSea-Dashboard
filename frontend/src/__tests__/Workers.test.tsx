@@ -70,6 +70,28 @@ describe('Workers', () => {
     expect(screen.getByRole('button', { name: 'Retry worker data' })).toBeInTheDocument();
   });
 
+  it.each([
+    { name: 'missing metrics', value: null as DashboardMetrics | null },
+    { name: 'zero price', value: { ...metrics, btc_price: 0 } },
+    { name: 'unavailable metrics', value: { ...metrics, data_status: 'unavailable' as const } },
+    { name: 'unconfigured metrics', value: { ...metrics, data_status: 'unconfigured' as const } },
+  ])('does not invent zero revenue or negative profit with $name', async ({ value }) => {
+    useAppStore.setState({ metrics: value });
+    await showSettings();
+    expect(screen.getByText('Waiting for an available BTC price')).toBeInTheDocument();
+    expect(screen.queryByText('+$1.36')).not.toBeInTheDocument();
+    const card = screen.getByRole('article', { name: 'Worker garage-miner' });
+    expect(within(card).getByText('Est. revenue/day').nextElementSibling).toHaveTextContent('—');
+    expect(within(card).getByText('Est. profit/day').nextElementSibling).toHaveTextContent('—');
+  });
+
+  it('labels estimates that use a known stale price', async () => {
+    useAppStore.setState({ metrics: { ...metrics, data_status: 'stale' } });
+    await showSettings();
+    expect(screen.getByText('Estimate uses the last available BTC price')).toBeInTheDocument();
+    expect(screen.getAllByText('+$1.36').length).toBe(2);
+  });
+
   it('rejects an invalid electricity rate without changing active calculations', async () => {
     await showSettings();
     fireEvent.change(screen.getByLabelText('Electricity cost (USD/kWh)'), { target: { value: '11' } });

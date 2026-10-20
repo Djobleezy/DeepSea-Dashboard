@@ -69,7 +69,7 @@ const WorkerCard: React.FC<{
   const efficiency = worker.efficiency;
   const power = worker.power_consumption;
   const dailyCost = powerCost === null ? null : (power / 1000) * 24 * powerCost;
-  const dailyRevenue = worker.estimated_daily_btc === undefined ? null : worker.estimated_daily_btc * btcPrice;
+  const dailyRevenue = worker.estimated_daily_btc === undefined || btcPrice <= 0 ? null : worker.estimated_daily_btc * btcPrice;
   const dailyProfit = dailyRevenue === null || dailyCost === null ? null : dailyRevenue - dailyCost;
   const hasOverride = override && Object.values(override).some(v => v !== undefined);
 
@@ -189,7 +189,9 @@ export const Workers: React.FC = () => {
   const setMetrics = useAppStore(s => s.setMetrics);
   const { formatFiat } = useCurrency();
   const { workers, loading, error, refresh } = useWorkers('all', 'hashrate_3hr', true);
-  const btcPrice = metrics?.btc_price ?? 0;
+  const priceAvailable = metrics !== null && Number.isFinite(metrics.btc_price) && metrics.btc_price > 0
+    && metrics.data_status !== 'unavailable' && metrics.data_status !== 'unconfigured';
+  const btcPrice = priceAvailable ? metrics.btc_price : 0;
   const dataUnavailable = workers?.data_status === 'unavailable' || workers?.data_status === 'unconfigured';
   const staleData = workers?.data_status === 'stale' || Boolean(error && workers);
   const lastUpdate = workers?.data_updated_at;
@@ -291,7 +293,7 @@ export const Workers: React.FC = () => {
   const totalPower = workers?.total_power_watts ?? allWorkers.reduce((sum, w) => sum + w.power_consumption, 0);
   const totalDailyCost = settingsLoaded ? totalPower / 1000 * 24 * powerCost : null;
   const dailyBtc = dataUnavailable ? undefined : workers?.total_daily_earnings_btc;
-  const dailyRevenue = dailyBtc === undefined ? null : dailyBtc * btcPrice;
+  const dailyRevenue = dailyBtc === undefined || !priceAvailable ? null : dailyBtc * btcPrice;
   const dailyProfit = dailyRevenue === null || totalDailyCost === null ? null : dailyRevenue - totalDailyCost;
   const overrideCount = Object.keys(overrides).length;
 
@@ -340,7 +342,7 @@ export const Workers: React.FC = () => {
         <div className="card"><div className="label">Fleet hashrate</div><div className="worker-summary-value">{fmtHashrate(workers.total_hashrate)}</div><p className="worker-help">3-hour average</p></div>
         <div className="card"><div className="label">Est. power draw</div><div className="worker-summary-value">{fmtPower(totalPower)}</div><p className="worker-help">{totalDailyCost === null ? 'Loading saved electricity rate…' : `${formatFiat(totalDailyCost)}/day at $${powerCost.toFixed(2)}/kWh`}</p></div>
         <div className="card"><div className="label">Est. daily profit</div><div className="worker-summary-value" style={{color:dailyProfit === null ? 'var(--text-dim)' : dailyProfit >= 0 ? 'var(--color-success)' : 'var(--color-error)'}}>
-          {dailyProfit === null ? '—' : `${dailyProfit >= 0 ? '+' : '-'}${formatFiat(Math.abs(dailyProfit))}`}</div><p className="worker-help">Revenue less electricity · whole fleet</p></div>
+          {dailyProfit === null ? '—' : `${dailyProfit >= 0 ? '+' : '-'}${formatFiat(Math.abs(dailyProfit))}`}</div><p className="worker-help">{!priceAvailable ? 'Waiting for an available BTC price' : metrics?.data_status === 'stale' ? 'Estimate uses the last available BTC price' : 'Revenue less electricity · whole fleet'}</p></div>
       </div>}
       {modelCounts.length > 0 && <div className="card"><div className="label" style={{marginBottom:14}}>Fleet composition</div>
         <div style={{display:'flex',flexDirection:'column',gap:14}}>{modelCounts.map(([model, data]) => <div key={model} className="worker-fleet-row">
