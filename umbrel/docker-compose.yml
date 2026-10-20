@@ -3,7 +3,7 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: ${APP_DEEPSEA_DASHBOARD_IP}
+      APP_HOST: deepsea-dashboard_deepsea_1
       APP_PORT: 8000
 
   redis:
@@ -33,7 +33,7 @@ services:
     environment:
       - DB_PATH=/data/deepsea.db
       - CONFIG_PATH=/config/config.json
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://deepsea-dashboard_redis_1:6379/0
       # Live DATUM Gateway probe — point at the Umbrel DATUM app's API
       # listener so the dashboard can render a real-time DATUM badge
       # instead of relying on the lagging pool_fees_percentage signal.
