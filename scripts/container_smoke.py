@@ -82,6 +82,7 @@ def main() -> None:
             )
 
             docker("restart", name)
+            base = "http://" + docker("port", name, "8000/tcp")
             wait_ready(base)
             assert request(base, "/api/config")["power_cost"] == 0.19
 
