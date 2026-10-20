@@ -203,7 +203,7 @@ async def _apply_financials(db: aiosqlite.Connection) -> None:
         return
     # Configured power is a fallback until an actual fleet is available.
     power = (_current_workers["total_power_watts"]
-             if _current_workers and _current_workers["workers"] else get_power_usage())
+             if _current_workers is not None else get_power_usage())
     rate = get_power_cost()
     financials = compute_financials(
         metrics.get("daily_mined_sats", 0), metrics.get("monthly_mined_sats", 0),

@@ -135,6 +135,18 @@ async def test_successful_empty_fleet_replaces_previous_workers(state, monkeypat
     await background.refresh_once(state)
     assert background.get_current_workers()["workers"] == []
     assert background.get_current_workers()["data_status"] == "fresh"
+    assert background.get_current_metrics()["power_usage_watts"] == 0
+    assert background.get_current_metrics()["daily_power_cost"] == 0
+
+
+@pytest.mark.asyncio
+async def test_unknown_worker_data_uses_configured_power_fallback(state, monkeypatch):
+    background._client = ocean_client(get_worker_data=None)
+    monkeypatch.setattr(background, "check_and_fire", AsyncMock())
+    await background.refresh_once(state)
+    assert background.get_current_workers() is None
+    assert background.get_current_metrics()["power_usage_watts"] == 3000
+    assert background.get_current_metrics()["daily_power_cost"] == 18
 
 
 @pytest.mark.asyncio
