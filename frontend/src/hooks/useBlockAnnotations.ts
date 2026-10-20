@@ -47,7 +47,9 @@ function showBlockToast(blockHeight: number) {
     boxShadow: '0 0 20px var(--primary-glow), 0 4px 20px rgba(0,0,0,0.5)',
     zIndex: '9999',
     animation: 'blockToastIn 0.4s ease-out',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
+    maxWidth: 'calc(100vw - 32px)',
+    textAlign: 'center',
   });
 
   // Inject animation keyframes if not already present
@@ -78,6 +80,7 @@ function showBlockToast(blockHeight: number) {
 
 /** Launch animated confetti particles for 3-4 seconds when a new block is found */
 function showBlockCelebration() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   // Inject CSS if needed (keyframes defined in global.css)
   const CONFETTI_COLORS = [
     '#f7931a', // bitcoin orange

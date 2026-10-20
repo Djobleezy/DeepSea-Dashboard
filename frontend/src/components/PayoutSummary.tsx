@@ -12,7 +12,7 @@ const SATS_PER_BTC = 100_000_000;
 const PAYOUT_THRESHOLD_BTC = 0.01; // Ocean.xyz minimum payout
 
 function estimatePayoutTime(unpaidBtc: number, dailySats: number): string {
-  if (dailySats <= 0) return 'N/A';
+  if (dailySats <= 0) return 'Not enough data';
 
   const remaining = PAYOUT_THRESHOLD_BTC - unpaidBtc;
   if (remaining <= 0) return 'Next block';
@@ -66,7 +66,7 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
   const estTime = estimatePayoutTime(unpaidBtc, metrics.daily_mined_sats);
 
   return (
-    <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
+    <div className="card payout-summary" style={{ position: 'relative', overflow: 'hidden' }}>
       {/* PAYOUT DETECTED flash overlay */}
       {newPayoutDetected && (
         <div
@@ -103,8 +103,8 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
           <button
             className={`btn${view === 'next' ? ' btn-primary' : ''}`}
             style={{
-              fontSize: '10px',
-              padding: '2px 8px',
+              fontSize: '12px',
+              padding: '6px 10px',
               ...(view === 'next' ? {
                 background: 'var(--primary)',
                 color: 'var(--bg)',
@@ -112,14 +112,15 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
               } : {}),
             }}
             onClick={() => setView('next')}
+            aria-pressed={view === 'next'}
           >
             NEXT
           </button>
           <button
             className={`btn${view === 'last' ? ' btn-primary' : ''}`}
             style={{
-              fontSize: '10px',
-              padding: '2px 8px',
+              fontSize: '12px',
+              padding: '6px 10px',
               ...(view === 'last' ? {
                 background: 'var(--primary)',
                 color: 'var(--bg)',
@@ -127,6 +128,7 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
               } : {}),
             }}
             onClick={() => setView('last')}
+            aria-pressed={view === 'last'}
           >
             LAST
           </button>
@@ -161,9 +163,9 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
 
       {/* Conditional view content */}
       {view === 'next' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div className="payout-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
           <div>
-            <div className="label">UNPAID EARNINGS</div>
+            <div className="label">UNPAID BALANCE</div>
             <div className="value-sm glow">{unpaidSats.toLocaleString()}</div>
             <div className="unit">SATS</div>
             <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
@@ -182,14 +184,14 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
             </div>
           </div>
           <div>
-            <div className="label">DAILY EARNINGS</div>
+            <div className="label">EST. DAILY EARNINGS</div>
             <div className="value-sm glow" style={{ color: 'var(--color-success)' }}>
               {metrics.daily_mined_sats.toLocaleString()}
             </div>
             <div className="unit">SATS/DAY</div>
           </div>
           <div>
-            <div className="label">DAILY PROFIT</div>
+            <div className="label">EST. DAILY PROFIT</div>
             <div
               className="value-sm"
               style={{ color: metrics.daily_profit_usd >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}
@@ -200,32 +202,32 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
         </div>
       ) : (
         /* Last payout view */
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div className="payout-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
           {lastPayout ? (
             <>
               <div>
                 <div className="label">LAST PAYOUT</div>
-                <div className="value-sm glow" style={{ color: 'var(--color-success)', fontSize: '14px' }}>
+                <div className="value-sm glow" style={{ color: 'var(--color-success)', fontSize: '18px' }}>
                   {formatRelativeDate(lastPayout.timestamp)}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                   {new Date(lastPayout.timestamp).toLocaleDateString()}
                 </div>
               </div>
               <div>
                 <div className="label">AMOUNT</div>
-                <div className="value-sm glow" style={{ color: '#f7931a', fontSize: '13px' }}>
+                <div className="value-sm glow" style={{ color: 'var(--color-warning)', fontSize: '18px', overflowWrap: 'anywhere' }}>
                   {formatBtc(lastPayout.amountBtc)}
                 </div>
                 {lastPayout.fiatValueUsd !== null && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                     ≈ {formatFiat(lastPayout.fiatValueUsd)}
                   </div>
                 )}
               </div>
               <div>
                 <div className="label">AVG INTERVAL</div>
-                <div className="value-sm glow" style={{ fontSize: '14px' }}>
+                <div className="value-sm glow" style={{ fontSize: '18px' }}>
                   {avgDaysBetweenPayouts !== null
                     ? `${avgDaysBetweenPayouts.toFixed(1)} days`
                     : '—'}
@@ -237,7 +239,7 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
                   className="value-sm"
                   style={{
                     color: lastPayout.verified ? 'var(--color-success)' : 'var(--color-warning, #f7931a)',
-                    fontSize: '13px',
+                    fontSize: '16px',
                   }}
                 >
                   {lastPayout.verified ? '✓ CONFIRMED' : '⏳ PENDING'}
@@ -250,7 +252,7 @@ export const PayoutSummary: React.FC<Props> = ({ metrics }) => {
                 NO PAYOUT HISTORY YET
               </span>
               <div style={{ fontSize: '11px', marginTop: '4px' }}>
-                Payouts auto-detected from earnings drops
+                Confirmed payouts will appear after the earnings history loads.
               </div>
             </div>
           )}

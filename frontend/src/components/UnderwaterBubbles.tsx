@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/store';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface Bubble {
   id: number;
@@ -23,13 +24,14 @@ function createBubble(): Bubble {
   };
 }
 
-const DENSITY_DESKTOP = 12;
+const DENSITY_DESKTOP = 6;
 const DENSITY_MOBILE = 3;
 const SPAWN_INTERVAL_DESKTOP = 2000; // ms
 const SPAWN_INTERVAL_MOBILE = 4000;
 
 export const UnderwaterBubbles: React.FC = () => {
   const theme = useAppStore((s) => s.theme);
+  const reducedMotion = useReducedMotion();
   const [bubbles, setBubbles] = React.useState<Bubble[]>([]);
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
   const density = isMobile ? DENSITY_MOBILE : DENSITY_DESKTOP;
@@ -44,7 +46,7 @@ export const UnderwaterBubbles: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (theme !== 'deepsea') {
+    if (theme !== 'deepsea' || reducedMotion) {
       setBubbles([]);
       return;
     }
@@ -65,13 +67,13 @@ export const UnderwaterBubbles: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [theme, density, spawnInterval, spawnBatch]);
+  }, [theme, reducedMotion, density, spawnInterval, spawnBatch]);
 
   const removeBubble = useCallback((id: number) => {
     setBubbles((prev) => prev.filter((b) => b.id !== id));
   }, []);
 
-  if (theme !== 'deepsea' || bubbles.length === 0) return null;
+  if (theme !== 'deepsea' || reducedMotion || bubbles.length === 0) return null;
 
   return (
     <div
@@ -91,7 +93,7 @@ export const UnderwaterBubbles: React.FC = () => {
         @keyframes bubble-rise {
           0% {
             transform: translateY(0) translateX(0) scale(1);
-            opacity: 0.15;
+            opacity: 0.08;
           }
           50% {
             opacity: 0.1;
@@ -115,7 +117,7 @@ export const UnderwaterBubbles: React.FC = () => {
             background:
               'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05))',
             borderRadius: '50%',
-            opacity: 0.15,
+            opacity: 0.08,
             boxShadow: '0 0 3px rgba(0, 136, 204, 0.15)',
             animation: `bubble-rise ${b.duration}s linear ${b.delay}s 1 forwards`,
             // CSS custom property for drift

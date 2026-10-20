@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import time
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -71,6 +71,13 @@ class DashboardMetrics(BaseModel):
     pool_fees_percentage: float = 0.0
     blocks_found: int = 0
     server_timestamp: float = Field(default_factory=time.time)
+    wallet: str = ""
+    data_status: Literal["fresh", "stale", "unavailable", "unconfigured"] = "unavailable"
+    data_updated_at: Optional[float] = None
+    snapshot_updated_at: float = 0.0
+    data_error: Optional[str] = None
+    power_usage_watts: float = 0.0
+    power_cost_per_kwh: float = 0.12
 
     # Extended fields
     estimated_earnings_per_day: float = 0.0
@@ -108,6 +115,7 @@ class Worker(BaseModel):
     efficiency: float = 0.0
     last_share: str = "N/A"
     earnings: float = 0.0
+    estimated_daily_btc: float = 0.0
     power_consumption: float = 0.0
     acceptance_rate: float = 100.0
 
@@ -122,7 +130,13 @@ class WorkerSummary(BaseModel):
     workers_online: int = 0
     workers_offline: int = 0
     total_earnings: float = 0.0
+    total_daily_earnings_btc: float = 0.0
+    total_power_watts: float = 0.0
     timestamp: str = ""
+    wallet: str = ""
+    data_status: Literal["fresh", "stale", "unavailable", "unconfigured"] = "unavailable"
+    data_updated_at: Optional[float] = None
+    snapshot_updated_at: float = 0.0
 
 
 # ---------------------------------------------------------------------------

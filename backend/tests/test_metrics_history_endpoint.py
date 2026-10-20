@@ -13,13 +13,15 @@ from app.routers import metrics
 
 
 @pytest_asyncio.fixture
-async def test_db():
+async def test_db(monkeypatch):
+    monkeypatch.setattr("app.config.get_wallet", lambda: "wallet-a")
     db = await aiosqlite.connect(":memory:")
     db.row_factory = aiosqlite.Row
     await db.execute(
         """
         CREATE TABLE metric_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wallet TEXT NOT NULL DEFAULT 'wallet-a',
             timestamp REAL NOT NULL,
             hashrate_60sec REAL,
             hashrate_10min REAL,
@@ -82,7 +84,7 @@ async def test_metrics_history_returns_filtered_ordered_rows(test_db, test_clien
     rows = [
         _insert_metric_row(now, 2.0, 75.0, 80.0),
         _insert_metric_row(now, 0.5, 101.0, 110.0),
-        _insert_metric_row(now, 0.25, 0.0, 0.0),  # filtered out by endpoint query
+        _insert_metric_row(now, 0.25, 0.0, 0.0),  # valid stopped-mining data is retained
         _insert_metric_row(now, 0.1, 120.0, 130.0),
     ]
 
@@ -101,9 +103,10 @@ async def test_metrics_history_returns_filtered_ordered_rows(test_db, test_clien
 
     assert resp.status_code == 200
     payload = resp.json()
-    assert len(payload) == 2
+    assert len(payload) == 3
     assert payload[0]["hashrate_60sec"] == 101.0
-    assert payload[1]["hashrate_60sec"] == 120.0
+    assert payload[1]["hashrate_60sec"] == 0.0
+    assert payload[2]["hashrate_60sec"] == 120.0
     assert payload[0]["timestamp"] < payload[1]["timestamp"]
 
 

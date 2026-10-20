@@ -5,41 +5,12 @@ from typing import Literal
 from fastapi import APIRouter, Query
 
 from app import background
+from app.config import get_wallet
 from app.models import WorkerSummary
 from app.services.cache import cache_get
-from app.services.worker_service import filter_workers, sort_workers
+from app.services.worker_service import build_worker_summary, filter_workers, sort_workers
 
 router = APIRouter()
-
-
-def _distribute_earnings(workers: list[dict], unpaid_btc: float) -> list[dict]:
-    """Distribute unpaid earnings across workers proportionally by hashrate (like v1).
-
-    Always sets an ``earnings`` field on every worker — even when
-    ``unpaid_btc`` is zero or unavailable — so the frontend never
-    sees the field disappear between refreshes.
-    """
-    if not workers:
-        return workers
-
-    if unpaid_btc <= 0:
-        for w in workers:
-            w.setdefault("earnings", 0.0)
-        return workers
-
-    total_hr = sum(float(w.get("hashrate_60sec", 0)) for w in workers)
-    if total_hr <= 0:
-        # Even split if no hashrate data
-        share = unpaid_btc / len(workers)
-        for w in workers:
-            w["earnings"] = share
-        return workers
-
-    for w in workers:
-        hr = float(w.get("hashrate_60sec", 0))
-        w["earnings"] = (hr / total_hr) * unpaid_btc
-
-    return workers
 
 
 @router.get("/workers", response_model=WorkerSummary, tags=["workers"])
@@ -54,38 +25,29 @@ async def get_workers(
 
     Hashrates, status, efficiency, power consumption, and ASIC model are enriched
     by the worker service. Unpaid earnings are distributed proportionally by
-    hashrate across all workers. Supports filtering by status and sorting by
-    any metric column.
+    hashrate across all workers, separately from estimated daily revenue.
+    Totals reflect the selected filter. Supports sorting by any metric column.
     """
-    cached = await cache_get(background.get_cache_key("workers"))
-    if not cached:
-        live = background.get_current_workers()
-        if live:
-            cached = live
-        else:
-            return WorkerSummary()
+    wallet = get_wallet().strip()
+    cached = background.get_current_workers() or await cache_get(background.get_cache_key("workers"))
+    if not cached or cached.get("wallet", wallet) != wallet:
+        return WorkerSummary(wallet=wallet, data_status="unavailable" if wallet else "unconfigured")
 
-    workers = cached.get("workers", [])
-
-    # Distribute unpaid earnings from metrics proportionally by hashrate
-    metrics = background.get_current_metrics()
-    unpaid_btc = float(metrics.get("unpaid_earnings", 0)) if metrics else 0
-    workers = _distribute_earnings(workers, unpaid_btc)
-
-    workers = filter_workers(workers, status)
-    workers = sort_workers(workers, sort_by, descending)
-
-    workers_online = sum(1 for w in workers if w.get("status") == "online")
-    workers_offline = sum(1 for w in workers if w.get("status") == "offline")
-    total_hashrate = sum(float(w.get("hashrate_3hr", 0) or 0) for w in workers)
-
+    # Old cache entries may predate the canonical worker response. Never mutate
+    # a cached dictionary while preparing a filtered REST response.
+    if "total_daily_earnings_btc" not in cached:
+        cached = build_worker_summary(cached, background.get_current_metrics() or {}, {}, wallet)
+    workers = sort_workers(filter_workers(cached.get("workers", []), status), sort_by, descending)
     return WorkerSummary(
-        workers=workers,
-        total_hashrate=total_hashrate,
-        hashrate_unit=cached.get("hashrate_unit", "TH/s"),
-        workers_total=len(workers),
-        workers_online=workers_online,
-        workers_offline=workers_offline,
-        total_earnings=unpaid_btc,
-        timestamp=cached.get("timestamp", ""),
+        **{
+            **cached,
+            "workers": workers,
+            "workers_total": len(workers),
+            "workers_online": sum(w.get("status") == "online" for w in workers),
+            "workers_offline": sum(w.get("status") == "offline" for w in workers),
+            "total_hashrate": sum(float(w.get("hashrate_3hr") or 0) for w in workers),
+            "total_earnings": sum(float(w.get("earnings") or 0) for w in workers),
+            "total_daily_earnings_btc": sum(float(w.get("estimated_daily_btc") or 0) for w in workers),
+            "total_power_watts": sum(float(w.get("power_consumption") or 0) for w in workers),
+        }
     )

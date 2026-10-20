@@ -23,6 +23,8 @@ import logging
 import re
 from typing import Any, Optional
 
+from app.models import WorkerSummary
+
 _log = logging.getLogger(__name__)
 
 # ASIC model patterns for name-based detection.
@@ -144,6 +146,61 @@ def enrich_workers(workers: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         enriched.append(worker)
     return enriched
+
+
+def build_worker_summary(
+    raw: dict,
+    metrics: dict,
+    overrides: dict,
+    wallet: str,
+) -> dict:
+    """Normalize one complete fleet snapshot for both REST and live updates.
+
+    ``earnings`` remains an estimated allocation of the unpaid balance.
+    ``estimated_daily_btc`` is a separate estimate and is the only revenue
+    field suitable for a daily-profit calculation.
+    """
+    workers = enrich_workers(raw.get("workers", []))
+    total_hr = sum(max(float(w.get("hashrate_3hr") or 0), 0) for w in workers)
+    unpaid_btc = max(float(metrics.get("unpaid_earnings") or 0), 0)
+    daily_btc = max(float(metrics.get("daily_mined_sats") or 0), 0) / 100_000_000
+    for worker in workers:
+        override = overrides.get(worker["name"], {})
+        efficiency = override.get("efficiency")
+        if efficiency is not None and efficiency > 0:
+            worker["efficiency"] = efficiency
+        if override.get("power") is not None:
+            worker["power_consumption"] = override["power"]
+        elif worker.get("status") == "offline":
+            worker["power_consumption"] = 0
+        else:
+            worker["power_consumption"] = round(
+                max(float(worker.get("hashrate_3hr") or 0), 0)
+                * max(float(worker.get("efficiency") or 0), 0)
+            )
+        share = max(float(worker.get("hashrate_3hr") or 0), 0) / total_hr if total_hr else 0
+        unpaid_share = share if total_hr else (1 / len(workers))
+        worker["earnings"] = unpaid_btc * unpaid_share
+        worker["estimated_daily_btc"] = daily_btc * share
+
+    return WorkerSummary(
+        workers=workers,
+        total_hashrate=total_hr,
+        hashrate_unit="TH/s",
+        workers_total=len(workers),
+        workers_online=sum(w.get("status") == "online" for w in workers),
+        workers_offline=sum(w.get("status") == "offline" for w in workers),
+        total_earnings=unpaid_btc,
+        total_daily_earnings_btc=daily_btc,
+        total_power_watts=sum(float(w.get("power_consumption") or 0) for w in workers),
+        timestamp=raw.get("timestamp", ""),
+        wallet=wallet,
+        data_updated_at=raw.get("data_updated_at"),
+        snapshot_updated_at=raw.get("snapshot_updated_at", 0.0),
+        data_status=(raw.get("data_status", "fresh")
+                     if raw.get("data_status", "fresh") != "fresh"
+                     else metrics.get("data_status", "fresh")),
+    ).model_dump()
 
 
 def sort_workers(

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { fetchMetrics, fetchWorkers } from '../api/client';
 import { useAppStore } from '../stores/store';
+import { publishApiStatus } from '../api/status';
 import type { DashboardMetrics, WorkerSummary } from '../types';
 
 const API_BASE = String(import.meta.env.VITE_API_BASE ?? '/api').replace(/\/+$/, '');
@@ -11,7 +12,18 @@ const MAX_BACKOFF = 30000;
 const STALE_AFTER_MS = 70000;
 const WATCHDOG_INTERVAL_MS = 10000;
 
+function publishSnapshotStatus(path: string, snapshot: object) {
+  const data = snapshot as Pick<DashboardMetrics, 'data_status' | 'data_updated_at' | 'data_error'>;
+  publishApiStatus({
+    path,
+    status: data.data_status === 'stale' ? 'stale' : data.data_status === 'unavailable' ? 'unavailable' : 'fresh',
+    updatedAt: data.data_updated_at ?? null,
+    error: data.data_error ?? null,
+  });
+}
+
 export function useSSE() {
+  const wallet = useAppStore((s) => s.wallet);
   const setMetrics = useAppStore((s) => s.setMetrics);
   const setWorkers = useAppStore((s) => s.setWorkers);
   const setSseConnected = useAppStore((s) => s.setSseConnected);
@@ -24,11 +36,14 @@ export function useSSE() {
 
   useEffect(() => {
     mountedRef.current = true;
+    if (wallet === null) return;
+    const scopeEpoch = useAppStore.getState().walletEpoch;
+    const isCurrent = () => mountedRef.current && scopeEpoch === useAppStore.getState().walletEpoch;
 
     async function resyncSnapshot() {
       try {
         const [metrics, workers] = await Promise.all([fetchMetrics(), fetchWorkers()]);
-        if (!mountedRef.current) return;
+        if (!isCurrent()) return;
         setMetrics(metrics);
         setWorkers(workers);
       } catch {
@@ -41,7 +56,7 @@ export function useSSE() {
     }
 
     function scheduleReconnect() {
-      if (!mountedRef.current || reconnectTimerRef.current) return;
+      if (!isCurrent() || reconnectTimerRef.current) return;
       const delay = backoffRef.current;
       backoffRef.current = Math.min(delay * 2, MAX_BACKOFF);
       reconnectTimerRef.current = setTimeout(() => {
@@ -59,7 +74,7 @@ export function useSSE() {
     }
 
     function connect() {
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
 
       closeConnection(false);
       const es = new EventSource(SSE_URL);
@@ -67,7 +82,7 @@ export function useSSE() {
       markActivity();
 
       es.addEventListener('open', () => {
-        if (!mountedRef.current) return;
+        if (!isCurrent()) return;
         markActivity();
         setSseConnected(true);
         backoffRef.current = INITIAL_BACKOFF;
@@ -75,22 +90,28 @@ export function useSSE() {
       });
 
       es.addEventListener('metrics', (e: MessageEvent) => {
-        if (!mountedRef.current) return;
+        if (!isCurrent()) return;
         markActivity();
         try {
           const data = JSON.parse(e.data) as DashboardMetrics;
-          setMetrics(data);
+          if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
+          if (setMetrics(data)) {
+            publishSnapshotStatus('/metrics', useAppStore.getState().metrics ?? data);
+          }
         } catch {
           // ignore malformed event
         }
       });
 
       es.addEventListener('workers', (e: MessageEvent) => {
-        if (!mountedRef.current) return;
+        if (!isCurrent()) return;
         markActivity();
         try {
           const data = JSON.parse(e.data) as WorkerSummary;
-          setWorkers(data);
+          if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
+          if (setWorkers(data)) {
+            publishSnapshotStatus('/workers', useAppStore.getState().workers ?? data);
+          }
         } catch {
           // ignore malformed event
         }
@@ -101,7 +122,7 @@ export function useSSE() {
       });
 
       es.addEventListener('error', () => {
-        if (!mountedRef.current) return;
+        if (!isCurrent()) return;
         closeConnection();
         scheduleReconnect();
       });
@@ -109,7 +130,7 @@ export function useSSE() {
 
     connect();
     watchdogTimerRef.current = setInterval(() => {
-      if (!mountedRef.current || !esRef.current) return;
+      if (!isCurrent() || !esRef.current) return;
       if (Date.now() - lastMessageAtRef.current <= STALE_AFTER_MS) return;
       closeConnection();
       scheduleReconnect();
@@ -127,5 +148,5 @@ export function useSSE() {
       }
       closeConnection();
     };
-  }, [setMetrics, setWorkers, setSseConnected]);
+  }, [setMetrics, setWorkers, setSseConnected, wallet]);
 }

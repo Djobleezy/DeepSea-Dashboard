@@ -1,10 +1,10 @@
 /**
  * DeepSea Dashboard — Service Worker v2.0.4
- * Best-in-class PWA caching with network-first API, cache-first static assets,
- * LRU eviction, offline fallback, and background sync stub.
+ * Wallet-scoped snapshot caching with explicit stale data, cache-first static
+ * assets, bounded eviction, and an offline navigation fallback.
  */
 
-const CACHE_VERSION = 'deepsea-v2.0.4';
+const CACHE_VERSION = 'deepsea-v2.0.4-freshness-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
@@ -17,6 +17,9 @@ const MAX_STATIC_ENTRIES = 100;
 
 // Network timeout for API and navigation requests (ms)
 const NETWORK_TIMEOUT_MS = 5000;
+const SCOPED_API_PATHS = new Set(['/api/metrics', '/api/workers']);
+const PUBLIC_API_PATHS = new Set(['/api/exchange-rates', '/api/pool-blocks']);
+let apiCacheGeneration = 0;
 
 // SPA shell routes to precache on install
 const SHELL_URLS = [
@@ -35,7 +38,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DeepSea — Offline</title>
   <style>
-    :root { --bg: #0a0e14; --accent: #00d4ff; --text: #a0d4f5; --dim: #3a5a7a; }
+    :root { --bg: #0a0e14; --accent: #00d4ff; --text: #a0d4f5; --dim: #8ba8c0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
@@ -56,6 +59,7 @@ const OFFLINE_HTML = `<!DOCTYPE html>
       0%, 100% { opacity: 0.2; transform: scale(0.8); }
       50% { opacity: 1; transform: scale(1.2); }
     }
+    @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
     button {
       background: transparent; border: 1px solid var(--accent); color: var(--accent);
       padding: 0.6rem 1.5rem; font-family: inherit; font-size: 0.85rem;
@@ -148,9 +152,26 @@ self.addEventListener('fetch', (event) => {
     return; // let browser handle natively
   }
 
+  // Writes and editable settings must reach the server. Successful wallet or
+  // power-setting updates invalidate the derived metrics/worker snapshots.
+  if (request.method !== 'GET') {
+    const configWrite = url.pathname === '/api/config' && request.method === 'POST';
+    const workerSettingsWrite = request.method === 'PUT' &&
+      (url.pathname === '/api/workers/settings' || url.pathname === '/api/workers/settings/electricity-rate');
+    if (configWrite || workerSettingsWrite) {
+      event.respondWith(updateSettingsAndClearSnapshots(request));
+    }
+    return;
+  }
+
   // --- API endpoints: network-first with timeout, fallback to cache ---
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstWithTimeout(request, API_CACHE, NETWORK_TIMEOUT_MS, MAX_API_ENTRIES));
+    // Wallet-specific snapshots are reusable only after a live config read has
+    // established the requested wallet. Never cache settings or alert state.
+    if (PUBLIC_API_PATHS.has(url.pathname) ||
+        (SCOPED_API_PATHS.has(url.pathname) && request.headers.get('X-DeepSea-Wallet'))) {
+      event.respondWith(networkFirstWithTimeout(request, API_CACHE, NETWORK_TIMEOUT_MS, MAX_API_ENTRIES));
+    }
     return;
   }
 
@@ -175,25 +196,64 @@ self.addEventListener('fetch', (event) => {
 
 async function networkFirstWithTimeout(request, cacheName, timeoutMs, maxEntries) {
   const cache = await caches.open(cacheName);
+  const generation = apiCacheGeneration;
+  const scoped = SCOPED_API_PATHS.has(new URL(request.url).pathname);
+  const wallet = request.headers.get('X-DeepSea-Wallet');
 
   try {
     const networkResponse = await fetchWithTimeout(request.clone(), timeoutMs);
 
     if (networkResponse.ok) {
-      // Clone before consuming
-      const responseToCache = networkResponse.clone();
-      cache.put(request, responseToCache).then(() =>
-        trimCache(cache, maxEntries)
-      );
+      let canCache = true;
+      if (scoped) {
+        const data = await networkResponse.clone().json().catch(() => null);
+        canCache = data?.wallet === wallet && data?.data_status === 'fresh';
+      }
+      if (canCache && generation === apiCacheGeneration) {
+        try {
+          const headers = new Headers(networkResponse.headers);
+          headers.set('X-DeepSea-Cached-At', String(Date.now()));
+          // CacheStorage must distinguish two requests with different wallets.
+          if (scoped) headers.append('Vary', 'X-DeepSea-Wallet');
+          const responseToCache = new Response(await networkResponse.clone().arrayBuffer(), {
+            status: networkResponse.status, statusText: networkResponse.statusText, headers,
+          });
+          if (generation === apiCacheGeneration) {
+            await cache.put(request, responseToCache);
+            await trimCache(cache, maxEntries);
+          }
+        } catch (error) {
+          // A full/disabled cache must not turn a successful read into an error.
+          console.warn('[SW] Could not save snapshot:', error);
+        }
+      }
     }
 
     return networkResponse;
   } catch (err) {
     // Network failed or timed out — serve from cache
     const cached = await cache.match(request);
-    if (cached) {
-      console.log(`[SW] API offline fallback: ${request.url}`);
-      return cached;
+    if (cached && generation === apiCacheGeneration) {
+      const data = await cached.clone().json().catch(() => null);
+      if (!scoped || data?.wallet === wallet) {
+        const headers = new Headers(cached.headers);
+        headers.set('X-DeepSea-Cache', 'stale');
+        headers.delete('Content-Length');
+        headers.delete('Content-Encoding');
+        let body = await cached.clone().text();
+        if (scoped && data) {
+          body = JSON.stringify({
+            ...data,
+            data_status: 'stale',
+            data_error: 'Server unavailable. Showing the last saved snapshot.',
+            // Preserve the server's data timestamp, never the fallback time.
+            data_updated_at: data.data_updated_at ?? Number(headers.get('X-DeepSea-Cached-At')) / 1000,
+          });
+        }
+        if (generation === apiCacheGeneration) {
+          return new Response(body, { status: cached.status, statusText: cached.statusText, headers });
+        }
+      }
     }
     // No cache — return 503
     return new Response(JSON.stringify({ error: 'offline', cached: false }), {
@@ -201,6 +261,15 @@ async function networkFirstWithTimeout(request, cacheName, timeoutMs, maxEntries
       headers: { 'Content-Type': 'application/json', 'X-SW-Offline': '1' },
     });
   }
+}
+
+async function updateSettingsAndClearSnapshots(request) {
+  const response = await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
+  if (response.ok) {
+    apiCacheGeneration++;
+    await caches.delete(API_CACHE).catch((error) => console.warn('[SW] Could not clear snapshots:', error));
+  }
+  return response;
 }
 
 // ---------------------------------------------------------------------------

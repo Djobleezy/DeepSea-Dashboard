@@ -4,11 +4,13 @@ import asyncio
 import logging
 
 import pytz
-from fastapi import APIRouter
+import aiosqlite
+from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
 from app import background
 from app.config import load_config, save_config
+from app.db import get_db, migrate_legacy_electricity_rate
 from app.models import AppConfig, ConfigUpdate
 
 _log = logging.getLogger(__name__)
@@ -17,12 +19,13 @@ router = APIRouter()
 
 
 @router.get("/config", response_model=AppConfig, tags=["config"])
-async def get_config() -> AppConfig:
+async def get_config(db: aiosqlite.Connection = Depends(get_db)) -> AppConfig:
     """Return the current dashboard configuration.
 
     Reads from ``config.json`` at the repo root. All fields have safe defaults
     so this endpoint always returns a valid response even if the file is missing.
     """
+    await migrate_legacy_electricity_rate(db)
     cfg = await run_in_threadpool(load_config)
     return AppConfig(
         wallet=cfg.get("wallet", ""),
@@ -37,7 +40,7 @@ async def get_config() -> AppConfig:
 
 
 @router.post("/config", response_model=AppConfig, tags=["config"])
-async def update_config(payload: ConfigUpdate) -> AppConfig:
+async def update_config(payload: ConfigUpdate, db: aiosqlite.Connection = Depends(get_db)) -> AppConfig:
     """Update dashboard configuration and trigger a background metrics refresh.
 
     Only provided (non-null) fields are updated — omitted fields retain their
@@ -45,7 +48,9 @@ async def update_config(payload: ConfigUpdate) -> AppConfig:
     fired in the background so new data reflects the new wallet/settings.
     """
     update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    await migrate_legacy_electricity_rate(db)
     await run_in_threadpool(save_config, update)
+    await background.refresh_financials(db)
 
     # If the DATUM gateway URL changed, drop the probe cache so the
     # next /api/datum/status call hits the new endpoint immediately
@@ -61,7 +66,7 @@ async def update_config(payload: ConfigUpdate) -> AppConfig:
     # Fire-and-forget: don't block the response waiting for Ocean API calls
     asyncio.ensure_future(_safe_refresh())
 
-    return await get_config()
+    return await get_config(db)
 
 
 async def _safe_refresh() -> None:

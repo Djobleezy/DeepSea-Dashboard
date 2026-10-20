@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../stores/store';
 import { ThemeToggle } from './ThemeToggle';
@@ -14,331 +14,116 @@ import { UpdatePrompt } from './UpdatePrompt';
 import { InstallPrompt } from './InstallPrompt';
 
 const NAV_LINKS = [
-  { to: '/dashboard', icon: '◈', label: 'DASHBOARD' },
-  { to: '/workers', icon: '⛭', label: 'WORKERS' },
-  { to: '/blocks', icon: '⛏', label: 'BLOCKS' },
-  { to: '/earnings', icon: '₿', label: 'EARNINGS' },
-  { to: '/notifications', icon: '⚑', label: 'ALERTS' },
-  { to: '/config', icon: '⚙', label: 'CONFIG' },
+  { to: '/dashboard', icon: '◈', label: 'Dashboard' },
+  { to: '/workers', icon: '⛭', label: 'Workers' },
+  { to: '/blocks', icon: '⛏', label: 'Blocks' },
+  { to: '/earnings', icon: '₿', label: 'Earnings' },
+  { to: '/notifications', icon: '⚑', label: 'Alerts' },
+  { to: '/config', icon: '⚙', label: 'Config' },
 ];
 
-interface Props {
-  children: React.ReactNode;
-}
-
-export const Layout: React.FC<Props> = ({ children }) => {
+export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useKeyboardShortcuts();
   useRetroRefresh();
   useThemeColor();
   const sseConnected = useAppStore((s) => s.sseConnected);
   const unreadCount = useAppStore((s) => s.unreadCount);
+  const theme = useAppStore((s) => s.theme);
   const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  // Close menu on route change
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
-
-  // Close on escape
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    triggerRef.current?.focus();
   }, []);
 
-  const toggleMenu = useCallback(() => setMenuOpen((o) => !o), []);
-  const theme = useAppStore((s) => s.theme);
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 768px)');
+    const onResize = () => { if (!query.matches) setMenuOpen(false); };
+    query.addEventListener('change', onResize);
+    return () => query.removeEventListener('change', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const drawer = drawerRef.current;
+    const controls = () => Array.from(drawer?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), [tabindex="0"]',
+    ) ?? []);
+    controls()[0]?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMenu();
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = controls();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen, closeMenu]);
+
+  const links = NAV_LINKS.map((link) => (
+    <NavLink key={link.to} to={link.to} aria-label={link.to === '/notifications' && unreadCount > 0 ? `${link.label}, ${unreadCount} unread` : undefined} className={({ isActive }) => `app-nav-link${isActive ? ' active' : ''}`}>
+      <span aria-hidden="true">{link.icon}</span> {link.label}
+      {link.to === '/notifications' && unreadCount > 0 && (
+        <span className="unread-badge" aria-hidden="true">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+    </NavLink>
+  ));
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', animation: 'layout-fade-in 0.6s ease' }}>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to content</a>
       {theme === 'deepsea' && <UnderwaterBubbles />}
       {theme === 'matrix' && <MatrixRain />}
-
-      {/* CSS for responsive nav */}
-      <style>{`
-        .nav-desktop { display: flex; }
-        .nav-hamburger { display: none; }
-        .nav-drawer { display: none; }
-        .nav-overlay { display: none; }
-
-        @media (max-width: 768px) {
-          .nav-desktop { display: none !important; }
-          .nav-hamburger { display: flex !important; }
-          .nav-drawer {
-            display: flex !important;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 260px;
-            height: 100vh;
-            background: var(--bg-card);
-            border-right: 1px solid var(--border);
-            flex-direction: column;
-            padding: 16px 0;
-            z-index: 1001;
-            transform: translateX(-100%);
-            transition: transform 0.25s ease;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.5);
-          }
-          .nav-drawer.open { transform: translateX(0); }
-          .nav-overlay {
-            display: block;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            z-index: 1000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s;
-          }
-          .nav-overlay.open {
-            opacity: 1;
-            pointer-events: auto;
-          }
-        }
-        nav::-webkit-scrollbar { display: none; }
-      `}</style>
-
-      {/* Mobile overlay */}
-      <div
-        className={`nav-overlay ${menuOpen ? 'open' : ''}`}
-        onClick={() => setMenuOpen(false)}
-      />
-
-      {/* Mobile drawer */}
-      <div className={`nav-drawer ${menuOpen ? 'open' : ''}`}>
-        <div style={{
-          padding: '8px 20px 20px',
-          borderBottom: '1px solid var(--border)',
-          marginBottom: '8px',
-        }}>
-          <span style={{
-            fontFamily: 'var(--font-vt323)',
-            fontSize: '28px',
-            color: 'var(--primary)',
-            textShadow: '0 0 10px var(--primary-glow)',
-            letterSpacing: '3px',
-          }}>
-            ⚓ DEEPSEA
-          </span>
-        </div>
-        {NAV_LINKS.map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            style={({ isActive }) => ({
-              fontFamily: 'var(--font-mono)',
-              fontSize: '15px',
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              color: isActive ? 'var(--primary)' : 'var(--text-dim)',
-              textDecoration: 'none',
-              padding: '12px 20px',
-              background: isActive ? 'var(--bg-hover)' : 'transparent',
-              borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-              textShadow: isActive ? '0 0 6px var(--primary-glow)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              position: 'relative',
-            })}
-          >
-            <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>{link.icon}</span>
-            {link.label}
-            {link.to === '/notifications' && unreadCount > 0 && (
-              <span style={{
-                background: 'var(--color-error)',
-                color: '#fff',
-                fontSize: '10px',
-                borderRadius: '8px',
-                padding: '0 5px',
-                marginLeft: 'auto',
-              }}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </NavLink>
-        ))}
-        <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              background: sseConnected ? 'var(--color-success)' : 'var(--color-warning)',
-              boxShadow: sseConnected ? '0 0 8px var(--color-success)' : 'none',
-            }} />
-            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              {sseConnected ? 'LIVE FEED CONNECTED' : 'CONNECTING...'}
-            </span>
+      {menuOpen && (
+        <>
+          <div className="nav-overlay" onClick={closeMenu} aria-hidden="true" />
+          <div ref={drawerRef} id="mobile-navigation" className="nav-drawer" role="dialog" aria-modal="true" aria-labelledby="navigation-title">
+            <div className="drawer-heading">
+              <span className="app-brand" id="navigation-title">⚓ DEEPSEA</span>
+              <button className="btn icon-button" onClick={closeMenu} aria-label="Close menu">✕</button>
+            </div>
+            <nav aria-label="Mobile navigation">{links}</nav>
+            <div className="drawer-controls">
+              <span className="connection-label">{sseConnected ? '● Live connection' : '○ Reconnecting'}</span>
+              <AudioPlayer />
+            </div>
           </div>
-          <AudioPlayer />
-        </div>
-      </div>
-
-      {/* Header */}
-      <header style={{
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg-card)',
-        padding: '0 16px',
-        display: 'flex',
-        alignItems: 'center',
-        minHeight: '56px',
-        gap: '12px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        boxShadow: '0 2px 12px var(--border-glow)',
-      }}>
-        {/* Hamburger — mobile only */}
-        <button
-          className="nav-hamburger"
-          onClick={toggleMenu}
-          aria-label="Toggle menu"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px',
-            flexDirection: 'column',
-            gap: '4px',
-            flexShrink: 0,
-          }}
-        >
-          <span style={{
-            width: '20px', height: '2px', background: 'var(--primary)',
-            borderRadius: '1px', transition: 'transform 0.2s',
-            transform: menuOpen ? 'rotate(45deg) translateY(6px)' : 'none',
-          }} />
-          <span style={{
-            width: '20px', height: '2px', background: 'var(--primary)',
-            borderRadius: '1px', transition: 'opacity 0.2s',
-            opacity: menuOpen ? 0 : 1,
-          }} />
-          <span style={{
-            width: '20px', height: '2px', background: 'var(--primary)',
-            borderRadius: '1px', transition: 'transform 0.2s',
-            transform: menuOpen ? 'rotate(-45deg) translateY(-6px)' : 'none',
-          }} />
-        </button>
-
-        <NavLink to="/dashboard" style={{ textDecoration: 'none', flexShrink: 0 }}>
-          <span style={{
-            fontFamily: 'var(--font-vt323)',
-            fontSize: '28px',
-            color: 'var(--primary)',
-            textShadow: '0 0 10px var(--primary-glow)',
-            letterSpacing: '3px',
-          }}>
-            ⚓ DEEPSEA
-          </span>
-        </NavLink>
-
-        {/* Desktop nav */}
-        <nav className="nav-desktop" style={{
-          gap: '2px',
-          flex: 1,
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          minWidth: 0,
-        }}>
-          {NAV_LINKS.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              style={({ isActive }) => ({
-                fontFamily: 'var(--font-mono)',
-                fontSize: '13px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                color: isActive ? 'var(--primary)' : 'var(--text-dim)',
-                textDecoration: 'none',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                background: isActive ? 'var(--bg-hover)' : 'transparent',
-                border: isActive ? '1px solid var(--border)' : '1px solid transparent',
-                textShadow: isActive ? '0 0 6px var(--primary-glow)' : 'none',
-                position: 'relative',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              })}
-            >
-              {link.icon} {link.label}
-              {link.to === '/notifications' && unreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: '2px', right: '2px',
-                  background: 'var(--color-error)', color: '#fff',
-                  fontSize: '10px', borderRadius: '8px',
-                  padding: '0 4px', minWidth: '14px', textAlign: 'center',
-                }}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Right side controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
-          <span
-            title={sseConnected ? 'Live feed connected' : 'Connecting...'}
-            style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              background: sseConnected ? 'var(--color-success)' : 'var(--color-warning)',
-              boxShadow: sseConnected ? '0 0 8px var(--color-success)' : 'none',
-              display: 'inline-block', flexShrink: 0,
-            }}
-          />
-          <span className="nav-desktop" style={{ display: 'flex' }}><AudioPlayer /></span>
+        </>
+      )}
+      <header className="app-header">
+        <button ref={triggerRef} className="nav-hamburger btn icon-button" onClick={() => setMenuOpen((open) => !open)}
+          aria-label="Toggle menu" aria-expanded={menuOpen} aria-controls={menuOpen ? 'mobile-navigation' : undefined}>☰</button>
+        <NavLink to="/dashboard" className="app-brand" aria-label="DeepSea dashboard">⚓ DEEPSEA</NavLink>
+        <nav className="nav-desktop" aria-label="Main navigation">{links}</nav>
+        <div className="header-controls">
+          <span className="connection-dot nav-desktop" role="img" title={sseConnected ? 'Live connection' : 'Reconnecting'} aria-label={sseConnected ? 'Live connection' : 'Reconnecting'}
+            style={{ background: sseConnected ? 'var(--color-success)' : 'var(--color-warning)' }} />
+          <span className="nav-desktop"><AudioPlayer /></span>
           <ThemeToggle />
         </div>
       </header>
-
-      {/* Main content */}
-      <main style={{
-        flex: 1,
-        padding: '16px',
-        maxWidth: '1400px',
-        margin: '0 auto',
-        width: '100%',
-        boxSizing: 'border-box',
-      }}>
-        {children}
-      </main>
-
-      {/* Footer */}
-      <footer style={{
-        borderTop: '1px solid var(--border)',
-        padding: '8px 16px',
-        fontSize: '10px',
-        color: 'var(--text-dim)',
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-      }}>
-        <span>DEEPSEA DASHBOARD v2.0.4</span>
-        <a
-          href="https://x.com/DJObleezy"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: 'var(--primary)',
-            textDecoration: 'none',
-            textShadow: '0 0 6px var(--primary-glow)',
-            fontFamily: 'var(--font-vt323)',
-            fontSize: '13px',
-            letterSpacing: '1px',
-          }}
-        >
-          MADE BY @DJO₿LEEZY
-        </a>
-        <span style={{
-          color: sseConnected ? 'var(--color-success)' : 'var(--color-warning)',
-          textAlign: 'right',
-        }}>
-          {sseConnected ? '● LIVE' : '○ CONNECTING'}
-        </span>
+      <main id="main-content" className="app-main" tabIndex={-1}>{children}</main>
+      <footer className="app-footer">
+        <span>DeepSea Dashboard v2.0.4</span>
+        <a href="https://x.com/DJObleezy" target="_blank" rel="noopener noreferrer">Made by @DJO₿LEEZY</a>
+        <span className="connection-label">{sseConnected ? '● Live connection' : '○ Reconnecting'}</span>
       </footer>
-
       <EasterEgg />
       <UpdatePrompt />
       <InstallPrompt />

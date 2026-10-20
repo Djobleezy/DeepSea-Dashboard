@@ -1,7 +1,9 @@
 """SQLite database management for persistent data."""
 
+import asyncio
 import json
 import logging
+import math
 import os
 import time
 import uuid
@@ -10,9 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 import aiosqlite
+from starlette.concurrency import run_in_threadpool
 
 DB_PATH = Path(os.environ.get("DB_PATH", "/data/deepsea.db"))
 MAX_NOTIFICATIONS = int(os.environ.get("MAX_NOTIFICATIONS", "1000"))
+LEGACY_RATE_MIGRATION_KEY = "electricity_rate_config_migration_v1"
+_rate_migration_lock = asyncio.Lock()
 
 
 async def _configure_connection(db: aiosqlite.Connection) -> None:
@@ -81,6 +86,7 @@ async def init_db() -> None:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS metric_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wallet TEXT NOT NULL DEFAULT '',
                 timestamp REAL NOT NULL,
                 hashrate_60sec REAL,
                 hashrate_10min REAL,
@@ -92,6 +98,15 @@ async def init_db() -> None:
                 unpaid_earnings REAL
             )
         """)
+        # Older snapshots cannot be assigned to a wallet safely. Preserve them
+        # with an empty scope rather than showing them for the current wallet.
+        async with db.execute("PRAGMA table_info(metric_history)") as cur:
+            columns = {row[1] for row in await cur.fetchall()}
+        if "wallet" not in columns:
+            await db.execute("ALTER TABLE metric_history ADD COLUMN wallet TEXT NOT NULL DEFAULT ''")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metric_history_wallet_ts ON metric_history(wallet, timestamp)"
+        )
         # Persists notification engine state across restarts, preventing alert
         # storms and duplicate notifications after a process restart.
         await db.execute("""
@@ -136,6 +151,7 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_metric_history_ts ON metric_history(timestamp)"
         )
         await db.commit()
+        await migrate_legacy_electricity_rate(db)
     logging.info("Database initialized at %s", DB_PATH)
 
 
@@ -298,6 +314,7 @@ async def get_metric_history(
     db: aiosqlite.Connection,
     hours: int = 1,
     limit: int = 360,
+    wallet: Optional[str] = None,
 ) -> list[dict]:
     """Return recent metric snapshots for chart hydration.
 
@@ -306,15 +323,20 @@ async def get_metric_history(
         limit: Maximum rows (default 360 = 6 hours at 60s intervals).
     """
     bounded_limit = max(1, min(int(limit), MAX_METRIC_HISTORY_ROWS))
+    if wallet is None:
+        from app.config import get_wallet
+
+        wallet = get_wallet().strip()
+    if not wallet:
+        return []
     cutoff = time.time() - hours * 3600
     async with db.execute(
         """SELECT timestamp, hashrate_60sec, hashrate_3hr
            FROM metric_history
-           WHERE timestamp > ?
-             AND (COALESCE(hashrate_60sec, 0) > 0 OR COALESCE(hashrate_3hr, 0) > 0)
+           WHERE timestamp > ? AND wallet = ?
            ORDER BY timestamp ASC
            LIMIT ?""",
-        (cutoff, bounded_limit),
+        (cutoff, wallet, bounded_limit),
     ) as cur:
         rows = await cur.fetchall()
     return [
@@ -328,13 +350,17 @@ async def get_metric_history(
 
 
 async def save_metric_snapshot(db: aiosqlite.Connection, metrics: dict) -> None:
+    wallet = metrics.get("wallet", "").strip()
+    if not wallet:
+        return
     await db.execute(
         """INSERT INTO metric_history
-           (timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
+           (wallet, timestamp, hashrate_60sec, hashrate_10min, hashrate_3hr, hashrate_24hr,
             workers_hashing, btc_price, daily_mined_sats, unpaid_earnings)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
-            time.time(),
+            wallet,
+            metrics.get("data_updated_at") or time.time(),
             metrics.get("hashrate_60sec"),
             metrics.get("hashrate_10min"),
             metrics.get("hashrate_3hr"),
@@ -420,6 +446,36 @@ async def set_worker_overrides(db: aiosqlite.Connection, overrides: dict) -> Non
 # ---------------------------------------------------------------------------
 # User settings (electricity rate, etc.)
 # ---------------------------------------------------------------------------
+
+
+async def migrate_legacy_electricity_rate(db: aiosqlite.Connection) -> None:
+    """Reconcile the legacy Workers rate with Config exactly once.
+
+    A valid legacy custom rate fills a missing/default Config rate. An
+    existing non-default Config value wins. Preserve the legacy row and mark
+    every completed decision, including invalid/missing legacy values, so a
+    later explicit Config choice of 0.12 is never overwritten on restart.
+    """
+    from app.config import import_legacy_power_cost
+
+    async with _rate_migration_lock:
+        async with db.execute("SELECT value FROM user_settings WHERE key = ?", (LEGACY_RATE_MIGRATION_KEY,)) as cur:
+            if await cur.fetchone() is not None:
+                return
+        async with db.execute("SELECT value FROM user_settings WHERE key = 'electricity_rate'") as cur:
+            row = await cur.fetchone()
+        imported = False
+        if row is not None:
+            try:
+                value = json.loads(row[0])
+                if isinstance(value, bool):
+                    raise ValueError("Boolean rates are not valid")
+                rate = float(value)
+                if math.isfinite(rate) and 0 <= rate <= 10:
+                    imported = await run_in_threadpool(import_legacy_power_cost, rate)
+            except (TypeError, ValueError):
+                pass
+        await set_user_setting(db, LEGACY_RATE_MIGRATION_KEY, {"completed": True, "imported": imported})
 
 
 async def get_user_settings(db: aiosqlite.Connection) -> dict:

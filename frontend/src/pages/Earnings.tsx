@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchEarnings } from '../api/client';
 import { useAppStore } from '../stores/store';
 import { useCurrency } from '../hooks/useCurrency';
@@ -6,7 +6,11 @@ import type { EarningsResponse } from '../types';
 
 export const Earnings: React.FC = () => {
   const [days, setDays] = useState(90);
-  const [data, setData] = useState<EarningsResponse | null>(null);
+  const [snapshot, setSnapshot] = useState<{ data: EarningsResponse; days: number; scope: number } | null>(null);
+  const walletEpoch = useAppStore((s) => s.walletEpoch);
+  const data = snapshot?.scope === walletEpoch ? snapshot.data : null;
+  const displayedDays = snapshot?.scope === walletEpoch ? snapshot.days : days;
+  const requestId = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const metrics = useAppStore((s) => s.metrics);
@@ -14,19 +18,25 @@ export const Earnings: React.FC = () => {
   const { formatFiat } = useCurrency();
 
   const load = useCallback(async (d: number) => {
+    const id = ++requestId.current;
     setLoading(true);
     try {
       const res = await fetchEarnings(d);
-      setData(res);
+      if (id !== requestId.current || walletEpoch !== useAppStore.getState().walletEpoch) return;
+      setSnapshot({ data: res, days: d, scope: walletEpoch });
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load earnings');
+      if (id === requestId.current && walletEpoch === useAppStore.getState().walletEpoch) setError(e instanceof Error ? e.message : 'Failed to load earnings');
     } finally {
-      setLoading(false);
+      if (id === requestId.current && walletEpoch === useAppStore.getState().walletEpoch) setLoading(false);
     }
-  }, []);
+  }, [walletEpoch]);
 
-  useEffect(() => { load(days); }, [days, load]);
+  useEffect(() => {
+    const pendingRequest = requestId;
+    void load(days);
+    return () => { pendingRequest.current++; };
+  }, [days, load]);
 
   const txLink = (txid: string, lightning_txid: string) => {
     if (txid) return `https://mempool.space/tx/${txid}`;
@@ -41,7 +51,7 @@ export const Earnings: React.FC = () => {
   const totalSats = data?.total_sats ?? 0;
   const totalBtc = data?.total_btc ?? 0;
   const avgPerPayment = payments.length > 0 ? Math.round(totalSats / payments.length) : 0;
-  const avgPerDay = days > 0 ? Math.round(totalSats / days) : 0;
+  const avgPerDay = displayedDays > 0 ? Math.round(totalSats / displayedDays) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -63,11 +73,16 @@ export const Earnings: React.FC = () => {
               {d}D
             </button>
           ))}
-          <button className="btn" onClick={() => load(days)}>⟳</button>
+          <button className="btn" aria-label="Refresh earnings" onClick={() => load(days)}>⟳</button>
         </div>
       </div>
 
-      {/* Summary cards — always show, even while loading new period */}
+      {loading && data && (
+        <div role="status" style={{ color: 'var(--text-dim)', fontSize: '13px' }}>
+          Loading {days}-day history. Showing the last completed {displayedDays}-day result.
+        </div>
+      )}
+      {/* Retain the old range label until the replacement dataset arrives. */}
       {data && (
         <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
           <div className="card">
@@ -84,7 +99,7 @@ export const Earnings: React.FC = () => {
             </div>
           </div>
           <div className="card">
-            <div className="label">PAYMENTS ({days}D)</div>
+            <div className="label">PAYMENTS ({displayedDays}D)</div>
             <div className="value glow" style={{ color: 'var(--primary)' }}>{payments.length}</div>
           </div>
           <div className="card">
@@ -173,7 +188,7 @@ export const Earnings: React.FC = () => {
         ) : payments.length === 0 ? (
           <div className="text-center" style={{ padding: '40px', color: 'var(--text-dim)' }}>
             <span style={{ fontFamily: 'var(--font-vt323)', fontSize: '18px' }}>
-              NO PAYMENTS IN {days}-DAY WINDOW
+              NO PAYMENTS IN {displayedDays}-DAY WINDOW
             </span>
           </div>
         ) : (

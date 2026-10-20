@@ -8,26 +8,39 @@ interface ChartPoint {
   ts: number;
 }
 
+interface SnapshotRevision {
+  snapshot_updated_at?: number;
+}
+
 interface AppState {
+  wallet: string | null;
+  walletEpoch: number;
+  setWallet: (wallet: string) => void;
   // Metrics
   metrics: DashboardMetrics | null;
   prevMetrics: DashboardMetrics | null;
-  setMetrics: (m: DashboardMetrics) => void;
+  setMetrics: (m: DashboardMetrics) => boolean;
+  metricsLoading: boolean;
+  metricsError: string | null;
+  setMetricsLoading: (loading: boolean) => void;
+  setMetricsError: (error: string | null) => void;
+  requestMetricsRefresh: () => void;
 
   // Chart history (persists across route changes)
   chartData60s: ChartPoint[];
   chartData3hr: ChartPoint[];
-  addChartPoint: (hr60s: number, hr3hr: number) => void;
+  addChartPoint: (hr60s: number, hr3hr: number, sourceTimestamp?: number | null) => void;
   chartHydrated: boolean;
   hydrateChart: (points: { timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]) => void;
 
   // Workers
   workers: WorkerSummary | null;
-  setWorkers: (w: WorkerSummary) => void;
+  setWorkers: (w: WorkerSummary) => boolean;
 
   // Notifications
   notifications: Notification[];
   unreadCount: number;
+  setUnreadCount: (count: number) => void;
   setNotifications: (n: Notification[]) => void;
   addNotification: (n: Notification) => void;
 
@@ -45,21 +58,80 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  wallet: null,
+  walletEpoch: 0,
+  setWallet: (rawWallet) => {
+    const wallet = rawWallet.trim();
+    if (get().wallet === wallet) return;
+    set((s) => ({
+      wallet, walletEpoch: s.walletEpoch + 1,
+      metrics: null, prevMetrics: null, workers: null, lastUpdated: null,
+      chartData60s: [], chartData3hr: [], chartHydrated: false,
+      metricsLoading: true, metricsError: null,
+    }));
+    // Legacy payout records had no wallet ownership and cannot be migrated safely.
+    try {
+      localStorage.removeItem('deepsea_payout_history');
+      localStorage.setItem('deepsea_wallet', wallet);
+    } catch { /* Storage can be unavailable in private browsing. */ }
+  },
   metrics: null,
   prevMetrics: null,
-  setMetrics: (m) =>
-    set({ prevMetrics: get().metrics, metrics: m, lastUpdated: Date.now() }),
+  metricsLoading: true,
+  metricsError: null,
+  setMetricsLoading: (metricsLoading) => set({ metricsLoading }),
+  setMetricsError: (metricsError) => set((s) => ({ metricsError, metricsLoading: metricsError ? false : s.metricsLoading })),
+  requestMetricsRefresh: () => window.dispatchEvent(new Event('deepsea:refresh-metrics')),
+  setMetrics: (m) => {
+    const current = get();
+    if (m.wallet !== undefined && m.wallet !== current.wallet) return false;
+    const sourceTime = m.data_updated_at === null ? null
+      : (m.data_updated_at ?? m.server_timestamp) * 1000;
+    const revision = (m as DashboardMetrics & SnapshotRevision).snapshot_updated_at;
+    const previousRevision = (current.metrics as (DashboardMetrics & SnapshotRevision) | null)?.snapshot_updated_at;
+    if (sourceTime === null && current.metrics && current.lastUpdated !== null) {
+      // A no-data response cannot erase a successful reading from this wallet.
+      // A restarted backend has revision 0: handle its loss of data before
+      // ordering snapshots, keeping the last reading's age and revision.
+      const retained: DashboardMetrics & SnapshotRevision = {
+        ...current.metrics,
+        ...(typeof revision === 'number' && (previousRevision === undefined || revision > previousRevision) ? { snapshot_updated_at: revision } : {}),
+        data_status: 'stale', data_error: m.data_error ?? 'Current mining data is unavailable.',
+      };
+      set({
+        metrics: retained,
+        metricsLoading: false,
+        metricsError: m.data_error ?? 'Current mining data is unavailable.',
+      });
+      return true;
+    }
+    // Financial recalculations can share a mining-source timestamp. Their
+    // separate revision prevents a delayed pre-save response undoing a save.
+    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
+    if (hasRevisions ? revision < previousRevision
+      : sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return false;
+    set({
+      prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
+      metricsLoading: false,
+      metricsError: m.data_error ?? (m.data_status === 'stale' ? 'Showing previously received data.' : null),
+    });
+    return true;
+  },
 
   chartData60s: [],
   chartData3hr: [],
   chartHydrated: false,
-  addChartPoint: (hr60s, hr3hr) =>
+  addChartPoint: (hr60s, hr3hr, sourceTimestamp) =>
     set((s) => {
-      const ts = Date.now();
+      const ts = sourceTimestamp ? sourceTimestamp * 1000 : Date.now();
       const label = new Date(ts).toLocaleTimeString();
+      const append = (points: ChartPoint[], value: number) => [
+        ...points.filter((point) => Math.floor(point.ts / 1000) !== Math.floor(ts / 1000)),
+        { label, value, ts },
+      ].sort((a, b) => a.ts - b.ts).slice(-60);
       return {
-        chartData60s: [...s.chartData60s.slice(-59), { label, value: hr60s, ts }],
-        chartData3hr: [...s.chartData3hr.slice(-59), { label, value: hr3hr, ts }],
+        chartData60s: append(s.chartData60s, hr60s),
+        chartData3hr: append(s.chartData3hr, hr3hr),
       };
     }),
   hydrateChart: (points) =>
@@ -95,12 +167,33 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   workers: null,
-  setWorkers: (w) => set({ workers: w }),
+  setWorkers: (w) => {
+    const current = get();
+    if (w.wallet !== undefined && w.wallet !== current.wallet) return false;
+    const sourceTime = (w as WorkerSummary & Pick<DashboardMetrics, 'data_updated_at'>).data_updated_at;
+    const previousTime = (current.workers as (WorkerSummary & Pick<DashboardMetrics, 'data_updated_at'>) | null)?.data_updated_at;
+    const revision = (w as WorkerSummary & SnapshotRevision).snapshot_updated_at;
+    const previousRevision = (current.workers as (WorkerSummary & SnapshotRevision) | null)?.snapshot_updated_at;
+    if (sourceTime === null && typeof previousTime === 'number' && current.workers) {
+      const retained = {
+        ...current.workers,
+        ...(typeof revision === 'number' && (previousRevision === undefined || revision > previousRevision) ? { snapshot_updated_at: revision } : {}),
+        data_status: 'stale',
+      };
+      set({ workers: retained as WorkerSummary });
+      return true;
+    }
+    const hasRevisions = typeof revision === 'number' && typeof previousRevision === 'number';
+    if (hasRevisions ? revision < previousRevision
+      : typeof sourceTime === 'number' && typeof previousTime === 'number' && sourceTime < previousTime) return false;
+    set({ workers: w });
+    return true;
+  },
 
   notifications: [],
   unreadCount: 0,
-  setNotifications: (n) =>
-    set({ notifications: n, unreadCount: n.filter((x) => !x.read).length }),
+  setUnreadCount: (count) => set({ unreadCount: Math.max(0, count) }),
+  setNotifications: (n) => set({ notifications: n }),
   addNotification: (n) =>
     set((s) => ({
       notifications: [n, ...s.notifications].slice(0, 500),

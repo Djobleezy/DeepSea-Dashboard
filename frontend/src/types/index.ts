@@ -1,6 +1,15 @@
 // DeepSea Dashboard — TypeScript Types
 
 export interface DashboardMetrics {
+  /** Wallet and source freshness accompany the snapshot, not the time it was fetched. */
+  wallet?: string;
+  data_status?: 'fresh' | 'stale' | 'unavailable' | 'unconfigured';
+  data_updated_at?: number | null;
+  /** Orders recalculated snapshots without changing the mining-data age. */
+  snapshot_updated_at?: number;
+  data_error?: string | null;
+  power_usage_watts?: number;
+  power_cost_per_kwh?: number;
   hashrate_60sec: number;
   hashrate_60sec_unit: string;
   hashrate_10min: number;
@@ -51,11 +60,17 @@ export interface Worker {
   efficiency: number;
   last_share: string;
   earnings: number;
+  /** Estimated BTC per day. `earnings` remains the unpaid balance. */
+  estimated_daily_btc?: number;
   power_consumption: number;
   acceptance_rate: number;
 }
 
 export interface WorkerSummary {
+  wallet?: string;
+  data_status?: 'fresh' | 'stale' | 'unavailable' | 'unconfigured';
+  data_updated_at?: number | null;
+  snapshot_updated_at?: number;
   workers: Worker[];
   total_hashrate: number;
   hashrate_unit: string;
@@ -63,6 +78,8 @@ export interface WorkerSummary {
   workers_online: number;
   workers_offline: number;
   total_earnings: number;
+  total_daily_earnings_btc?: number;
+  total_power_watts?: number;
   timestamp: string;
 }
 

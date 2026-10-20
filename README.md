@@ -157,15 +157,22 @@ manage a custom config mount, the backend reloads edits to its active file.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `wallet` | `string` | `""` | **Required.** Your Ocean.xyz wallet/payout address |
-| `power_cost` | `float` | `0.12` | Electricity cost in USD per kWh (0.01–1.00) |
-| `power_usage` | `float` | `3450` | Total rig power draw in watts (1–50,000) |
+| `power_cost` | `float` | `0.12` | Shared Config/Workers electricity rate in USD per kWh (0–10) |
+| `power_usage` | `float` | `3450` | Fallback power draw in watts when worker power is unavailable (0–100,000) |
 | `currency` | `string` | `"USD"` | Display currency: `USD`, `EUR`, `GBP`, `CAD`, `AUD`, `JPY` |
 | `timezone` | `string` | `"America/Los_Angeles"` | IANA timezone for time display (see `/api/timezones`) |
 | `network_fee` | `float` | `0.5` | Mining pool fee percentage for profit calculation (0–10) |
 | `theme` | `string` | `"deepsea"` | UI theme: `deepsea`, `bitcoin`, or `matrix` |
-| `extended_history` | `bool` | `false` | Keep up to 7 days of metric history instead of 24h |
+| `extended_history` | `bool` | `false` | Fetch extended payout history |
 
-> **Note:** A missing or empty `wallet` will cause all Ocean.xyz API calls to fail gracefully — the dashboard loads but shows zero values.
+An empty `wallet` opens setup guidance. Once configured, the dashboard distinguishes
+fresh, stale, and unavailable data. Cached values retain their source timestamp;
+they do not become new readings just because the browser fetched them again.
+
+Estimated daily profit uses estimated daily revenue less electricity cost.
+The unpaid balance is shown separately. Config and Workers share one saved
+electricity rate, and worker power overrides feed the dashboard's cost estimate.
+Payout and chart histories are isolated by wallet.
 
 ---
 

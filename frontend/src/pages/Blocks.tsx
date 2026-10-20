@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useId } from 'react';
+import React, { useState, useEffect, useMemo, useId, useRef, useCallback } from 'react';
 import { fetchBlocks } from '../api/client';
 import { useAppStore } from '../stores/store';
 import { useCurrency } from '../hooks/useCurrency';
@@ -318,37 +318,56 @@ export const Blocks: React.FC = () => {
   const [data, setData] = useState<BlocksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // For the donut we fetch 100 blocks once
   const [donutBlocks, setDonutBlocks] = useState<Block[]>([]);
+  const [distributionError, setDistributionError] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const distributionId = useRef(0);
+  const walletEpoch = useAppStore((s) => s.walletEpoch);
   const metrics = useAppStore((s) => s.metrics);
   const btcPrice = metrics?.btc_price ?? 0;
   const { formatFiat } = useCurrency();
 
-  async function load(p: number) {
+  const load = useCallback(async (p: number) => {
+    const id = ++requestId.current;
     setLoading(true);
     try {
       const res = await fetchBlocks(p, 20);
+      if (id !== requestId.current || walletEpoch !== useAppStore.getState().walletEpoch) return;
       setData(res);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load blocks');
+      if (id === requestId.current) setError(e instanceof Error ? e.message : 'Failed to load blocks');
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
-  }
+  }, [walletEpoch]);
+
+  const loadDistribution = useCallback(async () => {
+    const id = ++distributionId.current;
+    try {
+      const res = await fetchBlocks(0, 100);
+      if (id !== distributionId.current || walletEpoch !== useAppStore.getState().walletEpoch) return;
+      setDonutBlocks(res.blocks);
+      setDistributionError(null);
+    } catch {
+      if (id === distributionId.current) setDistributionError('Pool distribution could not be refreshed.');
+    }
+  }, [walletEpoch]);
 
   useEffect(() => {
-    load(page);
-  }, [page]);
+    const pendingRequest = requestId;
+    void load(page);
+    return () => { pendingRequest.current++; };
+  }, [page, load]);
 
-  // Fetch 100 blocks for donut chart on mount
   useEffect(() => {
-    fetchBlocks(0, 100)
-      .then((res) => setDonutBlocks(res.blocks))
-      .catch(() => {});
-  }, []);
+    const pendingDistribution = distributionId;
+    setDonutBlocks([]);
+    void loadDistribution();
+    return () => { pendingDistribution.current++; };
+  }, [loadDistribution]);
 
-  const blocks = data?.blocks ?? [];
+  const blocks = data?.page === page ? data.blocks : [];
 
   // Donut data
   const donutSlices = useMemo(() => {
@@ -370,11 +389,12 @@ export const Blocks: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div className="flex justify-between items-center">
-        <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>⛏ BLOCK EXPLORER</h1>
-        <button className="btn" onClick={() => load(page)}>⟳ REFRESH</button>
+      <div className="page-toolbar">
+        <h1>Block explorer</h1>
+        <button className="btn" onClick={() => { void load(page); void loadDistribution(); }}>⟳ REFRESH</button>
       </div>
 
+      {distributionError && <p role="status" style={{ color: 'var(--color-warning)' }}>{distributionError}</p>}
       {/* Donut chart — last 100 blocks pool distribution */}
       {donutSlices.length > 0 && (
         <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.05s both' }}>
@@ -418,7 +438,7 @@ export const Blocks: React.FC = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
               gap: '16px',
             }}
           >

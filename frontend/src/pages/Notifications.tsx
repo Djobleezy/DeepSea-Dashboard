@@ -32,14 +32,14 @@ export const Notifications: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="page-toolbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>ALERTS</h1>
+          <h1>Alerts</h1>
           {unreadCount > 0 && (
             <span
               style={{
                 background: 'var(--color-error)',
-                color: '#fff',
+                color: '#170808',
                 borderRadius: '12px',
                 padding: '2px 10px',
                 fontSize: '13px',
@@ -49,11 +49,11 @@ export const Notifications: React.FC = () => {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="page-toolbar-actions">
           <button className="btn" onClick={markAllRead}>✓ MARK ALL READ</button>
           <button className="btn" onClick={clearRead}>⊘ CLEAR READ</button>
           <button className="btn btn-danger" onClick={clearAll}>✗ CLEAR ALL</button>
-          <button className="btn" onClick={refresh}>⟳</button>
+          <button className="btn" onClick={refresh} aria-label="Refresh alerts">⟳</button>
         </div>
       </div>
 

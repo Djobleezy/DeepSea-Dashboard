@@ -28,8 +28,13 @@ wallet address the dashboard shows only network-level data.
 - **Default:** `0.12`
 - **Range:** `0.00` – `10.00`
 
-Your electricity rate in US dollars per kilowatt-hour. Used together with `power_usage` to
-calculate daily power cost and profitability estimates.
+Your electricity rate in US dollars per kilowatt-hour. The Config and Workers
+pages share this saved rate. Both pages use it for daily power-cost and profit
+estimates; changing it in either place updates the same setting.
+
+On upgrade, an existing custom Workers rate is imported once if the Config rate
+is still the default. An already customized Config rate takes precedence. Later
+changes always use the shared setting and do not re-import the old value.
 
 ---
 
@@ -38,8 +43,16 @@ calculate daily power cost and profitability estimates.
 - **Default:** `3000`
 - **Range:** `0` – `100,000`
 
-Total power draw of your mining rigs in **watts**. If you run multiple ASICs, sum their rated
-wattages. Used to compute `daily_power_cost = (power_usage / 1000) × 24 × power_cost`.
+Fallback total power draw in **watts**, used when worker power data is unavailable.
+When workers are available, the dashboard uses their estimated power draw and
+saved overrides instead. Offline workers use zero estimated watts unless you
+set an explicit fixed-power override. Daily cost is
+`(effective_power_watts / 1000) × 24 × power_cost`.
+
+Worker earnings and the unpaid balance are separate from estimated daily
+revenue. Daily profit subtracts one day's power cost from estimated daily
+revenue, not from the accumulated unpaid balance. These are projections;
+actual payouts depend on pool luck, fees, and variance.
 
 ---
 
