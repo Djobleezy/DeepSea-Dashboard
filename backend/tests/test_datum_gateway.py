@@ -201,6 +201,7 @@ async def test_probe_umbrel_api_happy_path(monkeypatch):
 async def test_probe_umbrel_api_reachable_with_zero_workers(monkeypatch):
     """Gateway up but no miners attached \u2014 still 'connected' (daemon alive)."""
     body = {
+        "type": "three-stats",
         "items": [
             {"title": "Connections", "text": "0", "subtext": "Worker"},
             {"title": "Hashrate", "text": "0.00", "subtext": "TH/s"},
@@ -304,7 +305,7 @@ async def test_get_datum_status_uses_env_override(monkeypatch):
     monkeypatch.setenv("DATUM_GATEWAY_URL", "http://127.0.0.1:7152")
     monkeypatch.setattr(dgc, "load_config", lambda: {"datum_gateway_url": "http://10.0.0.5:1234"})
 
-    body = {"items": [{"title": "Connections", "text": "1"}, {"title": "Hashrate", "text": "1", "subtext": "TH/s"}]}
+    body = {"type": "three-stats", "items": [{"title": "Connections", "text": "1"}, {"title": "Hashrate", "text": "1", "subtext": "TH/s"}]}
     seen_urls = []
 
     class _Capturing(_FakeAsyncClient):
@@ -347,7 +348,7 @@ async def test_get_datum_status_caches_results(monkeypatch):
     monkeypatch.setenv("DATUM_GATEWAY_URL", "http://127.0.0.1:21000")
 
     call_count = {"n": 0}
-    body = {"items": [{"title": "Connections", "text": "1"}, {"title": "Hashrate", "text": "1", "subtext": "TH/s"}]}
+    body = {"type": "three-stats", "items": [{"title": "Connections", "text": "1"}, {"title": "Hashrate", "text": "1", "subtext": "TH/s"}]}
 
     class _Counting(_FakeAsyncClient):
         async def get(self, url):
@@ -419,7 +420,7 @@ async def test_endpoint_transitioning_when_probe_up_but_fees_lag(client, monkeyp
     assert data["probe_reachable"] is True
     assert data["fees_in_datum_band"] is False
     # The user-facing explanation should call out the lagging-fee root cause.
-    assert "hours" in data["explanation"].lower() or "fees" in data["explanation"].lower()
+    assert "cannot verify" in data["explanation"].lower()
 
 
 @pytest.mark.asyncio
@@ -511,3 +512,82 @@ def _async_returning(value):
     async def _f(*_a, **_kw):
         return value
     return _f
+
+
+@pytest.mark.parametrize('url', [
+    'http://localhost:7152',
+    'http://[::1]:7152',
+])
+def test_local_gateway_names_are_accepted(url):
+    assert dgc._validate_gateway_url(url) == url
+
+
+@pytest.mark.parametrize('url', [
+    'http://127.0.0.1:bad',
+    'http://127.0.0.1:65536',
+    'http://user:password@127.0.0.1:7152',
+    'http://127.0.0.1:7152?endpoint=other',
+    'http://127.0.0.1:7152#fragment',
+])
+def test_malformed_gateway_urls_are_rejected(url):
+    assert dgc._validate_gateway_url(url) is None
+
+
+@pytest.mark.parametrize('text', ['nan', 'inf', '-1', '1e309'])
+def test_invalid_hashrates_are_not_serialized(text):
+    assert dgc._parse_hashrate_ths(text, 'TH/s') is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('body', [
+    [], 12, 'gateway', {}, {'status': 'ok'},
+    {'type': 'three-stats', 'items': {'title': 'Connections'}},
+    {'type': 'three-stats', 'items': [None, 7, {'title': 12}]},
+    {'type': 'three-stats', 'items': [{'title': 'Hashrate', 'text': 'nan', 'subtext': 'TH/s'}]},
+])
+async def test_invalid_widget_payload_uses_tcp_fallback(monkeypatch, body):
+    monkeypatch.setenv('DATUM_GATEWAY_URL', 'http://localhost:7152')
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda timeout=None: _FakeAsyncClient(response=_resp(200, body)))
+    monkeypatch.setattr(dgc, '_blocking_tcp_check', lambda host, port: None)
+    result = await dgc.get_datum_status()
+    assert result.reachable is True
+    assert result.probe == 'stratum-tcp'
+
+
+@pytest.mark.asyncio
+async def test_config_change_during_probe_does_not_cache_old_gateway(monkeypatch):
+    import asyncio
+
+    started = asyncio.Event()
+    finish = asyncio.Event()
+    current = {'url': 'http://127.0.0.1:7152'}
+    calls = []
+
+    async def probe():
+        url = current['url']
+        calls.append(url)
+        if len(calls) == 1:
+            started.set()
+            await finish.wait()
+        return dgc.DatumProbeResult(True, 'connected', 'umbrel-api', url, checked_at=1e20)
+
+    monkeypatch.setattr(dgc, '_do_probe', probe)
+    pending = asyncio.create_task(dgc.get_datum_status())
+    await started.wait()
+    current['url'] = 'http://127.0.0.2:7152'
+    dgc.clear_cache()
+    finish.set()
+    result = await pending
+    assert result.gateway_url == current['url']
+    assert (await dgc.get_datum_status()).gateway_url == current['url']
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_health_rejects_invalid_gateway_and_supports_autodiscovery(client, monkeypatch):
+    monkeypatch.setenv('DATUM_GATEWAY_URL', 'http://169.254.169.254')
+    monkeypatch.delenv('DATUM_GATEWAY_AUTODISCOVER', raising=False)
+    monkeypatch.setattr(dgc, 'load_config', lambda: {'datum_gateway_url': ''})
+    assert (await client.get('/api/health')).json()['datum_gateway_configured'] is False
+    monkeypatch.setenv('DATUM_GATEWAY_AUTODISCOVER', 'true')
+    assert (await client.get('/api/health')).json()['datum_gateway_configured'] is True

@@ -355,34 +355,29 @@ Each [GitHub Release](https://github.com/Djobleezy/DeepSea-Dashboard/releases) i
 
 ### DATUM badge says OFFLINE but my gateway is running
 
-This is the most common DATUM-related question. The default badge is derived from
-`pool_fees_percentage`, which Ocean computes as an **average over historical work**. After you
-enable DATUM on a gateway that previously mined non-DATUM (or on a brand-new wallet with no
-history), that average can take **hours or days** to land inside the 0.9%–1.3% "DATUM range".
-During that transition window the legacy badge incorrectly reports OFFLINE.
+Older versions inferred DATUM connectivity from historical pool fees. Those fees
+cannot establish whether your gateway is currently connected. The dashboard now
+labels fee-only evidence as `DATUM FEES IN RANGE` or `DATUM STATUS UNVERIFIED`.
 
-**Fix:** point the dashboard at your DATUM Gateway so it can probe it directly.
+To check whether the dashboard can reach your gateway, configure its API address:
 
-- **UmbrelOS:** set `DATUM_GATEWAY_URL=http://datum_datum_1:21000` in the deepsea-dashboard
-  service environment (or `datum_gateway_url` in `config.json`).
-- **Stock self-build:** `DATUM_GATEWAY_URL=http://127.0.0.1:7152` (or wherever your gateway's
-  `api.listen_port` is bound).
-- **Bare metal on LAN:** use the gateway machine's IP + API port.
+- **UmbrelOS:** `DATUM_GATEWAY_URL=http://datum_datum_1:21000`
+- **Stock self-build:** `DATUM_GATEWAY_URL=http://127.0.0.1:7152`
+- **Bare metal on LAN:** use the gateway machine's private IP and API port.
 
-With a probe configured the badge becomes:
+You can also set `datum_gateway_url` in `config.json`. Umbrel packaging sets the
+usual gateway address by default. The badge reports `DATUM GATEWAY REACHABLE`,
+`DATUM GATEWAY UNREACHABLE`, or `DATUM STATUS UNAVAILABLE` if the check failed.
+A failed reachability check can mean an incorrect address or network isolation,
+even when your gateway is working.
 
-| Probe | Fees in 0.9–1.3% band | Badge |
-|---|---|---|
-| reachable | yes | `DATUM CONNECTED` (green) |
-| reachable | no | `DATUM ACTIVE (fees settling)` (amber) — this is the transition window |
-| unreachable | yes | `DATUM FEES ONLY` (amber) — your gateway process may have died |
-| unreachable | no | `DATUM OFFLINE` (red) |
+**Reachability is not pool connectivity.** DATUM v0.4.1's `/umbrel-api` widget
+reports miner connections and hashrate, but no live DATUM pool connection state.
+The dashboard therefore does not call a reachable gateway “connected” or assume
+that out-of-range fees are settling. Check the gateway's own status for that.
 
-Without `DATUM_GATEWAY_URL` set the dashboard falls back to the legacy fee-only behaviour, so
-no setup is *required* — just recommended for anyone who recently switched on DATUM.
-
-Probe traffic is one ~2-second HTTP `GET` cached for 15 s; it never leaves your network. See
-`CONFIG.md` for the full `datum_gateway_url` reference.
+Each probe attempt times out after 2 seconds and results are cached for 15 seconds.
+See `CONFIG.md` for supported local addresses and configuration details.
 
 ### Redis connection errors
 

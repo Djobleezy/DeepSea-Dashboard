@@ -1,49 +1,12 @@
-"""Direct DATUM Gateway reachability probe.
+"""Check reachability of a configured local DATUM gateway.
 
-This module solves a long-standing UX problem with the dashboard's DATUM
-status indicator.  Previously the badge was derived **only** from
-``pool_fees_percentage`` (between 0.9% and 1.3% = "DATUM CONNECTED"), but
-that field is sourced from Ocean's stats page which **lags** real activity.
+Try the `/umbrel-api` widget first, then TCP port 23334 for builds without
+that widget. These probes establish reachability only: DATUM v0.4.1 does
+not report pool readiness here. Historical fees are not connection status.
 
-A user who just enabled DATUM may have their gateway running and submitting
-work, yet their average pool fee won't land in the 0.9%-1.3% band until
-enough new shares accumulate to outweigh historical non-DATUM hashrate.
-During that transition window — which can last hours or days for small
-miners — the dashboard would incorrectly show "DATUM OFFLINE".
-
-This client provides a **direct, current-state** signal by probing the
-DATUM Gateway itself.  Two probe strategies, tried in order:
-
-1. **Umbrel JSON API** (``GET <base>/umbrel-api``): the gateway exposes
-   a tiny widget endpoint that returns ``{"type": "three-stats",
-   "items": [...]}`` with connection count and hashrate.  This is the
-   cleanest signal because it confirms (a) the gateway process is up,
-   (b) at least one worker is connected, and (c) we get the live
-   hashrate estimate.  Available in any build with
-   ``DATUM_API_FOR_UMBREL`` (the Umbrel app image is built this way).
-
-2. **Stratum TCP connect** (``connect <host>:<stratum_port>``): a
-   simple TCP open on the stratum port (default 23334) confirms the
-   gateway is accepting miner connections.  Used when the HTTP API is
-   not compiled in (vanilla builds) or is bound to a different host.
-
-Both probes use a tight timeout (default 2 s) so failures degrade
-quickly.  Results are cached for ``CACHE_TTL`` seconds (15 s) to keep
-hot-path latency negligible.
-
-**Configuration precedence** (highest first):
-- ``DATUM_GATEWAY_URL`` environment variable (e.g.
-  ``http://datum_datum_1:21000`` for UmbrelOS, ``http://127.0.0.1:7152``
-  for a local install).
-- ``datum_gateway_url`` in ``config.json``.
-- Auto-discovery against a small set of well-known defaults
-  (Umbrel container hostname + common local ports) if explicitly enabled
-  via ``DATUM_GATEWAY_AUTODISCOVER=1``.  Disabled by default to avoid
-  surprise outbound connections.
-
-This client never raises on network errors — failures resolve to
-``{"reachable": False, "reason": "..."}`` and the caller decides how to
-present that to the user.
+The environment variable DATUM_GATEWAY_URL takes precedence over config.json.
+Optional DATUM_GATEWAY_AUTODISCOVER probes known local deployment addresses.
+Results are cached for 15 seconds; each network attempt has a 2-second timeout.
 """
 
 from __future__ import annotations
@@ -51,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import math
 import os
 import socket
 import time
@@ -125,6 +89,7 @@ class DatumProbeResult:
 _cached_result: Optional[DatumProbeResult] = None
 _cached_at: float = 0.0
 _probe_lock = asyncio.Lock()
+_cache_generation = 0
 
 
 # Hostnames that resolve to in-cluster Docker services we expect users to
@@ -137,6 +102,7 @@ _TRUSTED_DOCKER_HOSTS: frozenset[str] = frozenset(
         "datum_gateway",
         "datum",
         "datum_web_1",
+        "localhost",
     }
 )
 
@@ -210,11 +176,15 @@ def _validate_gateway_url(url: str) -> Optional[str]:
         return None
     try:
         parsed = urlparse(cleaned)
+        # Accessing .port validates malformed and out-of-range ports.
+        parsed.port
     except ValueError:
         _log.warning("DATUM gateway URL rejected (unparseable): %r", url)
         return None
     if parsed.scheme not in {"http", "https"}:
         _log.warning("DATUM gateway URL rejected (bad scheme %r)", parsed.scheme)
+        return None
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
         return None
     host = parsed.hostname or ""
     ok, reason = _is_safe_gateway_host(host)
@@ -267,6 +237,8 @@ def _parse_hashrate_ths(text: str, unit: str) -> Optional[float]:
         value = float(text)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(value) or value < 0:
+        return None
     unit_u = (unit or "").strip().upper()
     multipliers = {
         "H/S": 1e-12,
@@ -285,7 +257,8 @@ def _parse_hashrate_ths(text: str, unit: str) -> Optional[float]:
         # unit we'd rather show "unknown" than a wrong number.
         _log.warning("DATUM probe: unknown hashrate unit %r (value=%r)", unit, text)
         return None
-    return value * factor
+    result = value * factor
+    return result if math.isfinite(result) else None
 
 
 async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
@@ -326,20 +299,37 @@ async def _probe_umbrel_api(base_url: str) -> DatumProbeResult:
             checked_at=time.time(),
         )
 
-    items = body.get("items") or []
+    if not isinstance(body, dict) or body.get("type") not in {"three-stats", "four-stats"}:
+        return DatumProbeResult(
+            reachable=False, status="offline", probe="umbrel-api", gateway_url=base_url,
+            reason="invalid-payload", checked_at=time.time(),
+        )
+    items = body.get("items")
+    if not isinstance(items, list):
+        items = []
     connections: Optional[int] = None
     hashrate_ths: Optional[float] = None
     for item in items:
-        title = (item.get("title") or "").lower()
+        if not isinstance(item, dict) or not isinstance(item.get("title"), str):
+            continue
+        title = item["title"].lower()
         text = item.get("text")
         subtext = item.get("subtext")
         if title == "connections":
             try:
                 connections = int(text)
+                if connections < 0:
+                    connections = None
             except (TypeError, ValueError):
                 connections = None
         elif title == "hashrate":
-            hashrate_ths = _parse_hashrate_ths(text, subtext or "")
+            hashrate_ths = _parse_hashrate_ths(text, subtext if isinstance(subtext, str) else "")
+
+    if connections is None and hashrate_ths is None:
+        return DatumProbeResult(
+            reachable=False, status="offline", probe="umbrel-api", gateway_url=base_url,
+            reason="invalid-payload", checked_at=time.time(),
+        )
 
     # Gateway is up if it answered the API at all.  Connections == 0 is
     # still "reachable" — the daemon is alive, no miners hooked up yet.
@@ -474,18 +464,24 @@ async def get_datum_status(force: bool = False) -> DatumProbeResult:
         if not force and _cached_result is not None and (now - _cached_at) < CACHE_TTL:
             return _cached_result
 
-        try:
-            result = await _do_probe()
-        except Exception as e:  # pragma: no cover — last-resort guard
-            _log.warning("DATUM probe unexpectedly raised: %s", e)
-            result = DatumProbeResult(
-                reachable=False,
-                status="unknown",
-                probe="none",
-                gateway_url=_resolve_gateway_url(),
-                reason=f"probe-exception: {type(e).__name__}",
-                checked_at=time.time(),
-            )
+        while True:
+            generation = _cache_generation
+            try:
+                result = await _do_probe()
+            except Exception as e:  # pragma: no cover — last-resort guard
+                _log.warning("DATUM probe unexpectedly raised: %s", e)
+                result = DatumProbeResult(
+                    reachable=False,
+                    status="unknown",
+                    probe="none",
+                    gateway_url=_resolve_gateway_url(),
+                    reason=f"probe-exception: {type(e).__name__}",
+                    checked_at=time.time(),
+                )
+            if generation == _cache_generation:
+                break
+            # Configuration changed while a probe was in flight. Discard
+            # its result and probe the new destination before caching.
 
         _cached_result = result
         _cached_at = result.checked_at
@@ -500,9 +496,10 @@ def clear_cache() -> None:
     the next ``get_datum_status`` call runs a fresh probe instead of
     waiting up to :data:`CACHE_TTL` for the stale result to age out.
     """
-    global _cached_result, _cached_at
+    global _cached_result, _cached_at, _cache_generation
     _cached_result = None
     _cached_at = 0.0
+    _cache_generation += 1
 
 
 # Backwards-compatible alias.  Tests imported this name before

@@ -119,19 +119,7 @@ def get_exchange_rate_api_key() -> str:
 
 
 def get_datum_gateway_url() -> str:
-    """Return the configured DATUM gateway base URL (env > config).
+    """Return the validated gateway URL used by the live probe."""
+    from app.services.datum_gateway_client import _resolve_gateway_url
 
-    The env override exists so Docker/Umbrel deployments can wire this
-    via compose without touching the JSON file.
-    """
-    import os
-
-    env_url = os.environ.get("DATUM_GATEWAY_URL", "").strip().rstrip("/")
-    if env_url:
-        return env_url
-    # Strip + rstrip the config value too so /api/health reports
-    # ``datum_gateway_configured`` consistently with the probe, which
-    # also normalises whitespace and trailing slashes in
-    # ``datum_gateway_client._resolve_gateway_url``.
-    cfg_url = (load_config().get("datum_gateway_url") or "").strip().rstrip("/")
-    return cfg_url
+    return _resolve_gateway_url() or ""

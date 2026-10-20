@@ -99,22 +99,20 @@ anything other than `"USD"`. Leave empty if you only need USD display.
   - Bare metal on the LAN: `"http://192.168.1.50:21000"`
 - **Environment override:** `DATUM_GATEWAY_URL`
 
-Optional URL of a local [DATUM Gateway](https://github.com/OCEAN-xyz/datum_gateway). When set,
-the dashboard probes the gateway directly (via its `/umbrel-api` JSON endpoint and a TCP
-stratum-port check as a fallback) to render a **real-time** DATUM connection badge.
+Optional URL of a local [DATUM Gateway](https://github.com/OCEAN-xyz/datum_gateway).
+The dashboard checks its `/umbrel-api` widget endpoint, with a TCP connection
+on port 23334 as a fallback, and reports **gateway reachability**.
 
-**Why this matters:** the default DATUM badge is derived from `pool_fees_percentage`, which is
-an *average* of historical work as reported on Ocean's stats page. After a user enables DATUM
-that average can take **hours or days** to land inside the 0.9%–1.3% "DATUM range" — during
-that window the badge would show OFFLINE even though the gateway is fully operational. Setting
-`datum_gateway_url` gives the dashboard a current-state signal so it can show a clearly
-labelled "DATUM ACTIVE (fees settling)" badge during that transition window.
+Reachability does not prove an active connection to the DATUM pool. In DATUM
+v0.4.1 the widget reports miner connections and hashrate, but no live pool
+connection status. Historical pool fees are shown only as supporting evidence;
+they do not establish whether the gateway is currently connected or offline.
 
-The environment variable `DATUM_GATEWAY_URL` overrides this field at request time, which is
-useful for Docker / Umbrel compose setups where you'd rather wire the URL via the service
-rather than the JSON file.
-
-Probe traffic is small (one ~2 s HTTP `GET` cached for 15 s) and never leaves your network.
+`DATUM_GATEWAY_URL` overrides this setting when it contains a valid URL. Hosts
+must be loopback, private IP addresses, or supported local Docker service names.
+The probe is cached for 15 seconds and each HTTP/TCP attempt times out after
+2 seconds. A failed check can indicate an incorrect address or network problem
+while the gateway itself remains active.
 
 ---
 

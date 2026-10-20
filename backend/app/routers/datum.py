@@ -1,24 +1,8 @@
-"""GET /api/datum/status — live DATUM Gateway reachability + lagging-fee state.
+"""Report gateway reachability separately from historical pool-fee evidence.
 
-The dashboard's DATUM badge used to derive purely from
-``pool_fees_percentage`` (between 0.9% and 1.3% = connected).  That signal
-**lags reality** by hours or days for new DATUM users because Ocean's
-stats page averages historical work.  This endpoint surfaces a
-**current-state** signal by probing the DATUM Gateway directly, while
-still returning the fee-based signal so the UI can show a
-"transitioning" state when the two disagree.
-
-State machine returned in ``status``:
-
-- ``connected`` — probe reachable AND fees in band.  Steady-state happy path.
-- ``transitioning`` — probe reachable XOR fees in band.  Either DATUM was
-  just enabled and fees haven't caught up, OR the probe lost the gateway
-  but historical fees still look DATUM-shaped.
-- ``offline`` — probe unreachable AND fees out of band (or probe missing
-  and fees out of band).
-- ``unknown`` — no gateway URL configured and auto-discovery disabled
-  AND fees zero/unset.  The dashboard should fall back to the legacy
-  badge behaviour here so we don't regress users who never set this up.
+The status codes are retained for API compatibility. A reachable gateway does
+not prove an active DATUM pool connection: the v0.4.1 widget reports miners and
+hashrate, not upstream readiness. The explanation describes only observed facts.
 """
 
 from __future__ import annotations
@@ -49,7 +33,7 @@ class DatumStatus(BaseModel):
     that transparency is the whole point of this endpoint.
     """
 
-    status: str  # connected | transitioning | offline | unknown
+    status: str  # Legacy codes; use probe_reachable and explanation for display
     probe_reachable: bool
     probe_method: str  # umbrel-api | stratum-tcp | none
     gateway_url: Optional[str] = None
@@ -72,49 +56,27 @@ def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str, fees
     place where we *teach* users why the badge isn't matching their
     expectation, which is the core ask of the bug report.
     """
+    fee_evidence = (
+        "Historical pool fees are in the DATUM range."
+        if fees_in_band
+        else "Historical pool fees are outside the DATUM range."
+    )
     if probe_method == "none":
-        # No probe configured — we can only say what the fee field says.
-        if fees_in_band:
-            return (
-                "connected",
-                "Pool fees within DATUM range (no direct gateway probe configured).",
-            )
-        if fees_pct > 0:
-            return (
-                "offline",
-                "Pool fees outside DATUM range and no direct gateway probe configured. "
-                "If you just enabled DATUM, set DATUM_GATEWAY_URL so the dashboard "
-                "can confirm the gateway is up while fees catch up.",
-            )
         return (
             "unknown",
-            "No DATUM gateway URL configured and pool fees not yet reported.",
+            f"No live gateway status is available. {fee_evidence} "
+            "Fees alone do not establish whether DATUM is connected.",
         )
-
-    if probe_reachable and fees_in_band:
+    if probe_reachable:
         return (
-            "connected",
-            "DATUM gateway reachable and pool fees in the DATUM range.",
-        )
-    if probe_reachable and not fees_in_band:
-        # The headline bug case — DATUM is on, fees just haven't caught up.
-        return (
-            "transitioning",
-            "DATUM gateway is reachable but pool fees haven't shifted into the "
-            "DATUM range yet. Ocean averages your fee % over historical work, "
-            "so it can take hours or days after you enable DATUM for the number "
-            "to settle. Your gateway is running — this is expected.",
-        )
-    if (not probe_reachable) and fees_in_band:
-        return (
-            "transitioning",
-            "Pool fees are in the DATUM range but the gateway probe failed. "
-            "Your historical mining was via DATUM; check whether the gateway "
-            "process is still running.",
+            "connected" if fees_in_band else "transitioning",
+            f"The gateway is reachable. {fee_evidence} "
+            "This probe cannot verify its connection to the DATUM pool.",
         )
     return (
-        "offline",
-        "DATUM gateway probe failed and pool fees are outside the DATUM range.",
+        "transitioning" if fees_in_band else "offline",
+        f"The dashboard could not reach the gateway. {fee_evidence} "
+        "Check the gateway address and connectivity; the gateway may still be mining.",
     )
 
 
