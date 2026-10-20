@@ -6,6 +6,19 @@ services:
       APP_HOST: deepsea-dashboard_deepsea_1
       APP_PORT: 8000
 
+  init:
+    image: ghcr.io/djobleezy/deepsea-dashboard:2.0.4
+    user: "0:0"
+    restart: "no"
+    # Docker creates missing bind directories as root. Prepare only this
+    # app's storage before the non-root service starts, including upgrades.
+    entrypoint: ["sh", "-c", "mkdir -p /data /config && chown -R 1000:1000 /data /config"]
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/config:/config
+    security_opt:
+      - no-new-privileges:true
+
   redis:
     image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     restart: on-failure
@@ -25,6 +38,8 @@ services:
     user: "1000:1000"
     restart: on-failure
     depends_on:
+      init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     volumes:
