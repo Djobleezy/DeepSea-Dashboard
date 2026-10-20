@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-# ---- Stage 1: Build frontend ----
-FROM node:22-alpine AS frontend-builder
+# Static browser assets are architecture-independent. Run Node on the builder
+# CPU so multi-platform images do not depend on emulated Node/native tooling.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
