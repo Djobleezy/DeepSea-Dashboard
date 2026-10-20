@@ -95,8 +95,9 @@ export function useSSE() {
         try {
           const data = JSON.parse(e.data) as DashboardMetrics;
           if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
-          setMetrics(data);
-          publishSnapshotStatus('/metrics', data);
+          if (setMetrics(data)) {
+            publishSnapshotStatus('/metrics', useAppStore.getState().metrics ?? data);
+          }
         } catch {
           // ignore malformed event
         }
@@ -108,8 +109,9 @@ export function useSSE() {
         try {
           const data = JSON.parse(e.data) as WorkerSummary;
           if (data.wallet !== undefined && data.wallet !== useAppStore.getState().wallet) return;
-          setWorkers(data);
-          publishSnapshotStatus('/workers', data);
+          if (setWorkers(data)) {
+            publishSnapshotStatus('/workers', useAppStore.getState().workers ?? data);
+          }
         } catch {
           // ignore malformed event
         }

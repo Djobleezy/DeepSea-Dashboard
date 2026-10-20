@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchBlocks, fetchEarnings, fetchMetrics, fetchNotifications, fetchUnreadCount } from '../api/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetchBlocks, fetchConfig, fetchEarnings, fetchMetrics, fetchNotifications, fetchUnreadCount } from '../api/client';
 import { getApiStatus, publishApiStatus, resetApiStatus } from '../api/status';
 import { useAppStore } from '../stores/store';
 import { useMetrics } from '../hooks/useMetrics';
@@ -8,13 +8,14 @@ import { usePayoutTracking, payoutHistoryKey } from '../hooks/usePayoutTracking'
 import { useNotifications } from '../hooks/useNotifications';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import { useSSE } from '../hooks/useSSE';
+import { useWalletScope } from '../hooks/useWalletScope';
 import { Earnings } from '../pages/Earnings';
 import { Blocks } from '../pages/Blocks';
-import type { DashboardMetrics, EarningsResponse, Notification, WorkerSummary } from '../types';
+import type { AppConfig, DashboardMetrics, EarningsResponse, Notification, WorkerSummary } from '../types';
 
 vi.mock('../api/client', () => ({
   fetchBlocks: vi.fn(), fetchEarnings: vi.fn(), fetchMetrics: vi.fn(),
-  fetchNotifications: vi.fn(), fetchUnreadCount: vi.fn(), fetchWorkers: vi.fn(),
+  fetchNotifications: vi.fn(), fetchUnreadCount: vi.fn(), fetchWorkers: vi.fn(), fetchConfig: vi.fn(),
 }));
 vi.mock('../hooks/useCurrency', () => ({
   useCurrency: () => ({ formatFiat: (amount: number) => `$${amount.toFixed(2)}` }),
@@ -40,6 +41,7 @@ beforeEach(() => {
   vi.mocked(fetchUnreadCount).mockResolvedValue({ unread_count: 2 });
   vi.mocked(fetchNotifications).mockResolvedValue([]);
 });
+afterEach(() => vi.useRealTimers());
 
 describe('wallet-scoped snapshots', () => {
   it('clears charts and rejects delayed snapshots belonging to the previous wallet', () => {
@@ -53,11 +55,39 @@ describe('wallet-scoped snapshots', () => {
     expect(useAppStore.getState()).toMatchObject({ wallet: 'wallet-b', metrics: null, workers: null, chartData60s: [], chartHydrated: false });
   });
 
+  it('does not replace newer streamed workers with an older REST response', () => {
+    const store = useAppStore.getState();
+    store.setWallet('wallet-a');
+    const newer = { wallet: 'wallet-a', workers: [], data_updated_at: 2000 } as unknown as WorkerSummary;
+    const older = { wallet: 'wallet-a', workers: [], data_updated_at: 1000 } as unknown as WorkerSummary;
+    store.setWorkers(newer);
+    store.setWorkers(older);
+    expect(useAppStore.getState().workers).toBe(newer);
+    // Saving local power settings can legitimately revise the same source sample.
+    const revised = { ...newer, total_power_watts: 3000 };
+    store.setWorkers(revised);
+    expect(useAppStore.getState().workers).toBe(revised);
+  });
+
   it('retains the source timestamp for stale data rather than stamping receipt time', () => {
     useAppStore.getState().setWallet('wallet-a');
     useAppStore.getState().setMetrics({ ...snapshot('wallet-a', 100), data_status: 'stale', data_error: 'Source unavailable' });
     expect(useAppStore.getState().lastUpdated).toBe(100000);
     expect(useAppStore.getState().metricsError).toBe('Source unavailable');
+  });
+
+  it('retains successful readings when an unavailable response has no source timestamp', () => {
+    const store = useAppStore.getState();
+    store.setWallet('wallet-a');
+    store.setMetrics({ ...snapshot('wallet-a', 2000), hashrate_60sec: 250 });
+    store.setMetrics({ ...snapshot('wallet-a'), data_status: 'unavailable', data_updated_at: null, hashrate_60sec: 0 });
+    expect(useAppStore.getState().metrics).toMatchObject({ hashrate_60sec: 250, data_status: 'stale', data_updated_at: 2000 });
+    expect(useAppStore.getState().lastUpdated).toBe(2000000);
+
+    const freshWorkers = { wallet: 'wallet-a', data_updated_at: 2000, workers_total: 2, workers: [] } as unknown as WorkerSummary;
+    store.setWorkers(freshWorkers);
+    store.setWorkers({ wallet: 'wallet-a', data_updated_at: null, workers_total: 0, workers: [] } as unknown as WorkerSummary);
+    expect(useAppStore.getState().workers).toMatchObject({ workers_total: 2, data_status: 'stale', data_updated_at: 2000 });
   });
 
   it('records legitimate zero readings once per source timestamp', () => {
@@ -102,6 +132,41 @@ describe('wallet-scoped snapshots', () => {
   });
 });
 
+describe('authoritative wallet refresh', () => {
+  const config = (wallet: string) => ({ wallet } as AppConfig);
+
+  it('rechecks configuration on Retry, focus, and the regular poll', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchConfig)
+      .mockResolvedValueOnce(config('wallet-a'))
+      .mockResolvedValueOnce(config('wallet-b'))
+      .mockResolvedValueOnce(config('wallet-c'))
+      .mockResolvedValueOnce(config('wallet-d'));
+    const hook = renderHook(() => useWalletScope());
+    await act(async () => {});
+    expect(useAppStore.getState().wallet).toBe('wallet-a');
+    await act(async () => window.dispatchEvent(new Event('deepsea:refresh-metrics')));
+    expect(useAppStore.getState().wallet).toBe('wallet-b');
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(useAppStore.getState().wallet).toBe('wallet-c');
+    await act(async () => vi.advanceTimersByTime(60000));
+    expect(useAppStore.getState().wallet).toBe('wallet-d');
+    hook.unmount();
+  });
+
+  it('does not restore an old wallet from a configuration read started before a save', async () => {
+    const old = deferred<AppConfig>();
+    vi.mocked(fetchConfig).mockResolvedValueOnce(config('wallet-a')).mockReturnValueOnce(old.promise);
+    const hook = renderHook(() => useWalletScope());
+    await waitFor(() => expect(useAppStore.getState().wallet).toBe('wallet-a'));
+    act(() => window.dispatchEvent(new Event('deepsea:refresh-metrics')));
+    act(() => useAppStore.getState().setWallet('wallet-b'));
+    await act(async () => old.resolve(config('wallet-a')));
+    expect(useAppStore.getState().wallet).toBe('wallet-b');
+    hook.unmount();
+  });
+});
+
 describe('stream recovery', () => {
   it('clears a REST connection failure on a fresh event and ignores old-wallet events', () => {
     const sources: FakeSource[] = [];
@@ -123,6 +188,9 @@ describe('stream recovery', () => {
     publishApiStatus({ path: '/metrics', status: 'unavailable', updatedAt: null, error: 'Offline' });
     act(() => sources[0].emit('metrics', snapshot('wallet-a')));
     expect(getApiStatus()).toBeNull();
+    act(() => sources[0].emit('metrics', { ...snapshot('wallet-a', 100), data_status: 'stale' }));
+    expect(getApiStatus()).toBeNull();
+    expect(useAppStore.getState().metrics?.data_updated_at).toBe(1000);
     act(() => useAppStore.getState().setWallet('wallet-b'));
     act(() => sources[0].emit('metrics', snapshot('wallet-a', 2000)));
     expect(useAppStore.getState().metrics).toBeNull();

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { fetchConfig } from '../api/client';
 import { useAppStore } from '../stores/store';
 
-/** Initialize the authoritative wallet once, and resync changes made in another tab. */
+/** Keep the authoritative configuration in sync, including edits outside this tab. */
 export function useWalletScope() {
   useEffect(() => {
     let active = true;
@@ -24,14 +24,18 @@ export function useWalletScope() {
     const storage = (event: StorageEvent) => {
       if (event.key === 'deepsea_wallet') void refresh();
     };
-    const retry = () => { if (useAppStore.getState().wallet === null) void refresh(); };
+    const retry = () => { void refresh(); };
     void refresh();
+    const timer = window.setInterval(retry, 60000);
     window.addEventListener('storage', storage);
     window.addEventListener('deepsea:refresh-metrics', retry);
+    window.addEventListener('focus', retry);
     return () => {
       active = false;
+      window.clearInterval(timer);
       window.removeEventListener('storage', storage);
       window.removeEventListener('deepsea:refresh-metrics', retry);
+      window.removeEventListener('focus', retry);
     };
   }, []);
 }

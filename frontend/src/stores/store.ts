@@ -15,7 +15,7 @@ interface AppState {
   // Metrics
   metrics: DashboardMetrics | null;
   prevMetrics: DashboardMetrics | null;
-  setMetrics: (m: DashboardMetrics) => void;
+  setMetrics: (m: DashboardMetrics) => boolean;
   metricsLoading: boolean;
   metricsError: string | null;
   setMetricsLoading: (loading: boolean) => void;
@@ -31,7 +31,7 @@ interface AppState {
 
   // Workers
   workers: WorkerSummary | null;
-  setWorkers: (w: WorkerSummary) => void;
+  setWorkers: (w: WorkerSummary) => boolean;
 
   // Notifications
   notifications: Notification[];
@@ -80,16 +80,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestMetricsRefresh: () => window.dispatchEvent(new Event('deepsea:refresh-metrics')),
   setMetrics: (m) => {
     const current = get();
-    if (m.wallet !== undefined && m.wallet !== current.wallet) return;
+    if (m.wallet !== undefined && m.wallet !== current.wallet) return false;
     const sourceTime = m.data_updated_at === null ? null
       : (m.data_updated_at ?? m.server_timestamp) * 1000;
     // A delayed REST response must not roll back a newer streamed snapshot.
-    if (sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return;
+    if (sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return false;
+    if (sourceTime === null && current.metrics && current.lastUpdated !== null) {
+      // A no-data response cannot erase a successful reading from this wallet.
+      // Keep its age and values, while making the lost source explicit.
+      set({
+        metrics: { ...current.metrics, data_status: 'stale', data_error: m.data_error ?? 'Current mining data is unavailable.' },
+        metricsLoading: false,
+        metricsError: m.data_error ?? 'Current mining data is unavailable.',
+      });
+      return true;
+    }
     set({
       prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
       metricsLoading: false,
       metricsError: m.data_error ?? (m.data_status === 'stale' ? 'Showing previously received data.' : null),
     });
+    return true;
   },
 
   chartData60s: [],
@@ -142,8 +153,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   workers: null,
   setWorkers: (w) => {
-    if (w.wallet !== undefined && w.wallet !== get().wallet) return;
+    const current = get();
+    if (w.wallet !== undefined && w.wallet !== current.wallet) return false;
+    const sourceTime = (w as WorkerSummary & Pick<DashboardMetrics, 'data_updated_at'>).data_updated_at;
+    const previousTime = (current.workers as (WorkerSummary & Pick<DashboardMetrics, 'data_updated_at'>) | null)?.data_updated_at;
+    if (typeof sourceTime === 'number' && typeof previousTime === 'number' && sourceTime < previousTime) return false;
+    if (sourceTime === null && typeof previousTime === 'number' && current.workers) {
+      set({ workers: { ...current.workers, data_status: 'stale' } as WorkerSummary });
+      return true;
+    }
     set({ workers: w });
+    return true;
   },
 
   notifications: [],
