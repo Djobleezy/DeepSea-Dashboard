@@ -18,7 +18,7 @@ instance.
 6. Compute profitability figures (revenue, power cost, profit) using config values.
 7. Optionally merge fields only available via HTML scraping (``est_time_to_payout``,
    ``pool_fees_percentage``, ``blocks_found``) from a pre-cached scrape result.
-8. Detect low-hashrate mode (< 1 TH/s on the 60-second window).
+8. Detect low-hashrate mode using the configured 3-hour-average boundary.
 9. Construct and return a :class:`~app.models.DashboardMetrics` Pydantic model.
 """
 
@@ -30,7 +30,7 @@ import math
 import time
 from typing import Any, Optional
 
-from app.config import get_power_cost, get_power_usage
+from app.config import get_low_hashrate_threshold_ths, get_power_cost, get_power_usage
 from app.models import DashboardMetrics, convert_to_ths, format_hashrate
 from app.services.ocean_client import OceanClient
 
@@ -253,11 +253,11 @@ async def fetch_full_metrics(
     # the primary chart line from 60-sec to 3-hr data, notification
     # thresholds use the 3-hr window, and the "60 SEC" card is de-emphasised.
     #
-    # Threshold: < 1 TH/s on the *3-hour* window.  We use the 3-hr reading
+    # The configured threshold uses the *3-hour* window. We use that reading
     # because 60-sec is unreliable at low hashrates — that's the whole point
     # of the mode.
     hr_3hr = float(merged.get("hashrate_3hr") or 0)
-    merged["low_hashrate_mode"] = hr_3hr < 3.0  # < 3 TH/s on 3hr avg
+    merged["low_hashrate_mode"] = hr_3hr < get_low_hashrate_threshold_ths()
 
     merged["server_timestamp"] = time.time()
     merged["data_updated_at"] = merged["server_timestamp"]

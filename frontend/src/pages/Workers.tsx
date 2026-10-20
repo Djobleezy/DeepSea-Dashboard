@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useWorkers } from '../hooks/useWorkers';
 import { useAppStore } from '../stores/store';
 import { useCurrency } from '../hooks/useCurrency';
+import { fmtHashrate } from '../utils/format';
 import { StaggerChildren } from '../components/StaggerChildren';
 import { ASIC_MODELS, groupedModels } from '../data/asicModels';
 import { fetchWorkerSettings, saveWorkerSettings, saveElectricityRate, fetchMetrics } from '../api/client';
@@ -29,12 +30,6 @@ function encodeOverrides(overrides: OverrideMap): Record<string, WorkerOverrideD
     efficiency: o.efficiency ?? null,
     power: o.powerConsumption ?? null,
   }]));
-}
-function fmtHashrate(v: number): string {
-  if (v >= 1000) return `${(v / 1000).toFixed(2)} PH/s`;
-  if (v >= 1) return `${v.toFixed(1)} TH/s`;
-  if (v >= 0.001) return `${(v * 1000).toFixed(1)} GH/s`;
-  return `${v.toFixed(2)} TH/s`;
 }
 function fmtPower(w: number): string {
   return w >= 1000 ? `${(w / 1000).toFixed(1)} kW` : `${w.toFixed(0)} W`;

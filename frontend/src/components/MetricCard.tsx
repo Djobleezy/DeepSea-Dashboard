@@ -11,6 +11,7 @@ interface Props {
   metricKey?: string;
   subtext?: string;
   className?: string;
+  valueColor?: string;
   large?: boolean;
   children?: React.ReactNode;
 }
@@ -24,6 +25,7 @@ export const MetricCard: React.FC<Props> = ({
   metricKey,
   subtext,
   className = '',
+  valueColor,
   large = false,
   children,
 }) => {
@@ -34,7 +36,7 @@ export const MetricCard: React.FC<Props> = ({
       <div className="label">{label}</div>
       <div
         className={large ? 'value' : 'value-sm'}
-        style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}
+        style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', color: valueColor }}
       >
         <span className="glow">{value}</span>
         {unit && <span className="unit">{unit}</span>}

@@ -9,7 +9,7 @@ export const Boot: React.FC = () => {
   const navigate = useNavigate();
   const [config, setConfig] = useState<AppConfig>({
     wallet: '', power_cost: 0.12, power_usage: 3000, currency: 'USD',
-    timezone: 'UTC', network_fee: 0.5, extended_history: false,
+    timezone: 'UTC', network_fee: 0.5, extended_history: false, low_hashrate_threshold_ths: 3,
   });
   const [timezones, setTimezones] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export const Boot: React.FC = () => {
         fetchConfig(), fetchTimezones().catch(() => ({ timezones: [] as string[] })),
       ]);
       if (!mounted.current) return;
-      setConfig(cfg);
+      setConfig({ ...cfg, low_hashrate_threshold_ths: cfg.low_hashrate_threshold_ths ?? 3 });
       setTimezones(Array.from(new Set([cfg.timezone, 'UTC', ...zones.timezones])));
       setLoaded(true);
     } catch {
@@ -113,6 +113,14 @@ export const Boot: React.FC = () => {
             <select id="timezone" value={config.timezone} onChange={(event) => setConfig({ ...config, timezone: event.target.value })}>
               {timezones.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
             </select>
+          </section>
+          <section className="card">
+            <label className="label" htmlFor="low-hashrate-threshold">Low-hashrate threshold (TH/s)</label>
+            <input id="low-hashrate-threshold" type="number" step="any" min="0" max="1000000"
+              value={config.low_hashrate_threshold_ths ?? 3}
+              onChange={(event) => setConfig({ ...config, low_hashrate_threshold_ths: Number(event.target.value) })}
+              required aria-describedby="low-hashrate-help" />
+            <p id="low-hashrate-help" className="field-help">Below this 3-hour average, charts emphasize the steadier reading and alerts allow more variance. Set 0 to disable low-hashrate mode.</p>
           </section>
           <section className="card checkbox-field">
             <input type="checkbox" id="ext-history" checked={config.extended_history}

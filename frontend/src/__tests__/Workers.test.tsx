@@ -42,6 +42,17 @@ async function showSettings() {
 }
 
 describe('Workers', () => {
+  it.each([
+    [0.000999, '999.00 MH/s'],
+    [1_000_000, '1.00 EH/s'],
+  ])('uses the shared hashrate units for %s TH/s', async (hashrate, expected) => {
+    vi.mocked(fetchWorkers).mockResolvedValue({ ...summary, workers: [{ ...online, hashrate_3hr: hashrate }], workers_total: 1, total_hashrate: hashrate });
+    render(<Workers />);
+    const card = await screen.findByRole('article', { name: 'Worker garage-miner' });
+    expect(card).toHaveTextContent(expected);
+    expect(screen.getAllByText(expected).length).toBeGreaterThan(1);
+  });
+
   it('uses daily estimates for profit and keeps fleet totals independent of filters', async () => {
     await showSettings();
     expect(screen.getAllByText('+$1.36').length).toBe(2);

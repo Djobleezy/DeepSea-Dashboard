@@ -39,6 +39,7 @@ _DEFAULTS: dict[str, Any] = {
     "timezone": "America/Los_Angeles",
     "network_fee": 0.5,
     "extended_history": False,
+    "low_hashrate_threshold_ths": 3.0,
     "exchange_rate_api_key": "",
     # Optional URL of a local DATUM Gateway (e.g.
     # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
@@ -134,6 +135,23 @@ def import_legacy_power_cost(rate: float) -> bool:
 
 def get_power_usage() -> float:
     return float(load_config().get("power_usage", 3450))
+
+
+def get_low_hashrate_threshold_ths() -> float:
+    """Return the low-rate boundary, tolerating invalid hand-edited settings.
+
+    Zero disables low-hashrate mode. The API validates writes; this fallback
+    also protects existing configuration files edited outside the dashboard.
+    """
+    value = load_config().get("low_hashrate_threshold_ths", 3.0)
+    if not isinstance(value, bool):
+        try:
+            threshold = float(value)
+            if math.isfinite(threshold) and 0 <= threshold <= 1_000_000:
+                return threshold
+        except (TypeError, ValueError):
+            pass
+    return 3.0
 
 
 def get_currency() -> str:

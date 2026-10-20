@@ -143,19 +143,26 @@ total deadline. If none responds, the status is `unreachable`, rather than
 ### `low_hashrate_threshold_ths`
 - **Type:** `float` (TH/s)
 - **Default:** `3.0`
+- **Range:** `0`–`1,000,000`; finite values only. Set `0` to disable.
 
-Hashrate (in TH/s) below which the dashboard enters **low-hashrate mode**. In this mode the UI
-may display simplified metrics suitable for small miners or single BitAxe units. Triggers an
-informational status indicator in the header.
+The **3-hour average** below which the dashboard enters low-hashrate mode. Charts
+emphasize the steadier 3-hour series, dashboard labels explain short-window
+variance, and hashrate-drop alerts use a more tolerant threshold. At exactly the
+configured boundary, normal mode applies. Change this value on the Configuration
+page or through `POST /api/config`; it is also returned by `GET /api/config`.
+Saving the setting updates the current snapshot immediately without changing
+the age of its mining data or waiting for the next Ocean request.
+
+Invalid values in a hand-edited configuration file fall back to `3.0`.
 
 ---
 
-### `high_hashrate_threshold_ths`
-- **Type:** `float` (TH/s)
-- **Default:** `20.0`
+### Legacy `high_hashrate_threshold_ths`
 
-Hashrate (in TH/s) above which the dashboard uses larger-scale display formatting. Set to
-match the upper end of your expected operating range.
+This old example setting has no effect and is no longer offered. Existing files
+may retain it for compatibility. Hashrate units scale automatically at standard
+SI boundaries: `1 TH/s`, `1,000 TH/s` (PH/s), and `1,000,000 TH/s` (EH/s), rather
+than at an arbitrary high-rate threshold.
 
 ---
 
@@ -172,8 +179,7 @@ match the upper end of your expected operating range.
   "extended_history": false,
   "exchange_rate_api_key": "",
   "datum_gateway_url": "",
-  "low_hashrate_threshold_ths": 3.0,
-  "high_hashrate_threshold_ths": 20.0
+  "low_hashrate_threshold_ths": 3.0
 }
 ```
 

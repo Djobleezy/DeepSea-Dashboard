@@ -29,7 +29,9 @@ function estimatePayoutTime(unpaidBtc: number, dailySats: number): string {
   if (daysLeft < 2) return '~1 day';
   if (daysLeft < 30) return `~${Math.round(daysLeft)} days`;
   if (daysLeft < 60) return '~1 month';
-  return `~${Math.round(daysLeft / 30)} months`;
+  if (daysLeft < 365) return `~${Math.round(daysLeft / 30)} months`;
+  const years = Math.round(daysLeft / 365);
+  return years <= 1 ? '~1 year' : `~${years} years`;
 }
 
 function formatRelativeDate(isoString: string): string {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from '../pages/Dashboard';
 
@@ -25,7 +25,7 @@ beforeEach(() => {
   state.metricsLoading = false;
 });
 
-function show() { render(<MemoryRouter><Dashboard /></MemoryRouter>); }
+function show() { return render(<MemoryRouter><Dashboard /></MemoryRouter>); }
 
 describe('Dashboard source states', () => {
   it('guides an unconfigured installation to wallet setup instead of showing zero mining figures', () => {
@@ -58,5 +58,31 @@ describe('Dashboard source states', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('last available readings, not current mining status');
     expect(screen.getByText('Updated 2m ago')).toBeInTheDocument();
     expect(state.addChartPoint).not.toHaveBeenCalled();
+  });
+
+  it('resets elapsed time for a different block with the same rounded age', () => {
+    vi.useFakeTimers();
+    try {
+      state.wallet = 'wallet-a';
+      state.metrics = {
+        data_status: 'fresh', data_updated_at: Date.now() / 1000,
+        hashrate_60sec: 100, hashrate_60sec_unit: 'TH/s', hashrate_10min: 100, hashrate_10min_unit: 'TH/s',
+        hashrate_3hr: 100, hashrate_3hr_unit: 'TH/s', hashrate_24hr: 100, hashrate_24hr_unit: 'TH/s',
+        unpaid_earnings: 0, daily_profit_usd: 0, btc_price: 0, daily_mined_sats: 0,
+        daily_revenue: 0, daily_power_cost: 0, monthly_profit_usd: 0,
+        last_block_height: 100, last_block_time: '1 min ago', pool_fees_percentage: 0, difficulty: 0,
+        network_hashrate: 1000, network_hashrate_unit: 'EH/s', pool_total_hashrate: 25, pool_total_hashrate_unit: 'EH/s',
+      };
+      const view = show();
+      expect(screen.getByTitle('Elapsed since last block: 1m 0s')).toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(60_000); });
+      expect(screen.getByTitle('Elapsed since last block: 2m 0s')).toBeInTheDocument();
+      state.metrics = { ...state.metrics, last_block_height: 101 };
+      view.rerender(<MemoryRouter><Dashboard /></MemoryRouter>);
+      expect(screen.getByTitle('Elapsed since last block: 1m 0s')).toBeInTheDocument();
+      expect(screen.getByText('1m 0s / 400m 0s estimated pool interval')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

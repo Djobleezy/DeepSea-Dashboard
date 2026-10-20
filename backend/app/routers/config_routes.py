@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
 from app import background
-from app.config import load_config, save_config
+from app.config import get_low_hashrate_threshold_ths, load_config, save_config
 from app.db import get_db, migrate_legacy_electricity_rate
 from app.models import AppConfig, ConfigUpdate
 
@@ -35,6 +35,7 @@ async def get_config(db: aiosqlite.Connection = Depends(get_db)) -> AppConfig:
         timezone=cfg.get("timezone", "America/Los_Angeles"),
         network_fee=float(cfg.get("network_fee", 0.5)),
         extended_history=bool(cfg.get("extended_history", False)),
+        low_hashrate_threshold_ths=get_low_hashrate_threshold_ths(),
         datum_gateway_url=cfg.get("datum_gateway_url", "") or "",
     )
 

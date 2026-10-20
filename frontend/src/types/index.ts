@@ -158,6 +158,8 @@ export interface AppConfig {
   timezone: string;
   network_fee: number;
   extended_history: boolean;
+  /** Low-rate chart/notice boundary in TH/s; zero disables the mode. */
+  low_hashrate_threshold_ths?: number;
   /** Optional URL of a local DATUM Gateway (e.g. http://datum_datum_1:21000
    *  on UmbrelOS).  Empty string disables the live probe and falls back
    *  to the legacy pool_fees-only DATUM badge. */

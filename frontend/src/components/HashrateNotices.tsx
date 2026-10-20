@@ -25,24 +25,32 @@ interface Notice {
 function buildNotices(metrics: DashboardMetrics): Notice[] {
   const notices: Notice[] = [];
 
-  // No workers online
+  // A short-window active count cannot establish hardware connectivity.
   if (metrics.workers_hashing === 0) {
-    notices.push({ message: '⚠ No active workers — mining offline', type: 'error' });
-    return notices; // offline = no need for further hashrate notices
+    const hasRecentHistory = metrics.hashrate_60sec > 0 || metrics.hashrate_10min > 0
+      || metrics.hashrate_3hr > 0 || metrics.hashrate_24hr > 0;
+    notices.push(hasRecentHistory
+      ? { message: '⚠ No active workers reported — recorded hashrate is still available', type: 'warning' }
+      : { message: '⚠ No worker activity reported — check your miners and connection', type: 'error' });
+    if (!hasRecentHistory) return notices;
   }
 
-  // Low hashrate mode notice
+  const hr60 = metrics.hashrate_60sec;
+  const hr24 = metrics.hashrate_24hr;
+  const hr3 = metrics.hashrate_3hr;
+
+  // The short window is deliberately de-emphasized for small miners.
   if (metrics.low_hashrate_mode) {
     notices.push({
-      message: '⛏ Low hashrate device detected — using 3hr average for chart accuracy',
+      message: '⛏ Low hashrate mode — using 3hr average for steadier readings',
       type: 'info',
     });
+    if (hr24 > 0 && hr3 >= 0 && (hr24 - hr3) / hr24 > 0.40) {
+      const pct = Math.round((hr24 - hr3) / hr24 * 100);
+      notices.push({ message: `⚠ 3hr average ${pct}% below 24hr average — check sustained mining activity`, type: 'warning' });
+    }
+    return notices;
   }
-
-  // 60s hashrate vs 24hr average — flag if 60s is significantly below avg
-  const hr60  = metrics.hashrate_60sec;
-  const hr24  = metrics.hashrate_24hr;
-  const hr3   = metrics.hashrate_3hr;
 
   if (hr24 > 0 && hr60 > 0) {
     const dropVs24 = (hr24 - hr60) / hr24;
