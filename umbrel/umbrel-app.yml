@@ -4,7 +4,7 @@ name: DeepSea Dashboard
 tagline: Real-time Bitcoin mining dashboard for Ocean.xyz
 icon: https://raw.githubusercontent.com/Djobleezy/DeepSea-Dashboard/main/frontend/public/favicon.svg
 category: bitcoin
-version: "2.1.0"
+version: "2.1.1"
 port: 8000
 description: >-
   DeepSea Dashboard is a feature-rich, real-time Bitcoin mining dashboard
@@ -32,11 +32,10 @@ gallery: []
 # - https://raw.githubusercontent.com/Djobleezy/DeepSea-Dashboard/main/screenshots/workers.png
 
 releaseNotes: >-
-  v2.1.0: Clearer dashboard and mobile layouts, accurate daily profit and
-  shared electricity rates, reliable worker settings, wallet-scoped history,
-  explicit data freshness, combined Lightning and on-chain payouts, direct
-  DATUM reachability checks, improved audio and offline behavior, updated
-  dependencies, and corrected first-start configuration and persistence.
+  v2.1.1: Restores complete worker fleets from Ocean's live API and paginated
+  fallback, fixes compound block ages, uses an estimated pool block interval,
+  enables configurable low-hashrate mode, and improves hashrate units,
+  activity notices, payout estimates, and profit colors.
 defaultUsername: ""
 defaultPassword: ""
 submitter: Djobleezy

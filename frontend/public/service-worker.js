@@ -1,10 +1,10 @@
 /**
- * DeepSea Dashboard — Service Worker v2.1.0
+ * DeepSea Dashboard — Service Worker v2.1.1
  * Wallet-scoped snapshot caching with explicit stale data, cache-first static
  * assets, bounded eviction, and an offline navigation fallback.
  */
 
-const CACHE_VERSION = 'deepsea-v2.1.0-freshness-1';
+const CACHE_VERSION = 'deepsea-v2.1.1-freshness-1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 

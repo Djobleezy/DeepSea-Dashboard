@@ -3,7 +3,7 @@ import type { DatumStatus, HealthStatus } from '../types';
 import { deriveDatumBadge } from '../utils/datum';
 
 const health: HealthStatus = {
-  status: 'ok', version: '2.1.0', wallet_configured: true,
+  status: 'ok', version: '2.1.1', wallet_configured: true,
   redis_connected: false, uptime_seconds: 10, datum_gateway_configured: true,
 };
 const datum: DatumStatus = {

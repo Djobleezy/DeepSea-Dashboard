@@ -1,15 +1,13 @@
 id: deepsea-dashboard
 title: "DeepSea Dashboard"
-version: "2.1.0"
+version: "2.1.1"
 release-notes: |
-  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.1.0
-  - Clearer dashboard, accessible controls, and improved mobile layouts
-  - Accurate daily profit, shared electricity rates, and reliable worker saves
-  - Wallet-scoped history and explicit fresh, stale, and unavailable data
-  - Combined Lightning and on-chain payouts, plus direct DATUM reachability checks
-  - Reliable audio playback and safer offline caching
-  - Persistent private configuration and corrected first-start packaging
-  - Updated dependencies and expanded regression coverage
+  Full release notes at https://github.com/Djobleezy/DeepSea-Dashboard/releases/tag/v2.1.1
+  - Complete worker fleets from the live Ocean API and paginated fallback
+  - Correct compound block ages and estimated pool block intervals
+  - Configurable low-hashrate mode with immediate updates on save
+  - Consistent hashrate units, clearer activity notices, and profit colors
+  - Regression coverage based on live public Ocean responses
 license: MIT
 wrapper-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
 upstream-repo: "https://github.com/Djobleezy/DeepSea-Dashboard"
