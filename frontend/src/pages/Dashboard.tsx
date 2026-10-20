@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchMetricHistory } from '../api/client';
 import { useDatumStatus } from '../hooks/useDatumStatus';
 import { deriveDatumBadge } from '../utils/datum';
@@ -13,281 +14,144 @@ import { fmtHashrate, fmtSats, autoScaleHashrate } from '../utils/format';
 import { LiveBlockTimer } from '../components/LiveBlockTimer';
 import { HashrateNotices } from '../components/HashrateNotices';
 
-const HashrateChart = lazy(() =>
-  import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
-);
+const HashrateChart = lazy(() => import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })));
+
+function freshnessLabel(updatedAt: number | null | undefined, now: number) {
+  if (!updatedAt) return 'Waiting for the first successful update';
+  const age = Math.max(0, Math.floor(now / 1000 - updatedAt));
+  if (age < 60) return `Updated ${age}s ago`;
+  if (age < 3600) return `Updated ${Math.floor(age / 60)}m ago`;
+  return `Updated ${Math.floor(age / 3600)}h ago`;
+}
 
 export const Dashboard: React.FC = () => {
   const { formatFiat, formatFiatSigned } = useCurrency();
   const metrics = useAppStore((s) => s.metrics);
   const prevMetrics = useAppStore((s) => s.prevMetrics);
+  const metricsLoading = useAppStore((s) => s.metricsLoading);
+  const metricsError = useAppStore((s) => s.metricsError);
+  const wallet = useAppStore((s) => s.wallet);
+  const walletEpoch = useAppStore((s) => s.walletEpoch);
+  const retry = useAppStore((s) => s.requestMetricsRefresh);
   const chartData60s = useAppStore((s) => s.chartData60s);
   const chartData3hr = useAppStore((s) => s.chartData3hr);
   const addChartPoint = useAppStore((s) => s.addChartPoint);
   const chartHydrated = useAppStore((s) => s.chartHydrated);
   const hydrateChart = useAppStore((s) => s.hydrateChart);
   const { annotations: blockAnnotations } = useBlockAnnotations();
-  const hydrationAttempted = useRef(false);
+  const hydrationAttempted = useRef<number | null>(null);
   const { health, datum } = useDatumStatus();
-
-  // Hydrate chart from server history on first load
-  useEffect(() => {
-    if (hydrationAttempted.current || chartHydrated) return;
-    hydrationAttempted.current = true;
-
-    fetchMetricHistory(1)
-      .then((points) => {
-        hydrateChart(Array.isArray(points) ? points : []);
-      })
-      .catch(() => {});
-  }, [chartHydrated, hydrateChart]);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    if (!metrics) return;
-    // Skip chart points when hashrate is zero — likely a transient API failure,
-    // not a real drop.  Avoids visual dips to 0 on the chart.
-    if (metrics.hashrate_60sec > 0 || metrics.hashrate_3hr > 0) {
-      addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr);
-    }
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!wallet || hydrationAttempted.current === walletEpoch || chartHydrated) return;
+    hydrationAttempted.current = walletEpoch;
+    let cancelled = false;
+    fetchMetricHistory(1).then((points) => {
+      if (!cancelled) hydrateChart(Array.isArray(points) ? points : []);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [wallet, walletEpoch, chartHydrated, hydrateChart]);
+
+  useEffect(() => {
+    if (!metrics || metrics.data_status === 'stale' || metrics.data_status === 'unavailable' || metrics.data_status === 'unconfigured') return;
+    addChartPoint(metrics.hashrate_60sec, metrics.hashrate_3hr, metrics.data_updated_at);
   }, [metrics, addChartPoint]);
 
-  if (!metrics) {
-    return (
-      <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}
-      >
-        <span className="glow" style={{ fontFamily: 'var(--font-vt323)', fontSize: '24px' }}>
-          LOADING METRICS...▌
-        </span>
+  if (wallet === '' || metrics?.data_status === 'unconfigured') {
+    return <section className="card dashboard-setup">
+      <p className="eyebrow">Welcome to DeepSea</p>
+      <h1>Connect your mining wallet</h1>
+      <p>Add your Ocean payout address to see your workers, hashrate, and earnings. Until then, there is no mining data to display.</p>
+      <Link className="btn btn-primary" to="/config">Set up your dashboard →</Link>
+    </section>;
+  }
+
+  if (!metrics || metrics.data_status === 'unavailable') {
+    return <section className="status-panel" role={metricsError || metrics?.data_error ? 'alert' : 'status'}>
+      <div>
+        <h1>{metricsError || metrics?.data_error ? 'Mining data is unavailable' : 'Loading your mining data'}</h1>
+        <p>{metricsError || metrics?.data_error ? 'We could not get a current snapshot. Check the connection and try again.' : 'Connecting to your configured wallet. Your first update will appear here.'}</p>
       </div>
-    );
+      {(metricsError || metrics?.data_error || !metricsLoading) && <button className="btn" onClick={retry}>Retry</button>}
+      <Link to="/config">Check configuration</Link>
+    </section>;
   }
 
   const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
-  const hr60 = autoScaleHashrate(metrics.hashrate_60sec, metrics.hashrate_60sec_unit);
-  const hr10 = autoScaleHashrate(metrics.hashrate_10min, metrics.hashrate_10min_unit);
-  const hr3 = autoScaleHashrate(metrics.hashrate_3hr, metrics.hashrate_3hr_unit);
-  const hr24 = autoScaleHashrate(metrics.hashrate_24hr, metrics.hashrate_24hr_unit);
+  const isStale = metrics.data_status === 'stale' || Boolean(metricsError);
+  const hashrates = [
+    { label: metrics.low_hashrate_mode ? '60 sec · variable' : '60 sec', value: metrics.hashrate_60sec, unit: metrics.hashrate_60sec_unit, previous: prevMetrics?.hashrate_60sec, key: 'hashrate_60sec' },
+    { label: '10 min', value: metrics.hashrate_10min, unit: metrics.hashrate_10min_unit, previous: prevMetrics?.hashrate_10min, key: 'hashrate_10min' },
+    { label: metrics.low_hashrate_mode ? '3 hr · primary average' : '3 hr average', value: metrics.hashrate_3hr, unit: metrics.hashrate_3hr_unit, previous: prevMetrics?.hashrate_3hr, key: 'hashrate_3hr' },
+    { label: '24 hr average', value: metrics.hashrate_24hr, unit: metrics.hashrate_24hr_unit, previous: prevMetrics?.hashrate_24hr, key: 'hashrate_24hr' },
+  ];
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {/* Page title + status badges */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-        <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>MINING DASHBOARD</h1>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* Reachability and historical fee evidence are separate signals. */}
-          <span
-            className={`badge ${datumBadge.className}`}
-            style={{ fontSize: '12px', padding: '4px 12px' }}
-            title={datumBadge.tooltip}
-          >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: datumBadge.dotColor,
-                display: 'inline-block',
-                boxShadow: datumBadge.glow ? `0 0 6px ${datumBadge.dotColor}` : 'none',
-                animation: datumBadge.glow ? 'pulse-glow 2s infinite' : 'none',
-                marginRight: '6px',
-              }}
-            />
-            {datumBadge.label}
-          </span>
-          {metrics.low_hashrate_mode && (
-            <span
-              className="badge badge-warning"
-              style={{ fontSize: '12px', padding: '4px 12px' }}
-              title="Low hashrate device detected — chart uses 3hr average as primary, 60sec shown as secondary"
-            >
-              ⚠ LOW HASHRATE MODE
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Hashrate row — auto-scaled.  In low hashrate mode the 60-sec
-          reading is unreliable (BitAxe / small miners submit shares
-          infrequently), so we visually de-emphasise it and highlight
-          the 3hr average instead. */}
-      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.05s both' }}>
-        <MetricCard
-          label={metrics.low_hashrate_mode ? '60 SEC ⚡' : '60 SEC'}
-          value={hr60.display}
-          unit={hr60.unit}
-          current={metrics.hashrate_60sec}
-          previous={prevMetrics?.hashrate_60sec}
-          metricKey="hashrate_60sec"
-          large={!metrics.low_hashrate_mode}
-        />
-        <MetricCard
-          label="10 MIN"
-          value={hr10.display}
-          unit={hr10.unit}
-          current={metrics.hashrate_10min}
-          previous={prevMetrics?.hashrate_10min}
-          metricKey="hashrate_10min"
-          large
-        />
-        <MetricCard
-          label={metrics.low_hashrate_mode ? '⭐ 3 HR AVG' : '3 HR AVG'}
-          value={hr3.display}
-          unit={hr3.unit}
-          current={metrics.hashrate_3hr}
-          previous={prevMetrics?.hashrate_3hr}
-          metricKey="hashrate_3hr"
-          large
-        />
-        <MetricCard
-          label="24 HR AVG"
-          value={hr24.display}
-          unit={hr24.unit}
-          current={metrics.hashrate_24hr}
-          previous={prevMetrics?.hashrate_24hr}
-          metricKey="hashrate_24hr"
-          large
-        />
-      </div>
-
-      {/* Hashrate notices — shown when hashrate drops or low-hashrate mode */}
-      <HashrateNotices metrics={metrics} />
-
-      {/* Chart — data from Zustand store, persists across route changes */}
-      {chartData60s.length > 1 && (
-        <div className="card" style={{ animation: 'stagger-in-scale 0.5s ease-out 0.15s both' }}>
-          <div className="label" style={{ marginBottom: '12px' }}>
-            HASHRATE HISTORY{metrics.low_hashrate_mode ? ' — 3HR PRIMARY (LOW HASHRATE MODE)' : ''}
-          </div>
-          <ErrorBoundary>
-            <Suspense
-              fallback={
-                <div
-                  className="text-center"
-                  style={{ padding: '32px', color: 'var(--text-dim)', fontSize: '13px' }}
-                >
-                  LOADING CHART...
-                </div>
-              }
-            >
-              <HashrateChart
-                data60s={chartData60s}
-                data3hr={chartData3hr}
-                avg24hr={metrics.hashrate_24hr}
-                blockAnnotations={blockAnnotations}
-                lowHashrateMode={metrics.low_hashrate_mode}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-      )}
-
-      {/* Second row: workers, BTC price, daily sats, unpaid */}
-      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.25s both' }}>
-        <MetricCard
-          label="WORKERS HASHING"
-          value={metrics.workers_hashing}
-          current={metrics.workers_hashing}
-          previous={prevMetrics?.workers_hashing}
-          metricKey="workers_hashing"
-          large
-        />
-        <MetricCard
-          label="BTC PRICE"
-          value={formatFiat(metrics.btc_price)}
-          current={metrics.btc_price}
-          previous={prevMetrics?.btc_price}
-          metricKey="btc_price"
-          large
-        />
-        <MetricCard
-          label="DAILY MINED"
-          value={fmtSats(metrics.daily_mined_sats)}
-          unit="SATS"
-          current={metrics.daily_mined_sats}
-          previous={prevMetrics?.daily_mined_sats}
-          metricKey="daily_mined_sats"
-          large
-        />
-        <MetricCard
-          label="UNPAID EARNINGS"
-          value={`${(metrics.unpaid_earnings * 1e8).toFixed(0)}`}
-          unit="SATS"
-          large
-          subtext={`≈ ${formatFiat(metrics.unpaid_earnings * metrics.btc_price)}`}
-        />
-      </div>
-
-      {/* Bitcoin progress bar + payout */}
-      <div className="grid-2" style={{ animation: 'stagger-in 0.4s ease-out 0.35s both' }}>
-        <div className="card">
-          <div className="label" style={{ marginBottom: '12px' }}>OCEAN POOL BLOCK TIMER</div>
-          <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
-          <div className="flex gap-2 mt-2">
-            <div>
-              <div className="label">LAST OCEAN BLOCK</div>
-              <div className="value-sm glow">#{metrics.last_block_height.toLocaleString()}</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <LiveBlockTimer lastBlockTime={metrics.last_block_time} />
-                <span style={{ color: 'var(--text-dim)' }}>ago</span>
-              </div>
-            </div>
-            <div>
-              <div className="label">POOL BLOCKS FOUND</div>
-              <div className="value-sm glow">{metrics.blocks_found}</div>
-            </div>
-          </div>
-        </div>
-        <PayoutSummary metrics={metrics} />
-      </div>
-
-      {/* Network stats row */}
-      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.45s both' }}>
-        <MetricCard
-          label="NETWORK HASHRATE"
-          value={fmtHashrate(metrics.network_hashrate, metrics.network_hashrate_unit)}
-        />
-        <MetricCard
-          label="DIFFICULTY"
-          value={(metrics.difficulty / 1e12).toFixed(2)}
-          unit="T"
-        />
-        <MetricCard
-          label="POOL HASHRATE"
-          value={fmtHashrate(metrics.pool_total_hashrate, metrics.pool_total_hashrate_unit)}
-        />
-        <MetricCard
-          label="POOL FEES"
-          value={`${metrics.pool_fees_percentage.toFixed(2)}%`}
-        />
-      </div>
-
-      {/* Profitability row */}
-      <div className="grid-4" style={{ animation: 'stagger-in 0.4s ease-out 0.55s both' }}>
-        <MetricCard
-          label="DAILY REVENUE"
-          value={formatFiat(metrics.daily_revenue)}
-          current={metrics.daily_revenue}
-          previous={prevMetrics?.daily_revenue}
-          metricKey="daily_revenue"
-        />
-        <MetricCard
-          label="POWER COST/DAY"
-          value={formatFiat(metrics.daily_power_cost)}
-        />
-        <MetricCard
-          label="DAILY PROFIT"
-          value={formatFiatSigned(metrics.daily_profit_usd)}
-          current={metrics.daily_profit_usd}
-          previous={prevMetrics?.daily_profit_usd}
-          metricKey="daily_profit_usd"
-        />
-        <MetricCard
-          label="MONTHLY PROFIT"
-          value={formatFiatSigned(metrics.monthly_profit_usd)}
-        />
+  return <div className="dashboard-stack">
+    <div className="page-heading">
+      <div><p className="eyebrow">Your fleet at a glance</p><h1>Mining dashboard</h1></div>
+      <div className="dashboard-subtitle">
+        <span className={`badge ${datumBadge.className}`} title={datumBadge.tooltip}>{datumBadge.label}</span>
+        <span className="field-help" style={{ margin: 0 }}>{freshnessLabel(metrics.data_updated_at, now)}</span>
       </div>
     </div>
-  );
+    {isStale && <div className="status-panel status-warning" role="alert"><p>Updates are interrupted. These are the last available readings, not current mining status.</p><button className="btn" onClick={retry}>Retry update</button></div>}
+    <div className="grid-4">
+      <MetricCard label="Workers hashing" value={metrics.workers_hashing} current={metrics.workers_hashing} previous={prevMetrics?.workers_hashing} metricKey="workers_hashing" large />
+      <MetricCard label="Est. daily profit" value={formatFiatSigned(metrics.daily_profit_usd)} current={metrics.daily_profit_usd} previous={prevMetrics?.daily_profit_usd} metricKey="daily_profit_usd" large subtext="Revenue estimate less electricity" />
+      <MetricCard label="Unpaid balance" value={fmtSats(metrics.unpaid_earnings * 1e8)} unit="SATS" large subtext={`≈ ${formatFiat(metrics.unpaid_earnings * metrics.btc_price)}`} />
+      <MetricCard label="BTC price" value={formatFiat(metrics.btc_price)} current={metrics.btc_price} previous={prevMetrics?.btc_price} metricKey="btc_price" large />
+    </div>
+    {!isStale && <HashrateNotices metrics={metrics} />}
+    <section aria-labelledby="hashrate-heading">
+      <h2 id="hashrate-heading" className="label dashboard-section-title">Hashrate averages</h2>
+      <div className="grid-4">{hashrates.map((reading) => {
+        const rate = autoScaleHashrate(reading.value, reading.unit);
+        return <MetricCard key={reading.key} label={reading.label} value={rate.display} unit={rate.unit} current={reading.value} previous={reading.previous} metricKey={reading.key} large />;
+      })}</div>
+    </section>
+    <section className="card" aria-labelledby="history-heading">
+      <h2 className="label dashboard-section-title" id="history-heading">Hashrate history{metrics.low_hashrate_mode ? ' · 3 hr primary average' : ''}</h2>
+      {chartData60s.length > 1 ? <ErrorBoundary><Suspense fallback={<p className="field-help">Loading chart…</p>}>
+        <HashrateChart data60s={chartData60s} data3hr={chartData3hr} avg24hr={metrics.hashrate_24hr} blockAnnotations={blockAnnotations} lowHashrateMode={metrics.low_hashrate_mode} />
+      </Suspense></ErrorBoundary> : <p className="field-help">Your history will appear as readings arrive. Valid zero readings are included.</p>}
+    </section>
+    <div className="grid-2">
+      <section className="card">
+        <h2 className="label dashboard-section-title">Estimated cash flow</h2>
+        <dl className="dashboard-detail-list">
+          <div><dt>Revenue / day</dt><dd>{formatFiat(metrics.daily_revenue)}</dd></div>
+          <div><dt>Electricity / day</dt><dd>{formatFiat(metrics.daily_power_cost)}</dd></div>
+          <div><dt>Estimated sats / day</dt><dd>{fmtSats(metrics.daily_mined_sats)}</dd></div>
+          <div><dt>Profit / month</dt><dd>{formatFiatSigned(metrics.monthly_profit_usd)}</dd></div>
+        </dl>
+        <p className="field-help">Projections use current mining and price data. Actual payouts and future prices will vary.</p>
+      </section>
+      <PayoutSummary metrics={metrics} />
+    </div>
+    <section className="card">
+      <h2 className="label dashboard-section-title">Ocean pool block timer</h2>
+      {metrics.last_block_height > 0 ? <>
+        <BitcoinProgressBar lastBlockTime={metrics.last_block_time} />
+        <div className="dashboard-detail-list" style={{ marginTop: 20 }}>
+          <div><div className="label">Last Ocean block</div><div className="value-sm">#{metrics.last_block_height.toLocaleString()}</div><LiveBlockTimer lastBlockTime={metrics.last_block_time} /> <span className="field-help" style={{ display: 'inline' }}>ago</span></div>
+          <div><div className="label">Pool blocks found</div><div className="value-sm">{metrics.blocks_found}</div></div>
+        </div>
+      </> : <p className="field-help">No pool block timing is available yet.</p>}
+    </section>
+    <details className="network-details">
+      <summary>Network and pool details</summary>
+      <div className="grid-4">
+        <MetricCard label="Network hashrate" value={fmtHashrate(metrics.network_hashrate, metrics.network_hashrate_unit)} />
+        <MetricCard label="Difficulty" value={(metrics.difficulty / 1e12).toFixed(2)} unit="T" />
+        <MetricCard label="Pool hashrate" value={fmtHashrate(metrics.pool_total_hashrate, metrics.pool_total_hashrate_unit)} />
+        <MetricCard label="Pool fees" value={`${metrics.pool_fees_percentage.toFixed(2)}%`} />
+      </div>
+    </details>
+  </div>;
 };

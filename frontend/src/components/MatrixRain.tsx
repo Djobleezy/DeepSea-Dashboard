@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/store';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -81,14 +82,12 @@ function makeColumn(rows: number): Column {
 // ---------------------------------------------------------------------------
 export const MatrixRain: React.FC = () => {
   const theme = useAppStore((s) => s.theme);
+  const reducedMotion = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (theme !== 'matrix') return;
+    if (theme !== 'matrix' || reducedMotion) return;
 
-    // Respect prefers-reduced-motion
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (mediaQuery.matches) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -247,7 +246,7 @@ export const MatrixRain: React.FC = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
     };
-  }, [theme]);
+  }, [theme, reducedMotion]);
 
   // Clear canvas when theme switches away from matrix
   useEffect(() => {
@@ -257,9 +256,9 @@ export const MatrixRain: React.FC = () => {
     if (ctx && canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-  }, [theme]);
+  }, [theme, reducedMotion]);
 
-  if (theme !== 'matrix') return null;
+  if (theme !== 'matrix' || reducedMotion) return null;
 
   return (
     <canvas
@@ -273,7 +272,7 @@ export const MatrixRain: React.FC = () => {
         height: '100%',
         pointerEvents: 'none',
         zIndex: 0,
-        opacity: 0.18,
+        opacity: 0.09,
       }}
     />
   );

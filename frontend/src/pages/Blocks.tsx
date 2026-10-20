@@ -389,8 +389,8 @@ export const Blocks: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div className="flex justify-between items-center">
-        <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>⛏ BLOCK EXPLORER</h1>
+      <div className="page-toolbar">
+        <h1>Block explorer</h1>
         <button className="btn" onClick={() => { void load(page); void loadDistribution(); }}>⟳ REFRESH</button>
       </div>
 
@@ -438,7 +438,7 @@ export const Blocks: React.FC = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))',
               gap: '16px',
             }}
           >
