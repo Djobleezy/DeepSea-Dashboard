@@ -9,15 +9,23 @@ interface ChartPoint {
 }
 
 interface AppState {
+  wallet: string | null;
+  walletEpoch: number;
+  setWallet: (wallet: string) => void;
   // Metrics
   metrics: DashboardMetrics | null;
   prevMetrics: DashboardMetrics | null;
   setMetrics: (m: DashboardMetrics) => void;
+  metricsLoading: boolean;
+  metricsError: string | null;
+  setMetricsLoading: (loading: boolean) => void;
+  setMetricsError: (error: string | null) => void;
+  requestMetricsRefresh: () => void;
 
   // Chart history (persists across route changes)
   chartData60s: ChartPoint[];
   chartData3hr: ChartPoint[];
-  addChartPoint: (hr60s: number, hr3hr: number) => void;
+  addChartPoint: (hr60s: number, hr3hr: number, sourceTimestamp?: number | null) => void;
   chartHydrated: boolean;
   hydrateChart: (points: { timestamp: number; hashrate_60sec: number; hashrate_3hr: number }[]) => void;
 
@@ -28,6 +36,7 @@ interface AppState {
   // Notifications
   notifications: Notification[];
   unreadCount: number;
+  setUnreadCount: (count: number) => void;
   setNotifications: (n: Notification[]) => void;
   addNotification: (n: Notification) => void;
 
@@ -45,21 +54,58 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  wallet: null,
+  walletEpoch: 0,
+  setWallet: (rawWallet) => {
+    const wallet = rawWallet.trim();
+    if (get().wallet === wallet) return;
+    set((s) => ({
+      wallet, walletEpoch: s.walletEpoch + 1,
+      metrics: null, prevMetrics: null, workers: null, lastUpdated: null,
+      chartData60s: [], chartData3hr: [], chartHydrated: false,
+      metricsLoading: true, metricsError: null,
+    }));
+    // Legacy payout records had no wallet ownership and cannot be migrated safely.
+    try {
+      localStorage.removeItem('deepsea_payout_history');
+      localStorage.setItem('deepsea_wallet', wallet);
+    } catch { /* Storage can be unavailable in private browsing. */ }
+  },
   metrics: null,
   prevMetrics: null,
-  setMetrics: (m) =>
-    set({ prevMetrics: get().metrics, metrics: m, lastUpdated: Date.now() }),
+  metricsLoading: true,
+  metricsError: null,
+  setMetricsLoading: (metricsLoading) => set({ metricsLoading }),
+  setMetricsError: (metricsError) => set({ metricsError, metricsLoading: false }),
+  requestMetricsRefresh: () => window.dispatchEvent(new Event('deepsea:refresh-metrics')),
+  setMetrics: (m) => {
+    const current = get();
+    if (m.wallet !== undefined && m.wallet !== current.wallet) return;
+    const sourceTime = m.data_updated_at === null ? null
+      : (m.data_updated_at ?? m.server_timestamp) * 1000;
+    // A delayed REST response must not roll back a newer streamed snapshot.
+    if (sourceTime !== null && current.lastUpdated !== null && sourceTime < current.lastUpdated) return;
+    set({
+      prevMetrics: current.metrics, metrics: m, lastUpdated: sourceTime,
+      metricsLoading: false,
+      metricsError: m.data_error ?? (m.data_status === 'stale' ? 'Showing previously received data.' : null),
+    });
+  },
 
   chartData60s: [],
   chartData3hr: [],
   chartHydrated: false,
-  addChartPoint: (hr60s, hr3hr) =>
+  addChartPoint: (hr60s, hr3hr, sourceTimestamp) =>
     set((s) => {
-      const ts = Date.now();
+      const ts = sourceTimestamp ? sourceTimestamp * 1000 : Date.now();
       const label = new Date(ts).toLocaleTimeString();
+      const append = (points: ChartPoint[], value: number) => [
+        ...points.filter((point) => Math.floor(point.ts / 1000) !== Math.floor(ts / 1000)),
+        { label, value, ts },
+      ].sort((a, b) => a.ts - b.ts).slice(-60);
       return {
-        chartData60s: [...s.chartData60s.slice(-59), { label, value: hr60s, ts }],
-        chartData3hr: [...s.chartData3hr.slice(-59), { label, value: hr3hr, ts }],
+        chartData60s: append(s.chartData60s, hr60s),
+        chartData3hr: append(s.chartData3hr, hr3hr),
       };
     }),
   hydrateChart: (points) =>
@@ -95,12 +141,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   workers: null,
-  setWorkers: (w) => set({ workers: w }),
+  setWorkers: (w) => {
+    if (w.wallet !== undefined && w.wallet !== get().wallet) return;
+    set({ workers: w });
+  },
 
   notifications: [],
   unreadCount: 0,
-  setNotifications: (n) =>
-    set({ notifications: n, unreadCount: n.filter((x) => !x.read).length }),
+  setUnreadCount: (count) => set({ unreadCount: Math.max(0, count) }),
+  setNotifications: (n) => set({ notifications: n }),
   addNotification: (n) =>
     set((s) => ({
       notifications: [n, ...s.notifications].slice(0, 500),

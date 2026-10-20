@@ -36,8 +36,13 @@ export function useNotifications(category = 'all', pollMs = 30000) {
     }
   }, [category, setNotifications]);
 
+  const refreshUnreadCount = () => {
+    window.dispatchEvent(new Event('deepsea:notifications-changed'));
+  };
+
   useEffect(() => {
     mountedRef.current = true;
+    setLoading(true);
     load();
     const timer = setInterval(load, pollMs);
     return () => {
@@ -49,6 +54,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const markRead = async (id: string) => {
     try {
       await markNotificationRead(id);
+      refreshUnreadCount();
       await load();
     } catch (e) {
       if (!mountedRef.current) return;
@@ -59,6 +65,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const markAllReadFn = async () => {
     try {
       await markAllRead();
+      refreshUnreadCount();
       await load();
     } catch (e) {
       if (!mountedRef.current) return;
@@ -69,6 +76,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const deleteFn = async (id: string) => {
     try {
       await deleteNotification(id);
+      refreshUnreadCount();
       await load();
     } catch (e) {
       if (!mountedRef.current) return;
@@ -79,6 +87,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const clearRead = async () => {
     try {
       await clearReadNotifications();
+      refreshUnreadCount();
       await load();
     } catch (e) {
       if (!mountedRef.current) return;
@@ -89,6 +98,7 @@ export function useNotifications(category = 'all', pollMs = 30000) {
   const clearAll = async () => {
     try {
       await clearAllNotifications();
+      refreshUnreadCount();
       await load();
     } catch (e) {
       if (!mountedRef.current) return;

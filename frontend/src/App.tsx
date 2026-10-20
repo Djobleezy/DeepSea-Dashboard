@@ -13,19 +13,23 @@ import { useSSE } from './hooks/useSSE';
 import { useMetrics } from './hooks/useMetrics';
 import { useServerTime } from './hooks/useServerTime';
 import { useTheme } from './hooks/useTheme';
+import { useWalletScope } from './hooks/useWalletScope';
+import { useUnreadCount } from './hooks/useUnreadCount';
 import { applyTheme } from './theme/themes';
 import { useAppStore } from './stores/store';
 
 const BOOT_SHOWN_KEY = 'deepsea_boot_shown';
 
 function AppInner() {
+  useWalletScope();
+  useUnreadCount();
   useSSE();
   useMetrics();
   useServerTime();
   useTheme();
 
   const [showBoot, setShowBoot] = useState(() => {
-    return !sessionStorage.getItem(BOOT_SHOWN_KEY);
+    return !sessionStorage.getItem(BOOT_SHOWN_KEY) && localStorage.getItem('deepsea_skip_intro') !== '1';
   });
 
   const handleBootComplete = useCallback(() => {
