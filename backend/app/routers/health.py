@@ -5,9 +5,10 @@ import time
 from fastapi import APIRouter
 
 from app import background
-from app.config import get_wallet
+from app.config import get_datum_gateway_url, get_wallet
 from app.models import HealthStatus
 from app.services.cache import is_redis_connected
+from app.services.datum_gateway_client import _autodiscover_enabled
 
 router = APIRouter()
 
@@ -27,4 +28,5 @@ async def health_check() -> HealthStatus:
         last_refresh=background.get_last_refresh(),
         uptime_seconds=background.get_uptime(),
         server_timestamp=time.time(),
+        datum_gateway_configured=bool(get_datum_gateway_url()) or _autodiscover_enabled(),
     )

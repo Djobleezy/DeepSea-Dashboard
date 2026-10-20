@@ -1,5 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { fetchMetricHistory } from '../api/client';
+import { useDatumStatus } from '../hooks/useDatumStatus';
+import { deriveDatumBadge } from '../utils/datum';
 import { useAppStore } from '../stores/store';
 import { MetricCard } from '../components/MetricCard';
 import { PayoutSummary } from '../components/PayoutSummary';
@@ -15,11 +17,6 @@ const HashrateChart = lazy(() =>
   import('../components/HashrateChart').then((module) => ({ default: module.HashrateChart })),
 );
 
-// DATUM Gateway: pool_fees between 0.9% and 1.3% = connected via DATUM protocol
-function isDatumConnected(poolFeesPct: number): boolean {
-  return poolFeesPct >= 0.9 && poolFeesPct <= 1.3;
-}
-
 export const Dashboard: React.FC = () => {
   const { formatFiat, formatFiatSigned } = useCurrency();
   const metrics = useAppStore((s) => s.metrics);
@@ -31,6 +28,7 @@ export const Dashboard: React.FC = () => {
   const hydrateChart = useAppStore((s) => s.hydrateChart);
   const { annotations: blockAnnotations } = useBlockAnnotations();
   const hydrationAttempted = useRef(false);
+  const { health, datum } = useDatumStatus();
 
   // Hydrate chart from server history on first load
   useEffect(() => {
@@ -65,7 +63,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  const datumActive = isDatumConnected(metrics.pool_fees_percentage);
+  const datumBadge = deriveDatumBadge(health, datum, metrics.pool_fees_percentage);
   const hr60 = autoScaleHashrate(metrics.hashrate_60sec, metrics.hashrate_60sec_unit);
   const hr10 = autoScaleHashrate(metrics.hashrate_10min, metrics.hashrate_10min_unit);
   const hr3 = autoScaleHashrate(metrics.hashrate_3hr, metrics.hashrate_3hr_unit);
@@ -78,24 +76,25 @@ export const Dashboard: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <h1 style={{ fontSize: '32px', letterSpacing: '4px' }}>MINING DASHBOARD</h1>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* DATUM Gateway badge */}
+          {/* Reachability and historical fee evidence are separate signals. */}
           <span
-            className={`badge ${datumActive ? 'badge-online' : 'badge-offline'}`}
+            className={`badge ${datumBadge.className}`}
             style={{ fontSize: '12px', padding: '4px 12px' }}
+            title={datumBadge.tooltip}
           >
             <span
               style={{
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: datumActive ? 'var(--color-success)' : 'var(--color-error)',
+                background: datumBadge.dotColor,
                 display: 'inline-block',
-                boxShadow: datumActive ? '0 0 6px var(--color-success)' : 'none',
-                animation: datumActive ? 'pulse-glow 2s infinite' : 'none',
+                boxShadow: datumBadge.glow ? `0 0 6px ${datumBadge.dotColor}` : 'none',
+                animation: datumBadge.glow ? 'pulse-glow 2s infinite' : 'none',
                 marginRight: '6px',
               }}
             />
-            DATUM {datumActive ? 'CONNECTED' : 'OFFLINE'}
+            {datumBadge.label}
           </span>
           {metrics.low_hashrate_mode && (
             <span

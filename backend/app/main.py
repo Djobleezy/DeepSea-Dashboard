@@ -22,6 +22,7 @@ from app.routers import (
     blocks,
     client_errors,
     config_routes,
+    datum,
     earnings,
     exchange,
     health,
@@ -138,6 +139,7 @@ app.include_router(exchange.router, prefix=api_prefix, tags=["exchange"])
 app.include_router(client_errors.router, prefix=api_prefix, tags=["client-errors"])
 app.include_router(worker_settings.router, prefix=api_prefix, tags=["worker-settings"])
 app.include_router(batch.router, prefix=api_prefix, tags=["system"])
+app.include_router(datum.router, prefix=api_prefix, tags=["datum"])
 
 # Windows drive-letter pattern (e.g. "C:" or "D:")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
