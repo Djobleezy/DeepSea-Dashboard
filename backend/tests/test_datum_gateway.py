@@ -591,3 +591,149 @@ async def test_health_rejects_invalid_gateway_and_supports_autodiscovery(client,
     assert (await client.get('/api/health')).json()['datum_gateway_configured'] is False
     monkeypatch.setenv('DATUM_GATEWAY_AUTODISCOVER', 'true')
     assert (await client.get('/api/health')).json()['datum_gateway_configured'] is True
+
+
+def _enable_autodiscovery(monkeypatch):
+    monkeypatch.delenv('DATUM_GATEWAY_URL', raising=False)
+    monkeypatch.setenv('DATUM_GATEWAY_AUTODISCOVER', '1')
+    monkeypatch.setattr(dgc, 'load_config', lambda: {'datum_gateway_url': ''})
+
+
+def _unreachable_probe(base_url, method):
+    return dgc.DatumProbeResult(
+        reachable=False, status='unreachable', probe=method,
+        gateway_url=base_url, reason='connection-refused', checked_at=1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_autodiscovery_finds_stock_gateway_using_stratum(monkeypatch):
+    _enable_autodiscovery(monkeypatch)
+    attempts = []
+
+    async def no_widget(base_url):
+        attempts.append(('http', base_url))
+        return _unreachable_probe(base_url, 'umbrel-api')
+
+    async def stratum(base_url):
+        attempts.append(('tcp', base_url))
+        if base_url == 'http://127.0.0.1:7152':
+            return dgc.DatumProbeResult(True, 'reachable', 'stratum-tcp', base_url, checked_at=1)
+        return _unreachable_probe(base_url, 'stratum-tcp')
+
+    monkeypatch.setattr(dgc, '_probe_umbrel_api', no_widget)
+    monkeypatch.setattr(dgc, '_probe_stratum_tcp', stratum)
+    result = await dgc.get_datum_status()
+    assert result.status == 'reachable'
+    assert result.probe == 'stratum-tcp'
+    assert result.gateway_url == 'http://127.0.0.1:7152'
+    assert ('http', result.gateway_url) in attempts
+    assert ('tcp', result.gateway_url) in attempts
+
+
+@pytest.mark.asyncio
+async def test_exhausted_autodiscovery_remains_unreachable_through_api(client, monkeypatch):
+    _enable_autodiscovery(monkeypatch)
+    attempts = []
+
+    async def fail_widget(base_url):
+        attempts.append(('http', base_url))
+        return _unreachable_probe(base_url, 'umbrel-api')
+
+    async def fail_stratum(base_url):
+        attempts.append(('tcp', base_url))
+        return _unreachable_probe(base_url, 'stratum-tcp')
+
+    monkeypatch.setattr(dgc, '_probe_umbrel_api', fail_widget)
+    monkeypatch.setattr(dgc, '_probe_stratum_tcp', fail_stratum)
+    response = await client.get('/api/datum/status')
+    assert response.status_code == 200
+    data = response.json()
+    assert data['status'] == 'unreachable'
+    assert data['probe_reachable'] is False
+    assert data['probe_method'] == 'none'
+    assert data['probe_error'] == 'autodiscover-failed'
+    assert 'could not reach' in data['explanation']
+    assert set(attempts) == {
+        (method, url) for method in ('http', 'tcp') for url in dgc.AUTODISCOVER_CANDIDATES
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('blocked_method', ['http', 'tcp'])
+async def test_autodiscovery_deadline_bounds_parallel_probes_and_cleans_up(monkeypatch, blocked_method):
+    import asyncio
+    import time
+
+    _enable_autodiscovery(monkeypatch)
+    monkeypatch.setattr(dgc, 'DISCOVERY_TIMEOUT', 0.03)
+    started = set()
+    cancelled = set()
+
+    async def hanging_widget(base_url):
+        started.add(base_url)
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.add(base_url)
+
+    async def fail_widget(base_url):
+        return _unreachable_probe(base_url, 'umbrel-api')
+
+    if blocked_method == 'http':
+        monkeypatch.setattr(dgc, '_probe_umbrel_api', hanging_widget)
+    else:
+        monkeypatch.setattr(dgc, '_probe_umbrel_api', fail_widget)
+        monkeypatch.setattr(dgc, '_probe_stratum_tcp', hanging_widget)
+    start = time.monotonic()
+    result = await dgc.get_datum_status()
+    assert time.monotonic() - start < 1
+    assert result.status == 'unreachable'
+    assert result.reason == 'autodiscover-timeout'
+    assert started == cancelled == set(dgc.AUTODISCOVER_CANDIDATES)
+
+
+@pytest.mark.asyncio
+async def test_successful_autodiscovery_cancels_other_probes(monkeypatch):
+    import asyncio
+
+    _enable_autodiscovery(monkeypatch)
+    started = set()
+    cancelled = set()
+    all_started = asyncio.Event()
+    success_url = dgc.AUTODISCOVER_CANDIDATES[0]
+
+    async def widget(base_url):
+        started.add(base_url)
+        if len(started) == len(dgc.AUTODISCOVER_CANDIDATES):
+            all_started.set()
+        await all_started.wait()
+        if base_url == success_url:
+            return dgc.DatumProbeResult(True, 'reachable', 'umbrel-api', base_url, checked_at=1)
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.add(base_url)
+
+    monkeypatch.setattr(dgc, '_probe_umbrel_api', widget)
+    result = await dgc.get_datum_status()
+    assert result.gateway_url == success_url
+    assert result.status == 'reachable'
+    assert cancelled == set(dgc.AUTODISCOVER_CANDIDATES) - {success_url}
+
+
+@pytest.mark.asyncio
+async def test_autodiscovery_validates_candidates_before_probing(monkeypatch):
+    _enable_autodiscovery(monkeypatch)
+    safe_url = 'http://127.0.0.1:7152'
+    monkeypatch.setattr(dgc, 'AUTODISCOVER_CANDIDATES', (safe_url, 'http://169.254.169.254'))
+    attempts = []
+
+    async def widget(base_url):
+        attempts.append(base_url)
+        return dgc.DatumProbeResult(True, 'reachable', 'umbrel-api', base_url, checked_at=1)
+
+    monkeypatch.setattr(dgc, '_probe_umbrel_api', widget)
+    result = await dgc.get_datum_status()
+    assert result.gateway_url == safe_url
+    assert attempts == [safe_url]

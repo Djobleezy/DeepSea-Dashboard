@@ -37,6 +37,10 @@ CACHE_TTL = 15.0
 # misconfigured URL won't slow the dashboard down.
 PROBE_TIMEOUT = 2.0
 
+# Discovery runs candidates concurrently and must finish before the frontend's
+# 10-second request timeout, including gateways that stall during a response.
+DISCOVERY_TIMEOUT = 6.0
+
 # Default stratum port from the upstream DATUM gateway config.
 DEFAULT_STRATUM_PORT = 23334
 
@@ -63,7 +67,8 @@ class DatumProbeResult:
             ``unknown`` means no URL was configured and auto-discovery is
             off, so we cannot make any statement about reachability.
         probe: Which method produced the result
-            (``umbrel-api`` | ``stratum-tcp`` | ``none``).
+            (``umbrel-api`` | ``stratum-tcp`` | ``none``). ``none`` also
+            covers failed discovery across multiple candidate addresses.
         gateway_url: The URL we actually probed (may be auto-discovered).
         connections: Worker connection count (only via umbrel-api).
         hashrate_ths: Estimated hashrate in TH/s (only via umbrel-api).
@@ -392,44 +397,68 @@ def _blocking_tcp_check(host: str, port: int) -> None:
         pass
 
 
+async def _probe_gateway(base_url: str) -> DatumProbeResult:
+    """Try the widget, then Stratum for gateways without the Umbrel API."""
+    result = await _probe_umbrel_api(base_url)
+    if result.reachable:
+        return result
+    tcp_result = await _probe_stratum_tcp(base_url)
+    if tcp_result.reachable:
+        return tcp_result
+    return result
+
+
+async def _discover_gateway() -> DatumProbeResult:
+    """Check only validated local candidates, without serial timeout buildup."""
+    candidates = [
+        url for candidate in AUTODISCOVER_CANDIDATES
+        if (url := _validate_gateway_url(candidate)) is not None
+    ]
+    tasks = [asyncio.create_task(_probe_gateway(url)) for url in candidates]
+    reason = "autodiscover-failed"
+    try:
+        async with asyncio.timeout(DISCOVERY_TIMEOUT):
+            for completed in asyncio.as_completed(tasks):
+                result = await completed
+                if result.reachable:
+                    return result
+    except TimeoutError:
+        reason = "autodiscover-timeout"
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        # Drain the async tasks before returning, also after a successful
+        # candidate. An already-running socket/DNS executor call still uses
+        # its own timeout; cancellation does not forcibly stop its thread.
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    return DatumProbeResult(
+        reachable=False,
+        status="unreachable",
+        probe="none",
+        gateway_url=None,
+        reason=reason,
+        checked_at=time.time(),
+    )
+
+
 async def _do_probe() -> DatumProbeResult:
     """Run the configured probe(s) and return the best result.
 
     Order of operations:
     1. Explicit URL (env or config) — try umbrel-api, then stratum-tcp.
     2. Auto-discovery (only if ``DATUM_GATEWAY_AUTODISCOVER=1``) — try
-       each candidate against umbrel-api until one succeeds.
+       each candidate against umbrel-api and Stratum, within a total deadline.
     3. Nothing configured + auto-discovery off → ``unknown`` status.
     """
     base_url = _resolve_gateway_url()
 
     if base_url:
-        # Try the rich JSON probe first.
-        result = await _probe_umbrel_api(base_url)
-        if result.reachable:
-            return result
-        # Fall back to a simple TCP connect on the stratum port.  Use the
-        # same host the user pointed us at — they may have a build
-        # without DATUM_API_FOR_UMBREL but still expose stratum.
-        tcp_result = await _probe_stratum_tcp(base_url)
-        if tcp_result.reachable:
-            return tcp_result
-        # Both failed — return the more informative HTTP result.
-        return result
+        return await _probe_gateway(base_url)
 
     if _autodiscover_enabled():
-        for candidate in AUTODISCOVER_CANDIDATES:
-            result = await _probe_umbrel_api(candidate)
-            if result.reachable:
-                return result
-        return DatumProbeResult(
-            reachable=False,
-            status="unreachable",
-            probe="none",
-            gateway_url=None,
-            reason="autodiscover-failed",
-            checked_at=time.time(),
-        )
+        return await _discover_gateway()
 
     return DatumProbeResult(
         reachable=False,

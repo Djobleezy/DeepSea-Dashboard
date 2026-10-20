@@ -38,10 +38,10 @@ _DEFAULTS: dict[str, Any] = {
     "exchange_rate_api_key": "",
     # Optional URL of a local DATUM Gateway (e.g.
     # ``http://datum_datum_1:21000`` on UmbrelOS, ``http://127.0.0.1:7152``
-    # for a stock self-build).  Used by the dashboard to render a
-    # *live* DATUM connection badge that doesn't depend on the lagging
-    # ``pool_fees_percentage`` signal.  Leave blank to keep legacy
-    # fee-only behaviour.  Environment variable ``DATUM_GATEWAY_URL``
+    # for a stock self-build). Used for a gateway reachability check,
+    # separate from historical pool-fee evidence. Leave blank to use
+    # fee evidence only unless autodiscovery is enabled.
+    # Environment variable ``DATUM_GATEWAY_URL``
     # overrides this field at request time.
     "datum_gateway_url": "",
 }

@@ -27,4 +27,19 @@ describe('DATUM evidence labels', () => {
   it('does not fall back to a positive fee inference when live status is missing', () => {
     expect(deriveDatumBadge(health, null, 1).label).toBe('DATUM STATUS UNAVAILABLE');
   });
+
+  it('shows exhausted discovery as unreachable even without an individual probe method', () => {
+    const result = deriveDatumBadge(health, {
+      ...datum, status: 'unreachable', probe_reachable: false,
+      probe_method: 'none', gateway_url: null, probe_error: 'autodiscover-failed',
+    }, 1);
+    expect(result.label).toBe('DATUM GATEWAY UNREACHABLE');
+    expect(result.className).toBe('badge-warning');
+  });
+
+  it('keeps an unavailable discovery result distinct from an unsuccessful check', () => {
+    expect(deriveDatumBadge(health, {
+      ...datum, status: 'unknown', probe_reachable: false, probe_method: 'none',
+    }, 1).label).toBe('DATUM STATUS UNAVAILABLE');
+  });
 });

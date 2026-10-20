@@ -48,7 +48,7 @@ class DatumStatus(BaseModel):
     probe_error: Optional[str] = None
 
 
-def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str) -> tuple[str, str]:
+def _classify(probe_status: str, fees_in_band: bool) -> tuple[str, str]:
     """Combine probe + fee signals into a (status, explanation) pair.
 
     The explanation strings are user-facing — the dashboard renders them
@@ -61,13 +61,13 @@ def _classify(probe_reachable: bool, fees_in_band: bool, probe_method: str) -> t
         if fees_in_band
         else "Historical pool fees are outside the DATUM range."
     )
-    if probe_method == "none":
+    if probe_status == "unknown":
         return (
             "unknown",
             f"No live gateway status is available. {fee_evidence} "
             "Fees alone do not establish whether DATUM is connected.",
         )
-    if probe_reachable:
+    if probe_status == "reachable":
         return (
             "reachable",
             f"The gateway is reachable. {fee_evidence} "
@@ -99,9 +99,8 @@ async def datum_status() -> DatumStatus:
     fees_in_band = DATUM_FEE_BAND_LOW <= fees_pct <= DATUM_FEE_BAND_HIGH
 
     status_label, explanation = _classify(
-        probe_reachable=probe.reachable,
+        probe_status=probe.status,
         fees_in_band=fees_in_band,
-        probe_method=probe.probe,
     )
 
     return DatumStatus(

@@ -14,7 +14,7 @@ export function deriveDatumBadge(
   poolFeesPct: number,
 ): DatumBadgeState {
   if (health?.datum_gateway_configured) {
-    if (datum && datum.probe_method !== 'none') {
+    if (datum && datum.status !== 'unknown') {
       return {
         label: datum.probe_reachable ? 'DATUM GATEWAY REACHABLE' : 'DATUM GATEWAY UNREACHABLE',
         className: datum.probe_reachable ? 'badge-online' : 'badge-warning',

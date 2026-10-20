@@ -116,6 +116,12 @@ The probe is cached for 15 seconds and each HTTP/TCP attempt times out after
 2 seconds. A failed check can indicate an incorrect address or network problem
 while the gateway itself remains active.
 
+With no explicit gateway URL, `DATUM_GATEWAY_AUTODISCOVER=1` enables checks of
+the standard Umbrel address and loopback API ports 7152 and 21000. Each candidate
+tries the widget and then Stratum; candidates run concurrently under a 6-second
+total deadline. If none responds, the status is `unreachable`, rather than
+`unknown` (which means no check is configured or no result is available).
+
 ---
 
 ### `low_hashrate_threshold_ths`
