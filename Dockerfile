@@ -34,7 +34,7 @@ COPY backend/ ./backend/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Keep the seed separate from the writable config volume.
-COPY config.json.example /app/config.json.default
+COPY --chmod=644 config.json.example /app/config.json.default
 COPY --chmod=755 docker_entrypoint.sh /usr/local/bin/docker_entrypoint.sh
 
 # Create non-root runtime user and writable app directories
