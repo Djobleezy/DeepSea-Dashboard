@@ -97,7 +97,7 @@ jobs:
           tags: deepsea-dashboard:test
           load: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
       - name: Verify container starts
         run: |
           docker run -d --name test-app -p 8000:8000 deepsea-dashboard:test
