@@ -75,10 +75,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }, [menuOpen, closeMenu]);
 
   const links = NAV_LINKS.map((link) => (
-    <NavLink key={link.to} to={link.to} className={({ isActive }) => `app-nav-link${isActive ? ' active' : ''}`}>
+    <NavLink key={link.to} to={link.to} aria-label={link.to === '/notifications' && unreadCount > 0 ? `${link.label}, ${unreadCount} unread` : undefined} className={({ isActive }) => `app-nav-link${isActive ? ' active' : ''}`}>
       <span aria-hidden="true">{link.icon}</span> {link.label}
       {link.to === '/notifications' && unreadCount > 0 && (
-        <span className="unread-badge" aria-label={`${unreadCount} unread alerts`}>
+        <span className="unread-badge" aria-hidden="true">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
@@ -112,7 +112,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         <NavLink to="/dashboard" className="app-brand" aria-label="DeepSea dashboard">⚓ DEEPSEA</NavLink>
         <nav className="nav-desktop" aria-label="Main navigation">{links}</nav>
         <div className="header-controls">
-          <span className="connection-dot nav-desktop" title={sseConnected ? 'Live connection' : 'Reconnecting'} aria-label={sseConnected ? 'Live connection' : 'Reconnecting'}
+          <span className="connection-dot nav-desktop" role="img" title={sseConnected ? 'Live connection' : 'Reconnecting'} aria-label={sseConnected ? 'Live connection' : 'Reconnecting'}
             style={{ background: sseConnected ? 'var(--color-success)' : 'var(--color-warning)' }} />
           <span className="nav-desktop"><AudioPlayer /></span>
           <ThemeToggle />
