@@ -41,6 +41,7 @@ COPY --chmod=755 config_init.sh /usr/local/bin/config_init.sh
 # Create non-root runtime user and writable app directories
 RUN addgroup --system app && adduser --system --ingroup app app \
     && mkdir -p /data /config \
+    && chmod -R a+rX /app/backend /app/frontend \
     && chown -R app:app /app /data /config
 
 USER app
