@@ -120,7 +120,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </header>
       <main id="main-content" className="app-main" tabIndex={-1}>{children}</main>
       <footer className="app-footer">
-        <span>DeepSea Dashboard v2.0.4</span>
+        <span>DeepSea Dashboard v2.1.0</span>
         <a href="https://x.com/DJObleezy" target="_blank" rel="noopener noreferrer">Made by @DJO₿LEEZY</a>
         <span className="connection-label">{sseConnected ? '● Live connection' : '○ Reconnecting'}</span>
       </footer>
