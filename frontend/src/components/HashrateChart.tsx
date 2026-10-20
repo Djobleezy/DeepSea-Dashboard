@@ -48,7 +48,7 @@ function autoScale(ths: number): { divisor: number; unit: string } {
   if (ths >= 1_000) return { divisor: 1_000, unit: 'PH/s' };
   if (ths >= 1) return { divisor: 1, unit: 'TH/s' };
   if (ths >= 0.001) return { divisor: 0.001, unit: 'GH/s' };
-  return { divisor: 1, unit: 'TH/s' };
+  return { divisor: 0.000001, unit: 'MH/s' };
 }
 
 const BLOCK_COLOR = '#f7931a'; // Bitcoin orange
@@ -169,7 +169,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     const rawValues60s = data60s.map((d) => d.value);
     const rawValues3hr = data3hr.map((d) => d.value);
 
-    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
+    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0);
     const { divisor, unit: displayUnit } = autoScale(peakThs);
     const values60s = rawValues60s.map((v) => v / divisor);
     const values3hr = rawValues3hr.map((v) => v / divisor);
@@ -294,7 +294,7 @@ export const HashrateChart: React.FC<Props> = ({ data60s, data3hr, avg24hr, bloc
     const rawValues60s = data60s.map((d) => d.value);
     const rawValues3hr = data3hr.map((d) => d.value);
 
-    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0.001);
+    const peakThs = Math.max(...rawValues60s, ...rawValues3hr, avg24hr ?? 0, 0);
     const { divisor, unit: displayUnit } = autoScale(peakThs);
     const values60s = rawValues60s.map((v) => v / divisor);
     const values3hr = rawValues3hr.map((v) => v / divisor);

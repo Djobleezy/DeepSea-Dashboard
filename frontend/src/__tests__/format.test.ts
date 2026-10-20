@@ -18,6 +18,16 @@ describe('fmtHashrate', () => {
     expect(fmtHashrate(0)).toBe('0.00 MH/s');
   });
 
+  it.each([
+    [999, 'MH/s', '999.00 MH/s'],
+    [1_000_000_000_000, 'H/s', '1.00 TH/s'],
+    [1_000_000_000, 'KH/s', '1.00 TH/s'],
+    [0.000999, 'TH/s', '999.00 MH/s'],
+    [1_000_000, 'TH/s', '1.00 EH/s'],
+  ])('normalizes %s %s consistently', (value, unit, expected) => {
+    expect(fmtHashrate(value, unit)).toBe(expected);
+  });
+
   it('scales down to GH/s for small values', () => {
     expect(fmtHashrate(0.5, 'TH/s')).toBe('500.00 GH/s');
   });

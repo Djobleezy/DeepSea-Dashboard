@@ -93,13 +93,15 @@ export function autoScaleHashrate(
   return { display: `${(normalized * 1_000_000).toFixed(2)}`, value: normalized * 1_000_000, unit: 'MH/s' };
 }
 
-function normalizeToTHs(value: number, unit: string): number {
+export function normalizeToTHs(value: number, unit: string): number {
   const u = unit.toLowerCase().replace(/\s/g, '');
   if (u.startsWith('eh')) return value * 1_000_000;
   if (u.startsWith('ph')) return value * 1_000;
   if (u.startsWith('th')) return value;
   if (u.startsWith('gh')) return value / 1_000;
   if (u.startsWith('mh')) return value / 1_000_000;
+  if (u.startsWith('kh')) return value / 1_000_000_000;
+  if (u === 'h/s' || u === 'h') return value / 1_000_000_000_000;
   return value; // assume TH/s
 }
 
